@@ -1,0 +1,691 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useStore } from '@/lib/store';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Search, Plus, Minus, ShoppingCart, Loader2, Trash2, ChevronRight, Check, Gift, Percent, FileText, StickyNote } from 'lucide-react';
+import { toast } from 'sonner';
+import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+
+export function OrderRegistrationDialog({
+  open,
+  onOpenChange
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { profile, user } = useStore();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  
+  // Data
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  
+  // Order State
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [invoiceType, setInvoiceType] = useState('cash'); // 'cash', 'pending_cash', 'credit'
+  
+  // Custom Flow State
+  const [step, setStep] = useState<1 | 2>(1); // 1: Selection, 2: Review
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [skipReview, setSkipReview] = useState(false);
+
+  // Cart State: array of items
+  const [cart, setCart] = useState<any[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  
+  // Customer History
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  
+  // Stages
+  const [orderStages, setOrderStages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!open || !profile?.companyId) return;
+
+    setLoading(true);
+    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+
+    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubStages = onSnapshot(qStages, (snap) => {
+        const sortedStages = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index);
+        setOrderStages(sortedStages);
+    });
+    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
+      if (docSnap.exists()) setCompanyDetails(docSnap.data());
+    });
+
+    setLoading(false);
+
+    return () => { unsubC(); unsubP(); unsubB(); unsubStages(); unsubComp(); };
+  }, [open, profile?.companyId]);
+
+  useEffect(() => {
+    if (!selectedCustomerId || !profile?.companyId) {
+      setCustomerOrders([]);
+      return;
+    }
+    const qOrders = query(
+      collection(db, 'orders'),
+      where('companyId', '==', profile.companyId),
+      where('customerId', '==', selectedCustomerId),
+      where('isDeleted', '==', false)
+    );
+    const unsub = onSnapshot(qOrders, (snap) => {
+      const ordersInfo = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      ordersInfo.sort((a, b) => {
+        const da = a.createdAt?.toMillis?.() || 0;
+        const dbTime = b.createdAt?.toMillis?.() || 0;
+        return dbTime - da;
+      });
+      setCustomerOrders(ordersInfo);
+    });
+    return () => unsub();
+  }, [selectedCustomerId, profile?.companyId]);
+
+  const addToCart = (product: any, isOfferEntry = false) => {
+    if (product.inStock === false && !isOfferEntry) {
+      toast.error(`نفدت الكمية للصنف ${product.name}`);
+      return;
+    }
+
+    // Check restrictions
+    if (product.invoiceTypeRestriction) {
+      if (product.invoiceTypeRestriction === 'cash_only' && invoiceType !== 'cash') {
+        toast.error(`الصنف ${product.name} يباع نقداً فقط.`);
+        return;
+      }
+      if (product.invoiceTypeRestriction === 'cash_or_pending' && invoiceType === 'credit') {
+        toast.error(`الصنف ${product.name} لا يباع بالأجل.`);
+        return;
+      }
+    }
+
+    let finalCurrency = companyDetails?.primaryCurrency || 'SAR';
+    if (product.currencyRestrictionType === 'specific' && product.specificCurrencies?.length) {
+      finalCurrency = product.specificCurrencies[0];
+    } else if (product.currencyRestrictionType === 'primary_only') {
+      finalCurrency = product.currency || companyDetails?.primaryCurrency || 'SAR';
+    } else if (product.currencyRestrictionType === 'any') {
+      finalCurrency = companyDetails?.primaryCurrency || 'SAR'; // Defaults to primary if flexible
+    } else if (product.currency) {
+      finalCurrency = product.currency;
+    }
+
+    const pIdToStore = isOfferEntry ? `${product.id}_offer` : product.id;
+    const pNameToStore = isOfferEntry ? `${product.name} (عرض خاص)` : product.name;
+    const priceToStore = isOfferEntry ? product.specialOffer.price : product.price;
+
+    const existingItemIndex = cart.findIndex(item => item.productId === pIdToStore && item.currency === finalCurrency);
+    if (existingItemIndex >= 0) {
+      const newCart = [...cart];
+      newCart[existingItemIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      setCart([...cart, { 
+        productId: pIdToStore, 
+        productName: pNameToStore, 
+        price: priceToStore, 
+        currency: finalCurrency,
+        quantity: 1,
+        isOfferEntry,
+        productObj: product 
+      }]);
+    }
+  };
+
+  const updateQuantity = (index: number, delta: number) => {
+    const newCart = [...cart];
+    const newQty = newCart[index].quantity + delta;
+    if (newQty <= 0) {
+      newCart.splice(index, 1);
+    } else {
+      newCart[index].quantity = newQty;
+    }
+    setCart(newCart);
+  };
+
+  const categories = ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
+
+  const updateItemCurrency = (index: number, newCurrency: string) => {
+    const newCart = [...cart];
+    newCart[index].currency = newCurrency;
+    setCart(newCart);
+  };
+
+  const updateItemNote = (index: number, note: string) => {
+    const newCart = [...cart];
+    newCart[index].note = note;
+    setCart(newCart);
+  };
+
+  const getProductQty = (pId: string) => cart.filter(i => i.productId === pId).reduce((s, i) => s + i.quantity, 0);
+
+  const handleDecrementProduct = (productId: string) => {
+    const index = cart.map(i => i.productId).lastIndexOf(productId);
+    if (index >= 0) {
+      updateQuantity(index, -1);
+    }
+  };
+
+  const calculateBonus = (item: any) => {
+    const p = item.productObj;
+    if (!p.bonusType || p.bonusType === 'none') return 0;
+    
+    if (p.bonusType === 'fixed') {
+      const pct = p.bonusFixedPercent || 0;
+      return Math.floor(item.quantity * (pct / 100));
+    }
+    
+    if (p.bonusType === 'tiered' && p.bonusTiers) {
+      // Find matching tier
+      const tier = p.bonusTiers.find((t: any) => {
+         const mInvoice = !t.invoiceType || t.invoiceType === 'all' || t.invoiceType === invoiceType;
+         const mQty = item.quantity >= t.minQty && (!t.maxQty || item.quantity <= t.maxQty);
+         return mInvoice && mQty;
+      });
+      if (tier) {
+        return Math.floor(item.quantity * (tier.percent / 100));
+      }
+    }
+    
+    return 0;
+  };
+
+  const calculateItemTotal = (item: any) => {
+    return item.quantity * item.price;
+  };
+
+  const totalsByCurrency = cart.reduce((acc, item) => {
+    const curr = item.currency || companyDetails?.primaryCurrency || 'SAR';
+    if (!acc[curr]) acc[curr] = 0;
+    acc[curr] += calculateItemTotal(item);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const handleSubmit = async () => {
+    if (!selectedCustomerId || cart.length === 0 || !profile?.companyId || !user) {
+      toast.error('الرجاء إكمال كافة البيانات');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      
+      // Group items by brand (for the UI mostly, but we can save group tags)
+      // The requirement says: split orders by brand. We can save them as multiple orders!
+      // Or save as one order with multiple sub-invoices. Let's do multiple orders if they have different brands.
+      
+      const itemsByBrand: Record<string, any[]> = {};
+      cart.forEach(item => {
+        const bId = item.productObj.brandId || 'general';
+        if (!itemsByBrand[bId]) itemsByBrand[bId] = [];
+        itemsByBrand[bId].push(item);
+      });
+
+      for (const brandId of Object.keys(itemsByBrand)) {
+        const orderId = `ord_${Math.random().toString(36).substring(2, 11)}`;
+        const brandItems = itemsByBrand[brandId];
+        
+        const brandTotalsByCurrency = brandItems.reduce((acc, item) => {
+          const curr = item.currency || companyDetails?.primaryCurrency || 'SAR';
+          if (!acc[curr]) acc[curr] = 0;
+          acc[curr] += calculateItemTotal(item);
+          return acc;
+        }, {} as Record<string, number>);
+        
+        const defaultInitialStatus = orderStages.length > 0 ? orderStages[0].name : 'pending';
+        
+        await setDoc(doc(db, 'orders', orderId), {
+          companyId: profile.companyId,
+          customerId: customer.id,
+          customerName: customer.name,
+          customerPhone: customer.phone || '',
+          customerAddress: customer.address || 'غير محدد',
+          invoiceType, // 'cash', 'pending_cash', 'credit'
+          brandId: brandId === 'general' ? null : brandId,
+          items: brandItems.map(i => ({
+            productId: i.productId,
+            productName: i.productName,
+            quantity: i.quantity,
+            note: i.note || '',
+            bonusQuantity: calculateBonus(i),
+            price: i.price,
+            currency: i.currency,
+            total: calculateItemTotal(i)
+          })),
+          discount: { type: discountType, value: discountValue },
+          skipReviewPhase: skipReview,
+          totalAmountByCurrency: brandTotalsByCurrency,
+          status: skipReview ? (orderStages.length > 2 ? orderStages[2].name : (orderStages.length > 1 ? orderStages[1].name : 'approved')) : defaultInitialStatus,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user.uid,
+          createdByName: profile.displayName || user.displayName || 'غير محدد',
+          updatedBy: user.uid,
+          isDeleted: false
+        });
+      }
+
+      toast.success('تم تسجيل الطلب بنجاح');
+      onOpenChange(false);
+      setCart([]);
+      setSelectedCustomerId('');
+      setStep(1);
+      setDiscountValue(0);
+      setSkipReview(false);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.CREATE, 'orders');
+      toast.error('فشل تسجيل الطلب');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const expandedFilteredProducts = products.flatMap(p => {
+    const matchesSearch = p.name?.toLowerCase().includes(productSearch.toLowerCase());
+    const matchesCategory = activeCategory === 'all' || p.category === activeCategory;
+    if (!matchesSearch || !matchesCategory) return [];
+    
+    const entries = [];
+    
+    // Add regular product entry
+    entries.push({ ...p, isOfferEntry: false, displayId: p.id });
+
+    // Add special offer entry if active
+    if (p.specialOffer?.isActive) {
+      entries.push({ ...p, isOfferEntry: true, displayId: `${p.id}_offer` });
+    }
+    
+    return entries;
+  });
+
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
+  const primaryTotal = totalsByCurrency[companyDetails?.primaryCurrency || 'SAR'] || 0;
+  
+  // Cutomer Stats
+  const primaryCurr = companyDetails?.primaryCurrency || 'SAR';
+  const orderCount = customerOrders.length;
+  const totalPrimaryValue = customerOrders.reduce((sum, o) => sum + (o.totalAmountByCurrency?.[primaryCurr] || 0), 0);
+  const avgOrderValue = orderCount > 0 ? Math.round(totalPrimaryValue / orderCount) : 0;
+  
+  const lastOrder = customerOrders[0];
+  let daysAgo = '';
+  if (lastOrder && lastOrder.createdAt) {
+     const then = lastOrder.createdAt.toDate();
+     const diff = Math.floor((new Date().getTime() - then.getTime()) / (1000 * 3600 * 24));
+     daysAgo = diff === 0 ? 'اليوم' : `قبل ${diff} أيام`;
+  }
+  const lastOrderItemCount = lastOrder?.items?.reduce((s:number, i:any) => s + (i.quantity || 1), 0) || 0;
+  const lastOrderTotal = lastOrder?.totalAmountByCurrency?.[primaryCurr] || 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px] h-[90vh] md:h-[800px] flex flex-col p-0 overflow-hidden bg-gray-50 border-gray-200" dir="rtl">
+        {step === 1 ? (
+          // STEP 1: SELECTION
+          <>
+            <DialogHeader className="p-4 border-b bg-white flex-shrink-0 relative">
+              <DialogTitle className="text-xl font-bold flex items-center justify-center text-gray-900 leading-none m-0">
+                طلب جديد
+              </DialogTitle>
+            </DialogHeader>
+
+            {loading ? (
+              <div className="flex-1 flex justify-center items-center"><Loader2 className="animate-spin w-8 h-8 text-blue-600" /></div>
+            ) : (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Customer Section */}
+                <div className="p-4 bg-white border-b flex-shrink-0">
+                  <Label className="text-gray-900 font-bold mb-2 block">العميل</Label>
+                  {!selectedCustomerId ? (
+                     <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                       <SelectTrigger className="w-full text-right h-12 bg-white">
+                         <SelectValue placeholder="بحث بالاسم أو رقم الهاتف..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                       </SelectContent>
+                     </Select>
+                  ) : (
+                    <div className="border border-blue-200 bg-white rounded-xl p-4 relative shadow-sm">
+                       <button onClick={() => setSelectedCustomerId('')} className="absolute left-4 top-4 p-2 hover:bg-gray-100 rounded-full text-blue-600 transition-colors">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+                       </button>
+                       <div className="flex items-center gap-3 mb-4">
+                         <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-lg">
+                           {selectedCustomer?.name?.charAt(0) || 'ع'}
+                         </div>
+                         <div>
+                           <h3 className="font-bold text-gray-900">{selectedCustomer?.name}</h3>
+                           <p className="text-sm text-gray-500">{selectedCustomer?.phone} • {selectedCustomer?.address || 'بدون عنوان'}</p>
+                           <p className="text-xs text-gray-400 mt-1">{orderCount} طلب • متوسط {avgOrderValue.toLocaleString()} {primaryCurr}</p>
+                         </div>
+                       </div>
+                       
+                       {lastOrder && (
+                         <div className="border-t border-gray-100 pt-3 flex justify-between items-end">
+                            <div>
+                              <p className="text-xs text-gray-500">آخر الطلبات</p>
+                              <p className="text-sm font-bold text-gray-700 mt-1">{daysAgo}</p>
+                            </div>
+                            <p className="text-sm text-gray-600">{lastOrderItemCount} صنف</p>
+                            <p className="text-sm font-bold text-gray-900">{lastOrderTotal.toLocaleString()} {primaryCurr}</p>
+                         </div>
+                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Categories */}
+                {selectedCustomerId && (
+                  <div className="bg-white flex-shrink-0">
+                     <div className="p-4 pb-2">
+                       <h3 className="font-bold text-gray-900 mb-3">الأصناف</h3>
+                       <div className="relative">
+                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                         <Input 
+                           placeholder="بحث في الأصناف..." 
+                           className="pl-4 pr-10 h-12 bg-gray-50 border-gray-200 rounded-xl focus-visible:ring-blue-500"
+                           value={productSearch}
+                           onChange={(e) => setProductSearch(e.target.value)}
+                         />
+                       </div>
+                     </div>
+                     <div className="flex overflow-x-auto hide-scrollbar px-4 pb-3 pt-1 gap-2">
+                       {categories.map(cat => (
+                         <button 
+                           key={cat}
+                           onClick={() => setActiveCategory(cat)}
+                           className={cn(
+                             "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors border", 
+                             activeCategory === cat ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                           )}
+                         >
+                           {cat === 'all' ? 'الكل' : cat}
+                         </button>
+                       ))}
+                     </div>
+                  </div>
+                )}
+
+                {/* Products List */}
+                <div className="flex-1 overflow-y-auto px-4 py-2 relative">
+                   {selectedCustomerId ? (
+                     <div className="space-y-3 pb-24">
+                       {expandedFilteredProducts.map(product => {
+                         const qty = getProductQty(product.displayId);
+                         return (
+                           <div key={product.displayId} className={`bg-white border ${product.isOfferEntry ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-xl p-4 flex justify-between items-center shadow-sm ${product.inStock === false && !product.isOfferEntry ? 'opacity-70' : ''}`}>
+                             <div>
+                               <div className="flex items-center gap-2 mb-1">
+                                 <h4 className="font-bold text-gray-900 leading-tight">{product.name}</h4>
+                                 {product.isOfferEntry && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">عرض خاص</span>}
+                               </div>
+                               <p className={`text-sm font-bold ${product.isOfferEntry ? 'text-red-600' : 'text-blue-600'}`}>
+                                 {product.isOfferEntry ? product.specialOffer.price : product.price} <span className="text-xs font-normal text-gray-500">{product.currency} / {product.unit || 'حبة'}</span>
+                               </p>
+                               {product.isOfferEntry && product.specialOffer.targetExpiryDate && product.specialOffer.targetExpiryDate !== 'any' && (
+                                  <p className="text-xs text-gray-400 mt-0.5 block">صلاحية: <span dir="ltr">{product.specialOffer.targetExpiryDate}</span></p>
+                               )}
+                             </div>
+                             
+                             <div className="flex items-center gap-2 border rounded-lg overflow-hidden bg-gray-50 h-10 shadow-sm border-gray-200">
+                               <button onClick={() => addToCart(product, product.isOfferEntry)} className={`w-10 h-full hover:bg-blue-50 flex items-center justify-center transition-colors ${product.isOfferEntry ? 'text-red-600' : 'text-blue-600'}`}>
+                                 <Plus className="w-4 h-4" />
+                               </button>
+                               <span className="text-sm font-bold w-6 text-center select-none">{qty}</span>
+                               <button onClick={() => handleDecrementProduct(product.displayId)} disabled={qty === 0} className={cn("w-10 h-full flex items-center justify-center transition-colors", qty > 0 ? "hover:bg-red-50 text-red-500" : "text-gray-300 pointer-events-none")}>
+                                 <Minus className="w-4 h-4" />
+                               </button>
+                             </div>
+                           </div>
+                         )
+                       })}
+                       {expandedFilteredProducts.length === 0 && (
+                         <div className="text-center py-12 text-gray-400">لا يوجد أصناف متطابقة</div>
+                       )}
+                     </div>
+                   ) : (
+                     <div className="text-center py-12 text-gray-400 text-sm">الرجاء اختيار العميل أولاً لعرض الأصناف</div>
+                   )}
+                </div>
+
+                {/* Bottom Action Bar */}
+                {cart.length > 0 && selectedCustomerId && (
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] flex items-center justify-between z-10">
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold mb-0.5">{totalCartItems} صنف</p>
+                      <p className="font-bold text-lg text-gray-900 leading-none">{primaryTotal.toLocaleString()} {companyDetails?.primaryCurrency || 'SAR'}</p>
+                    </div>
+                    <Button onClick={() => setStep(2)} className="h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2">
+                       مراجعة الطلب <ChevronRight className="w-5 h-5 rotate-180" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          // STEP 2: REVIEW
+          <>
+            <DialogHeader className="p-4 border-b bg-white flex-shrink-0 relative">
+              <button onClick={() => setStep(1)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors">
+                <ChevronRight className="w-6 h-6" />
+              </button>
+              <DialogTitle className="text-xl font-bold flex items-center justify-center text-gray-900 leading-none m-0">
+                مراجعة الطلب
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto p-4 pb-32">
+               <div className="space-y-6">
+                 
+                 {/* Customer Summary */}
+                 <div>
+                   <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><span className="w-2 h-2 rounded-full bg-blue-600"></span> العميل</h3>
+                   <div className="border border-gray-200 bg-white rounded-xl p-4 shadow-sm">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-lg">
+                          {selectedCustomer?.name?.charAt(0) || 'ع'}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900">{selectedCustomer?.name}</h3>
+                          <p className="text-sm text-gray-500">{selectedCustomer?.phone} • {selectedCustomer?.address}</p>
+                          <p className="text-xs text-gray-400 mt-1">{orderCount} طلب • متوسط {avgOrderValue.toLocaleString()} {primaryCurr}</p>
+                        </div>
+                      </div>
+                      {lastOrder && (
+                         <div className="border-t border-gray-100 pt-3 flex justify-between items-end">
+                            <div>
+                              <p className="text-xs text-gray-500">آخر الطلبات</p>
+                              <p className="text-sm font-bold text-gray-700 mt-1">{daysAgo}</p>
+                            </div>
+                            <p className="text-sm text-gray-600">{lastOrderItemCount} صنف</p>
+                            <p className="text-sm font-bold text-gray-900">{lastOrderTotal.toLocaleString()} {primaryCurr}</p>
+                         </div>
+                       )}
+                   </div>
+                 </div>
+
+                 {/* Cart Items */}
+                 <div>
+                    <div className="flex justify-between items-end mb-3">
+                      <h3 className="text-blue-600 font-bold flex items-center gap-2 text-sm"><ShoppingCart className="w-4 h-4" /> الأصناف ({totalCartItems})</h3>
+                      <button onClick={() => setStep(1)} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full flex items-center gap-1"><Plus className="w-3 h-3"/> تعديل</button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {cart.map((item, idx) => {
+                        const computedBonus = calculateBonus(item);
+                        return (
+                          <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative">
+                             <div className="flex justify-between items-start mb-3">
+                               <div>
+                                 <h4 className="font-bold text-gray-900 leading-tight">{item.productName}</h4>
+                                 <p className="text-xs text-gray-500 mt-1">{item.price} {item.currency} / {item.productObj?.unit || 'حبة'}</p>
+                               </div>
+                               <p className="font-bold text-blue-600">{calculateItemTotal(item).toLocaleString()} {item.currency}</p>
+                             </div>
+
+                             <div className="flex items-center gap-3">
+                               <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 h-9">
+                                 <button onClick={() => updateQuantity(idx, 1)} className="w-9 h-full hover:bg-blue-50 text-blue-600 flex items-center justify-center"><Plus className="w-4 h-4" /></button>
+                                 <span className="text-sm font-bold w-6 text-center select-none bg-blue-600 text-white leading-9">{item.quantity}</span>
+                                 <button onClick={() => updateQuantity(idx, -1)} disabled={item.quantity <= 1} className={cn("w-9 h-full flex items-center justify-center", item.quantity > 1 ? "hover:bg-red-50 text-red-500" : "text-gray-300 pointer-events-none")}><Minus className="w-4 h-4" /></button>
+                               </div>
+                               <button onClick={() => { const nc = [...cart]; nc.splice(idx,1); setCart(nc); if(nc.length===0) setStep(1); }} className="p-2 hover:bg-red-50 text-red-400 rounded-lg border border-transparent hover:border-red-100 transition-colors">
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                             </div>
+
+                             {computedBonus > 0 && (
+                               <div className="mt-3 flex items-center gap-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1.5 rounded">
+                                 <Gift className="w-3.5 h-3.5" />
+                                 بونص: {computedBonus} مجاناً
+                               </div>
+                             )}
+
+                             <div className="mt-3">
+                               <Input 
+                                 placeholder="ملاحظة على الصنف..." 
+                                 className="h-9 bg-gray-50 border-gray-200 text-xs shadow-none"
+                                 value={item.note || ''}
+                                 onChange={(e) => updateItemNote(idx, e.target.value)}
+                               />
+                             </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                 </div>
+
+                 {/* Discount (Percentage only to simplify multi-curr math for now) */}
+                 <div>
+                   <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><Percent className="w-4 h-4" /> الخصم العام (%)</h3>
+                   <div className="bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col p-3 gap-2">
+                       <Input 
+                         type="number" 
+                         min="0" 
+                         max="100"
+                         placeholder="أدخل نسبة الخصم %..." 
+                         className="h-12 border-gray-200 font-bold text-lg"
+                         value={discountValue || ''}
+                         onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                       />
+                       <p className="text-xs text-gray-500">سيتم تطبيق هذه النسبة كخصم على الإجمالي عند إصدار الفاتورة النهائية.</p>
+                   </div>
+                 </div>
+
+                 {/* Invoice Type */}
+                 <div>
+                   <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><FileText className="w-4 h-4" /> نوع الفاتورة</h3>
+                   <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'cash', label: 'نقدي' },
+                        { id: 'credit', label: 'آجل' },
+                        { id: 'pending_cash', label: 'نقدي معلق' },
+                        { id: 'other', label: 'آخر' }
+                      ].map(type => (
+                        <button 
+                          key={type.id}
+                          onClick={() => setInvoiceType(type.id)}
+                          className={cn(
+                            "flex-1 min-w-20 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border",
+                            invoiceType === type.id ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          )}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                   </div>
+                 </div>
+
+                 {/* Options */}
+                 <div>
+                   <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> خيارات المراحل</h3>
+                   <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                      <div>
+                        <h4 className="font-bold text-gray-900">تجاوز {orderStages[1]?.name || 'المرحلة التالية'}</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">القفز مباشرة إلى حالة &apos;{orderStages.length > 2 ? orderStages[2].name : (orderStages[1]?.name || 'النهاية')}&apos;</p>
+                      </div>
+                      <button 
+                        onClick={() => setSkipReview(!skipReview)}
+                        className={cn("w-12 h-6 rounded-full transition-colors relative", skipReview ? "bg-blue-600" : "bg-gray-200")}
+                      >
+                        <span className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all", skipReview ? "left-1" : "right-1")}></span>
+                      </button>
+                   </div>
+                 </div>
+
+                 {/* Order Summary */}
+                 <div>
+                   <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><StickyNote className="w-4 h-4" /> ملخص الطلب</h3>
+                   <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>عدد الأصناف</span>
+                        <span className="font-bold">{totalCartItems} وحدة</span>
+                      </div>
+                      {cart.filter(i => calculateBonus(i) > 0).length > 0 && (
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>إجمالي البونص المضاف</span>
+                          <span className="font-bold text-green-600">{cart.reduce((s,i) => s + calculateBonus(i), 0)} وحدة</span>
+                        </div>
+                      )}
+                      
+                      <div className="border-t border-dashed pt-3 mt-1 space-y-2">
+                        {Object.entries(totalsByCurrency).map(([curr, total]) => (
+                           <div key={curr} className="flex justify-between items-center">
+                             <span className="text-sm font-bold text-gray-900">الإجمالي ({curr})</span>
+                             <div className="text-left">
+                                {discountValue > 0 && (
+                                  <span className="text-xs text-red-500 line-through block ml-auto">{total.toLocaleString()}</span>
+                                )}
+                                <span className={cn("font-bold text-xl", curr === companyDetails?.primaryCurrency ? "text-blue-700" : "text-gray-700")}>
+                                  {discountValue > 0 ? (total * (1 - discountValue / 100)).toLocaleString() : total.toLocaleString()} {curr}
+                                </span>
+                             </div>
+                           </div>
+                        ))}
+                      </div>
+                   </div>
+                 </div>
+
+               </div>
+            </div>
+
+            {/* Bottom Final Action Bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 flex gap-3 z-10 shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
+              <Button onClick={() => setStep(1)} variant="outline" className="flex-1 h-14 rounded-xl font-bold text-blue-600 border-blue-200 hover:bg-blue-50">
+                تعديل
+              </Button>
+              <Button onClick={handleSubmit} disabled={saving} className="flex-[2] h-14 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-lg gap-2 shadow-sm">
+                {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Check className="w-6 h-6" /> تأكيد الطلب</>}
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

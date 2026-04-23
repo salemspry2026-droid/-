@@ -1,0 +1,261 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "A business entity that uses the platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the company" },
+        "ownerId": { "type": "string", "description": "UID of the user who owns the company" },
+        "joinCode": { "type": "string", "description": "Unique code for employees to join" },
+        "logoUrl": { "type": "string", "description": "URL of the company logo" },
+        "phone": { "type": "string", "description": "Main phone number" },
+        "address": { "type": "string", "description": "Address" },
+        "taxId": { "type": "string", "description": "Tax ID" },
+        "contactNumbers": { 
+          "type": "array", 
+          "items": { 
+             "type": "object",
+             "properties": {
+               "name": { "type": "string" },
+               "countryCode": { "type": "string" },
+               "number": { "type": "string" }
+             }
+          }, 
+          "description": "Additional contact numbers with specific structure" 
+        },
+        "aboutUs": { "type": "string", "description": "About Us" },
+        "email": { "type": "string", "description": "Email" },
+        "notes": { "type": "string", "description": "Notes" },
+        "workingHours": { "type": "string", "description": "Working Hours" },
+        "companyType": { "type": "string", "description": "Company Type" },
+        "companyTypeOther": { "type": "string", "description": "Other Company Type" },
+        "primaryCurrency": { "type": "string", "description": "Primary currency code" },
+        "secondaryCurrencies": { "type": "array", "items": { "type": "string" }, "description": "List of secondary currency codes" },
+        "exchangeRates": { "type": "object", "description": "Map of secondary currency code to its exchange rate to primary currency" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "updatedBy": { "type": "string", "description": "UID of last updater" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete flag" }
+      },
+      "required": ["name", "ownerId", "joinCode", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profile information for a user.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User's full name" },
+        "companyId": { "type": "string", "description": "ID of the company the user belongs to" },
+        "role": { "type": "string", "enum": ["owner", "admin", "sales", "client"], "description": "User's role within the company" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "updatedBy": { "type": "string", "description": "UID of last updater" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete flag" }
+      },
+      "required": ["email", "displayName", "companyId", "role", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A product or service offered by a company.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string", "description": "ID of the company that owns the product" },
+        "name": { "type": "string", "description": "Product name" },
+        "description": { "type": "string", "description": "Product description" },
+        "price": { "type": "number", "description": "Product price" },
+        "currency": { "type": "string", "description": "Currency code (e.g., USD, EUR)" },
+        "category": { "type": "string", "description": "Product category" },
+        "brand": { "type": "string", "description": "Product brand" },
+        "isActive": { "type": "boolean", "description": "Whether the product is currently active" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "updatedBy": { "type": "string", "description": "UID of last updater" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete flag" }
+      },
+      "required": ["companyId", "name", "price", "currency", "isActive", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer profile managed by a company.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string", "description": "ID of the company managing the customer" },
+        "name": { "type": "string", "description": "Customer name" },
+        "email": { "type": "string", "format": "email", "description": "Customer email" },
+        "phone": { "type": "string", "description": "Customer phone number" },
+        "address": { "type": "string", "description": "Customer address" },
+        "notes": { "type": "string", "description": "Internal notes about the customer" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "updatedBy": { "type": "string", "description": "UID of last updater" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete flag" }
+      },
+      "required": ["companyId", "name", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A sales order placed by or for a customer.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string", "description": "ID of the company processing the order" },
+        "customerId": { "type": "string", "description": "ID of the customer" },
+        "customerName": { "type": "string", "description": "Name of the customer" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "productName": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" },
+              "currency": { "type": "string" }
+            }
+          }
+        },
+        "totalAmountByCurrency": {
+          "type": "object",
+          "description": "Map of currency codes to total amounts"
+        },
+        "status": { "type": "string", "description": "Order status" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "updatedBy": { "type": "string", "description": "UID of last updater" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete flag" }
+      },
+      "required": ["companyId", "customerId", "customerName", "items", "totalAmountByCurrency", "status", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "App notification",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "orderId": { "type": "string" },
+        "readBy": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["companyId", "title", "message", "type", "orderId", "readBy", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "ProductCategory": {
+      "title": "ProductCategory",
+      "description": "A category for products.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["companyId", "name", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "ProductBrand": {
+      "title": "ProductBrand",
+      "description": "A brand for products.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["companyId", "name", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "A geographical location in the hierarchy (Country -> Governorate -> Region -> Neighborhood).",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "type": { "type": "string", "enum": ["country", "governorate", "region", "neighborhood"] },
+        "name": { "type": "string" },
+        "parentId": { "type": "string", "description": "ID of the parent location, null if country" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["companyId", "type", "name", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    },
+    "OrderStage": {
+      "title": "OrderStage",
+      "description": "A customizable stage in the order lifecycle.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "index": { "type": "number", "description": "Order of the stage" },
+        "allowedRoles": { "type": "array", "items": { "type": "string" }, "description": "Roles allowed to transition to this stage" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" },
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["companyId", "name", "index", "allowedRoles", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+    }
+  },
+  "firestore": {
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Stores company profiles."
+    },
+    "/userProfiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles, linked to Firebase Auth UID."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Stores products for all companies."
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Stores customers for all companies."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Stores orders for all companies."
+    },
+    "/productCategories/{categoryId}": {
+      "schema": "ProductCategory",
+      "description": "Stores product categories for all companies."
+    },
+    "/productBrands/{brandId}": {
+      "schema": "ProductBrand",
+      "description": "Stores product brands for all companies."
+    },
+    "/locations/{locationId}": {
+      "schema": "Location",
+      "description": "Stores geographical locations for all companies."
+    },
+    "/orderStages/{stageId}": {
+      "schema": "OrderStage",
+      "description": "Stores order stages for all companies."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Stores notifications for all companies."
+    }
+  }
+}

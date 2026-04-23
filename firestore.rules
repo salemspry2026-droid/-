@@ -1,0 +1,340 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserProfile() {
+      let profile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid));
+      return profile != null ? profile.data : null;
+    }
+
+    function getUserCompanyId() {
+      let profile = getUserProfile();
+      return profile != null ? profile.companyId : null;
+    }
+
+    function getUserRole() {
+      let profile = getUserProfile();
+      return profile != null ? profile.role : null;
+    }
+
+    function isCompanyMember(companyId) {
+      return isAuthenticated() && getUserCompanyId() == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isCompanyMember(companyId) && (getUserRole() == 'admin' || getUserRole() == 'owner');
+    }
+
+    function isCompanyOwner(companyId) {
+      return isCompanyMember(companyId) && getUserRole() == 'owner';
+    }
+
+    function isCompanySales(companyId) {
+      return isCompanyMember(companyId) && getUserRole() == 'sales';
+    }
+
+    function isCompanyClient(companyId) {
+      return isCompanyMember(companyId) && getUserRole() == 'client';
+    }
+
+    function isSystemAdmin() {
+      return isAuthenticated() && request.auth.token.email == "salemspry2026@gmail.com" && request.auth.token.email_verified == true;
+    }
+
+    // ===============================================================
+    // Validation Helpers
+    // ===============================================================
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isUnchangedOrBackfilled(key) {
+      return !(key in resource.data) || request.resource.data[key] == resource.data[key];
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) || (request.resource.data[field] is string && request.resource.data[field].size() >= minLen && request.resource.data[field].size() <= maxLen);
+    }
+
+    function isCreatedByCurrentUser() {
+      return request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function isUpdatedByCurrentUser() {
+      return request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidContactNumberList(listData) {
+      return listData is list && listData.size() <= 20 &&
+             (listData.size() == 0 || (
+                (listData[0] is map && isValidString(listData[0].name, 0, 50) && isValidString(listData[0].countryCode, 0, 10) && isValidString(listData[0].number, 0, 20)) &&
+                (listData.size() <= 1 || (listData[1] is map && isValidString(listData[1].name, 0, 50) && isValidString(listData[1].countryCode, 0, 10) && isValidString(listData[1].number, 0, 20))) &&
+                (listData.size() <= 2 || (listData[2] is map && isValidString(listData[2].name, 0, 50) && isValidString(listData[2].countryCode, 0, 10) && isValidString(listData[2].number, 0, 20))) &&
+                (listData.size() <= 3 || (listData[3] is map && isValidString(listData[3].name, 0, 50) && isValidString(listData[3].countryCode, 0, 10) && isValidString(listData[3].number, 0, 20))) &&
+                (listData.size() <= 4 || (listData[4] is map && isValidString(listData[4].name, 0, 50) && isValidString(listData[4].countryCode, 0, 10) && isValidString(listData[4].number, 0, 20)))
+             ));
+    }
+
+    function isValidCompany(data) {
+      return hasRequiredFields(['name', 'ownerId', 'joinCode', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.name, 1, 100) &&
+             isValidString(data.ownerId, 1, 100) &&
+             isValidString(data.joinCode, 1, 50) &&
+             data.isDeleted is bool &&
+             isValidOptionalString('clientJoinCode', 1, 50) &&
+             isValidOptionalString('phone', 0, 50) &&
+             isValidOptionalString('address', 0, 500) &&
+             isValidOptionalString('taxId', 0, 50) &&
+             (!('contactNumbers' in data) || isValidContactNumberList(data.contactNumbers)) &&
+             isValidOptionalString('aboutUs', 0, 5000) &&
+             isValidOptionalString('email', 0, 100) &&
+             isValidOptionalString('logoUrl', 0, 500000) &&
+             isValidOptionalString('notes', 0, 5000) &&
+             isValidOptionalString('workingHours', 0, 500) &&
+             isValidOptionalString('companyType', 0, 100) &&
+             isValidOptionalString('companyTypeOther', 0, 100) &&
+             (!('primaryCurrency' in data) || isValidString(data.primaryCurrency, 1, 10)) &&
+             (!('secondaryCurrencies' in data) || (data.secondaryCurrencies is list && data.secondaryCurrencies.size() <= 20)) &&
+             (!('exchangeRates' in data) || data.exchangeRates is map);
+    }
+
+    function isValidUserProfile(data) {
+      return hasRequiredFields(['email', 'displayName', 'companyId', 'role', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.email, 3, 100) &&
+             isValidString(data.displayName, 1, 100) &&
+             isValidString(data.companyId, 0, 100) && // Can be empty initially
+             data.role in ['owner', 'admin', 'sales', 'client'] &&
+             data.isDeleted is bool &&
+             isValidOptionalString('jobTitle', 0, 100);
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['companyId', 'name', 'price', 'currency', 'isActive', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.name, 1, 200) &&
+             data.price is number && data.price >= 0 &&
+             isValidString(data.currency, 1, 10) &&
+             data.isActive is bool &&
+             data.isDeleted is bool;
+    }
+
+    function isValidCustomer(data) {
+      return hasRequiredFields(['companyId', 'name', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.name, 1, 200) &&
+             data.isDeleted is bool &&
+             isValidOptionalString('email', 0, 100) &&
+             isValidOptionalString('phone', 0, 50) &&
+             isValidOptionalString('address', 0, 500) &&
+             isValidOptionalString('notes', 0, 5000) &&
+             isValidOptionalString('customerType', 0, 100) &&
+             isValidOptionalString('customerTypeOther', 0, 100);
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['companyId', 'customerId', 'customerName', 'items', 'totalAmountByCurrency', 'status', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.customerId, 1, 100) &&
+             isValidString(data.customerName, 1, 200) &&
+             data.items is list && data.items.size() >= 0 && data.items.size() <= 200 &&
+             data.totalAmountByCurrency is map &&
+             isValidString(data.status, 1, 100) &&
+             data.isDeleted is bool;
+    }
+
+    function isValidNotification(data) {
+      return hasRequiredFields(['companyId', 'title', 'message', 'type', 'orderId', 'readBy', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.title, 1, 200) &&
+             isValidString(data.message, 1, 1000) &&
+             isValidString(data.type, 1, 50) &&
+             isValidString(data.orderId, 1, 100) &&
+             data.readBy is list && data.readBy.size() <= 1000 &&
+             data.isDeleted is bool;
+    }
+
+    function isValidProductCategory(data) {
+      return hasRequiredFields(['companyId', 'name', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.name, 1, 200) &&
+             data.isDeleted is bool;
+    }
+
+    function isValidProductBrand(data) {
+      return hasRequiredFields(['companyId', 'name', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.name, 1, 200) &&
+             data.isDeleted is bool;
+    }
+
+    function isValidLocation(data) {
+      return hasRequiredFields(['companyId', 'type', 'name', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             data.type in ['country', 'governorate', 'region', 'neighborhood'] &&
+             isValidString(data.name, 1, 200) &&
+             (!('parentId' in data) || data.parentId == null || isValidString(data.parentId, 1, 100)) &&
+             data.isDeleted is bool;
+    }
+
+    function isValidOrderStage(data) {
+      return hasRequiredFields(['companyId', 'name', 'index', 'allowedRoles', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.name, 1, 100) &&
+             data.index is number &&
+             data.allowedRoles is list && data.allowedRoles.size() <= 10 &&
+             data.isDeleted is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+                    isValidCompany(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser() && 
+                    request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if isAuthenticated() && 
+                    isValidCompany(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'ownerId']) &&
+                    (isCompanyOwner(companyId) || isSystemAdmin());
+    }
+
+    match /userProfiles/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        (resource != null && (
+          isCompanyAdmin(resource.data.companyId) || 
+          isCompanySales(resource.data.companyId) || 
+          isCompanyOwner(resource.data.companyId)
+        ))
+      );
+      
+      allow create: if isAuthenticated() && 
+                    request.auth.uid == userId &&
+                    isValidUserProfile(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser();
+
+      allow update: if isAuthenticated() && 
+                    isValidUserProfile(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy']) &&
+                    (
+                      (request.auth.uid == userId && areImmutableFieldsUnchanged(['role'])) || 
+                      (resource != null && isCompanyAdmin(resource.data.companyId)) || 
+                      isSystemAdmin()
+                    );
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+                    isValidProduct(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser() && 
+                    isCompanyAdmin(request.resource.data.companyId);
+
+      allow update: if isAuthenticated() && 
+                    isValidProduct(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) &&
+                    isCompanyAdmin(resource.data.companyId);
+    }
+
+    match /customers/{customerId} {
+      allow read: if isCompanyMember(resource.data.companyId);
+      
+      allow create: if isAuthenticated() && 
+                    isValidCustomer(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser() && 
+                    (isCompanyAdmin(request.resource.data.companyId) || isCompanySales(request.resource.data.companyId));
+
+      allow update: if isAuthenticated() && 
+                    isValidCustomer(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) &&
+                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId));
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+                  (isCompanyMember(resource.data.companyId) && (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId))) || 
+                  resource.data.createdBy == request.auth.uid
+      );
+      
+      allow create: if isAuthenticated() && 
+                    isValidOrder(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser() && 
+                    (isCompanyMember(request.resource.data.companyId) || getUserRole() == 'client');
+
+      allow update: if isAuthenticated() && 
+                    isValidOrder(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    isUnchangedOrBackfilled('createdAt') &&
+                    isUnchangedOrBackfilled('createdBy') &&
+                    isUnchangedOrBackfilled('companyId') &&
+                    isUnchangedOrBackfilled('customerId') &&
+                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId) || (resource.data.createdBy == request.auth.uid && areImmutableFieldsUnchanged(['status', 'totalAmountByCurrency', 'items', 'companyId'])));
+    }
+
+    match /productCategories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProductCategory(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
+      allow update: if isAuthenticated() && isValidProductCategory(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
+    }
+
+    match /productBrands/{brandId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProductBrand(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
+      allow update: if isAuthenticated() && isValidProductBrand(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
+    }
+
+    match /locations/{locationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidLocation(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
+      allow update: if isAuthenticated() && isValidLocation(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isCompanyMember(resource.data.companyId);
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && (isCompanyAdmin(request.resource.data.companyId) || isCompanySales(request.resource.data.companyId) || isCompanyClient(request.resource.data.companyId));
+      allow update: if isAuthenticated() && isValidNotification(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'title', 'message', 'type', 'orderId']) && isCompanyMember(resource.data.companyId);
+    }
+
+    match /orderStages/{stageId} {
+      allow read: if isCompanyMember(resource.data.companyId);
+      allow create: if isAuthenticated() && isValidOrderStage(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
+      allow update: if isAuthenticated() && isValidOrderStage(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
+    }
+  }
+}
