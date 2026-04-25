@@ -90,7 +90,7 @@ export function OrderRegistrationDialog({
       where('isDeleted', '==', false)
     );
     const unsub = onSnapshot(qOrders, (snap) => {
-      const ordersInfo = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ordersInfo = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
       ordersInfo.sort((a, b) => {
         const da = a.createdAt?.toMillis?.() || 0;
         const dbTime = b.createdAt?.toMillis?.() || 0;
@@ -359,7 +359,7 @@ export function OrderRegistrationDialog({
                 <div className="p-4 bg-white border-b flex-shrink-0">
                   <Label className="text-gray-900 font-bold mb-2 block">العميل</Label>
                   {!selectedCustomerId ? (
-                     <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                     <Select value={selectedCustomerId} onValueChange={(v) => setSelectedCustomerId(v || '')}>
                        <SelectTrigger className="w-full text-right h-12 bg-white">
                          <SelectValue placeholder="بحث بالاسم أو رقم الهاتف..." />
                        </SelectTrigger>
@@ -654,7 +654,7 @@ export function OrderRegistrationDialog({
                       )}
                       
                       <div className="border-t border-dashed pt-3 mt-1 space-y-2">
-                        {Object.entries(totalsByCurrency).map(([curr, total]) => (
+                        {Object.entries(totalsByCurrency as Record<string, number>).map(([curr, total]) => (
                            <div key={curr} className="flex justify-between items-center">
                              <span className="text-sm font-bold text-gray-900">الإجمالي ({curr})</span>
                              <div className="text-left">

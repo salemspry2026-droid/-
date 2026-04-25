@@ -262,11 +262,7 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {children && (
-        <DialogTrigger asChild>
-            {children}
-        </DialogTrigger>
-      )}
+      // No longer needs children handling here since we moved the trigger out
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle>{productToEdit ? 'تعديل الصنف' : 'إضافة صنف جديد (بخيارات متقدمة)'}</DialogTitle>
@@ -321,7 +317,7 @@ export function ProductFormDialog({
                 <Label>السعر الافتراضي *</Label>
                 <div className="flex gap-2">
                     <Input type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} />
-                    <Select value={currency} onValueChange={setCurrency}>
+                    <Select value={currency} onValueChange={(v) => setCurrency(v || '')}>
                         <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                         <SelectContent>{activeCurrencies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
@@ -330,7 +326,7 @@ export function ProductFormDialog({
               <div className="space-y-2">
                 <Label>العلامة التجارية</Label>
                 <div className="flex flex-col gap-2">
-                  <Select value={brandId} onValueChange={setBrandId}>
+                  <Select value={brandId} onValueChange={(v) => setBrandId(v || '')}>
                     <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">بدون علامة تجارية</SelectItem>
@@ -346,7 +342,7 @@ export function ProductFormDialog({
               <div className="space-y-2">
                 <Label>التصنيف</Label>
                 <div className="flex flex-col gap-2">
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={category} onValueChange={(v) => setCategory(v || '')}>
                     <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
                     <SelectContent>
                         {companyCategories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
@@ -430,7 +426,7 @@ export function ProductFormDialog({
                     
                     <div className="space-y-2 col-span-2 md:col-span-1">
                       <Label>يستهدف تاريخ صلاحية (اختياري)</Label>
-                      <Select value={offerExpiryDate} onValueChange={setOfferExpiryDate}>
+                      <Select value={offerExpiryDate} onValueChange={(v) => setOfferExpiryDate(v || '')}>
                         <SelectTrigger><SelectValue placeholder="اختر تاريخ..." /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="any">أي تاريخ (الكل)</SelectItem>

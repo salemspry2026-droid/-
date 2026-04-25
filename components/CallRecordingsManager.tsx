@@ -261,7 +261,7 @@ export function CallRecordingsManager() {
                     <div className="space-y-3">
                       <div>
                         <Label>العميل المستهدف للمكالمة</Label>
-                        <Select value={selectedCustomerId} onValueChange={(val) => setSelectedCustomerId(val)}>
+                        <Select value={selectedCustomerId} onValueChange={(val) => setSelectedCustomerId(val || '')}>
                           <SelectTrigger className="mt-1 bg-[#F0F2F5] border-transparent"><SelectValue placeholder="اختر العميل المعني" /></SelectTrigger>
                           <SelectContent>
                             {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -270,7 +270,7 @@ export function CallRecordingsManager() {
                       </div>
                       <div>
                         <Label>الصنف</Label>
-                        <Select value={selectedProductId} onValueChange={(val) => setSelectedProductId(val)}>
+                        <Select value={selectedProductId} onValueChange={(val) => setSelectedProductId(val || '')}>
                           <SelectTrigger className="mt-1 bg-[#F0F2F5] border-transparent"><SelectValue placeholder="اختر الصنف المطلوب" /></SelectTrigger>
                           <SelectContent>
                             {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} - {p.price} {p.currency}</SelectItem>)}

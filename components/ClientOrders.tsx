@@ -38,7 +38,7 @@ export function ClientOrders() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       // Filter out isDeleted in memory because we query by createdBy without a composite index on isDeleted
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !d.isDeleted));
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 

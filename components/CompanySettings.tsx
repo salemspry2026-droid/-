@@ -51,7 +51,7 @@ const compressImageToBase64 = async (file: File): Promise<string> => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
-      const img = new Image();
+      const img = document.createElement('img');
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -84,9 +84,9 @@ const compressImageToBase64 = async (file: File): Promise<string> => {
         const base64String = canvas.toDataURL('image/jpeg', 0.7);
         resolve(base64String);
       };
-      img.onerror = (error) => reject(error);
+      img.onerror = (error: any) => reject(error);
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = (error: any) => reject(error);
   });
 };
 
@@ -487,7 +487,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
 
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2"><Coins className="w-4 h-4 text-gray-400" /> العملة الرئيسية</Label>
-                      <Select value={primaryCurrency} onValueChange={setPrimaryCurrency}>
+                      <Select value={primaryCurrency} onValueChange={(v) => setPrimaryCurrency(v || '')}>
                         <SelectTrigger className="bg-white text-left" dir="ltr">
                           <SelectValue placeholder="اختر العملة" />
                         </SelectTrigger>

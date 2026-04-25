@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
-import { Phone, PhoneOff, Mic, SquareDashedBox, Loader2, AlertCircle } from 'lucide-react';
+import { Phone, PhoneOff, Mic, SquareDashed, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import localforage from 'localforage';
 import { toast } from 'sonner';

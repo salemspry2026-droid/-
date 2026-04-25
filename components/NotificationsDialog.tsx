@@ -61,7 +61,6 @@ export function NotificationsDialog({
     });
 
     return () => {
-      clearTimeout(timeout);
       unsubNotifs();
       unsubOrders();
     };
