@@ -1,7 +1,8 @@
 'use client';
 
+import React, { useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { signInWithPopup, googleProvider, auth, signOut } from '@/lib/firebase';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, googleProvider, auth, signOut } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut } from 'lucide-react';
@@ -12,11 +13,25 @@ import { ClientDashboard } from '@/components/ClientDashboard';
 export default function Home() {
   const { user, profile, isAuthReady, isProfileLoaded } = useStore();
 
+  useEffect(() => {
+    getRedirectResult(auth).catch(error => {
+      console.error("Redirect redirect result error:", error);
+    });
+  }, []);
+
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed:", error);
+    }
+  };
+
+  const handleLoginRedirect = async () => {
+    try {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      console.error("Redirect login failed:", error);
     }
   };
 
@@ -47,10 +62,16 @@ export default function Home() {
             <CardTitle className="text-2xl font-bold text-gray-900">نظام إدارة الطلبات</CardTitle>
             <CardDescription className="text-gray-500">تسجيل الدخول للمتابعة</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center pt-6">
+          <CardContent className="flex flex-col gap-3 justify-center pt-6">
             <Button onClick={handleLogin} className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl text-base font-bold">
-              تسجيل الدخول باستخدام Google
+              تسجيل الدخول (الوضع العادي)
             </Button>
+            <Button onClick={handleLoginRedirect} variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 h-12 rounded-xl text-base font-bold">
+              تسجيل الدخول (لتطبيقات الهاتف والمتصفحات المدمجة)
+            </Button>
+            <p className="text-xs text-center text-gray-500 mt-2">
+              إذا واجهت مشكلة في تسجيل الدخول عبر التطبيق، يرجى استخدام الزر الثاني (لتطبيقات الهاتف).
+            </p>
           </CardContent>
         </Card>
       </div>
