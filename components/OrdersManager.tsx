@@ -251,7 +251,7 @@ export function OrdersManager() {
       </div>
 
       {/* Orders List */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredOrders.map(order => {
             let timeString = '';
             if (order.createdAt) {

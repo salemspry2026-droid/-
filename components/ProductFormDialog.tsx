@@ -262,7 +262,6 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      // No longer needs children handling here since we moved the trigger out
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle>{productToEdit ? 'تعديل الصنف' : 'إضافة صنف جديد (بخيارات متقدمة)'}</DialogTitle>

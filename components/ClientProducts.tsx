@@ -163,7 +163,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {/* Products List */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filteredProducts.map(product => (
           <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
             <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative">

@@ -213,7 +213,7 @@ export function HomeTab() {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Button 
           variant="outline" 
           className="flex-1 bg-white border-gray-200 text-gray-700 h-12 rounded-xl"
@@ -252,7 +252,7 @@ export function HomeTab() {
           <h3 className="text-lg font-bold text-gray-900">آخر الطلبات</h3>
           <Button variant="link" className="text-blue-600 p-0 h-auto" onClick={() => setActiveTab('orders')}>الكل</Button>
         </div>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {orders.slice(0, 3).map(order => {
             let timeString = '';
             if (order.createdAt) {

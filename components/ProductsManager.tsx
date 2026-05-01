@@ -101,7 +101,7 @@ export function ProductsManager() {
       </div>
 
       {/* Products List */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredProducts.map(product => (
           <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:border-blue-300 transition-colors ${product.inStock === false ? 'opacity-75' : ''}`}>
             <div className="w-20 h-20 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 overflow-hidden relative">

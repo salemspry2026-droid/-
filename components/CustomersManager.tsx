@@ -229,7 +229,7 @@ export function CustomersManager() {
       </div>
 
       {/* Customers List */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredCustomers.map(customer => (
           <div key={customer.id} onClick={() => setSelectedCustomer(customer)} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition-colors">
             <div className="flex justify-between items-start mb-3">
