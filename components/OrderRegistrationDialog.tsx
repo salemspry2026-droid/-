@@ -284,6 +284,21 @@ export function OrderRegistrationDialog({
           updatedBy: user.uid,
           isDeleted: false
         });
+
+        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+        await setDoc(doc(db, 'notifications', notifId), {
+          companyId: profile.companyId,
+          title: 'طلب جديد',
+          message: `تم إنشاء طلب جديد للعميل ${customer.name}`,
+          type: 'new_order',
+          orderId: orderId,
+          readBy: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user.uid,
+          updatedBy: user.uid,
+          isDeleted: false
+        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
       }
 
       toast.success('تم تسجيل الطلب بنجاح');

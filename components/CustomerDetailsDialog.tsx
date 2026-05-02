@@ -5,12 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { UserCircle, Search, Edit, Trash2, MapPin, Phone, Mail, Building, ShoppingBag, Banknote, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 
 export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { customer: any, isOpen: boolean, onClose: () => void, onEdit?: (customer: any) => void }) {
-  const { profile } = useStore();
+  const { profile, user } = useStore();
   const [stats, setStats] = useState({ totalOrders: 0, totalSpent: 0 });
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +72,8 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
        try {
          await updateDoc(doc(db, 'customers', customer.id), {
            isDeleted: true,
-           updatedAt: new Date(),
+           updatedAt: serverTimestamp(),
+           updatedBy: user?.uid
          });
          toast.success('تم حذف العميل بنجاح');
          onClose();

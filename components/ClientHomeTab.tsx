@@ -12,7 +12,7 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 
 export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const { setClientSelectedCompany, profile, user, setIsNotificationsOpen } = useStore();
+  const { setClientSelectedCompany, profile, user, setIsNotificationsOpen, unreadNotifications } = useStore();
   const [companies, setCompanies] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -74,8 +74,13 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-green-700/50 rounded-full h-10 w-10 shrink-0" onClick={() => setIsNotificationsOpen(true)}>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-green-700/50 rounded-full h-10 w-10 shrink-0 relative" onClick={() => setIsNotificationsOpen(true)}>
               <Bell className="w-5 h-5" />
+              {unreadNotifications > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
             </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-red-500 hover:text-white rounded-full h-10 w-10 shrink-0 transition-colors" onClick={handleLogout} title="تسجيل الخروج">
               <LogOut className="w-5 h-5" />

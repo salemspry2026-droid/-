@@ -5,12 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Package, Search, Gift, Edit, Trash2, CheckCircle, Store, Tag } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 
 export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { product: any, isOpen: boolean, onClose: () => void, onEdit?: (product: any) => void }) {
-  const { profile } = useStore();
+  const { profile, user } = useStore();
   const [stats, setStats] = useState({ timesOrdered: 0, unitsSold: 0, totalSales: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +64,8 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { pro
        try {
          await updateDoc(doc(db, 'products', product.id), {
            isDeleted: true,
-           updatedAt: new Date(),
+           updatedAt: serverTimestamp(),
+           updatedBy: user?.uid
          });
          toast.success('تم حذف الصنف بنجاح');
          onClose();

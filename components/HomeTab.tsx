@@ -16,7 +16,7 @@ import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { AdministrationDialog } from './AdministrationDialog';
 
 export function HomeTab() {
-  const { profile, setIsNotificationsOpen, setIsCallRecordingsOpen, setActiveTab } = useStore();
+  const { profile, setIsNotificationsOpen, setIsCallRecordingsOpen, setActiveTab, unreadNotifications } = useStore();
   const [orders, setOrders] = useState<any[]>([]);
   const [orderStages, setOrderStages] = useState<any[]>([]);
   const [companyCurrency, setCompanyCurrency] = useState('ر.س');
@@ -230,10 +230,15 @@ export function HomeTab() {
         </Button>
         <Button 
           variant="outline" 
-          className="flex-1 bg-white border-gray-200 text-gray-700 h-12 rounded-xl"
+          className="flex-1 bg-white border-gray-200 text-gray-700 h-12 rounded-xl relative overflow-hidden"
           onClick={() => setIsNotificationsOpen(true)}
         >
           <Bell className="w-4 h-4 ml-2 text-orange-500" /> الإشعارات
+          {unreadNotifications > 0 && (
+            <span className="absolute top-1 left-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
         </Button>
       </div>
 

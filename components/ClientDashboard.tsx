@@ -6,20 +6,31 @@ import { ClientOrders } from './ClientOrders';
 import { ClientHomeTab } from './ClientHomeTab';
 import { useStore } from '@/lib/store';
 import { NotificationsDialog } from './NotificationsDialog';
-import { LayoutGrid, ShoppingBag, ReceiptText, User } from 'lucide-react';
+import { GlobalNotificationListener } from './GlobalNotificationListener';
+import { LayoutGrid, ShoppingBag, ReceiptText, User, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function ClientDashboard() {
-  const { profile, activeTab, setActiveTab, isNotificationsOpen, setIsNotificationsOpen, setSelectedOrderId } = useStore();
+  const { profile, activeTab, setActiveTab, isNotificationsOpen, setIsNotificationsOpen, setSelectedOrderId, unreadNotifications } = useStore();
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-20 md:pb-0 md:pr-64 flex flex-col transition-all duration-300">
-      
+      <GlobalNotificationListener />
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex flex-col w-64 fixed top-0 bottom-0 right-0 bg-white border-l border-gray-200 z-40 shadow-sm">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-900">بوابة العملاء</h2>
-          <p className="text-sm text-gray-500 mt-1">{profile?.name || 'عميل'}</p>
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">بوابة العملاء</h2>
+            <p className="text-sm text-gray-500 mt-1">{profile?.name || 'عميل'}</p>
+          </div>
+          <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-green-600 transition-colors">
+            <Bell className="w-6 h-6" />
+            {unreadNotifications > 0 && (
+              <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              </span>
+            )}
+          </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-4">
           <SidebarItem icon={<LayoutGrid className="w-5 h-5" />} label="الرئيسية" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
@@ -28,6 +39,22 @@ export function ClientDashboard() {
           <SidebarItem icon={<User className="w-5 h-5" />} label="حسابي" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
         </nav>
       </aside>
+
+      {/* Mobile Header (Only visible on mobile) */}
+      <div className="md:hidden bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">بوابة العملاء</h2>
+          <p className="text-xs text-gray-500">{profile?.name || 'عميل'}</p>
+        </div>
+        <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-green-600 transition-colors">
+          <Bell className="w-6 h-6" />
+          {unreadNotifications > 0 && (
+            <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </button>
+      </div>
 
       <main className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto transition-all duration-300">
         <div className="w-full">

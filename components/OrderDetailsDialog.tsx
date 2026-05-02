@@ -50,6 +50,25 @@ export function OrderDetailsDialog({
       });
       toast.success('تم انتقال الطلب للمرحلة التالية بنجاح');
       onOpenChange(false);
+
+      const isFinalStage = stages.length > 0 && nextStage.name === stages[stages.length - 1].name;
+      if (!isFinalStage) {
+        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'notifications', notifId), {
+          companyId: order.companyId,
+          title: 'تحديث حالة الطلب',
+          message: `تم تحديث حالة الطلب للعميل ${order?.customerName || ''} إلى: ${nextStage.name}`,
+          type: 'status_update',
+          orderId: order.id,
+          readBy: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user?.uid,
+          updatedBy: user?.uid,
+          isDeleted: false
+        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+      }
     } catch (error: any) {
       handleFirestoreError(error, OperationType.UPDATE, `orders/${order.id}`);
       toast.error('حدث خطأ أثناء نقل الطلب');

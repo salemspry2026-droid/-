@@ -27,6 +27,7 @@ interface AppState {
   selectedOrderId: string | null;
   activeTab: string;
   clientSelectedCompany: any | null;
+  unreadNotifications: number;
   setUser: (user: any | null) => void;
   setProfile: (profile: UserProfile | null) => void;
   setIsAuthReady: (ready: boolean) => void;
@@ -37,6 +38,7 @@ interface AppState {
   setSelectedOrderId: (id: string | null) => void;
   setActiveTab: (tab: string) => void;
   setClientSelectedCompany: (company: any | null) => void;
+  setUnreadNotifications: (count: number) => void;
   clearAuth: () => void;
 }
 
@@ -51,6 +53,7 @@ export const useStore = create<AppState>((set) => ({
   selectedOrderId: null,
   activeTab: 'home',
   clientSelectedCompany: null,
+  unreadNotifications: 0,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile, isProfileLoaded: true }),
   setIsAuthReady: (ready) => set({ isAuthReady: ready }),
@@ -61,5 +64,6 @@ export const useStore = create<AppState>((set) => ({
   setSelectedOrderId: (id) => set({ selectedOrderId: id }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   setClientSelectedCompany: (company) => set({ clientSelectedCompany: company }),
-  clearAuth: () => set({ user: null, profile: null, isProfileLoaded: false, activeTab: 'home', clientSelectedCompany: null }),
+  setUnreadNotifications: (count) => set({ unreadNotifications: count }),
+  clearAuth: () => set({ user: null, profile: null, isProfileLoaded: false, activeTab: 'home', clientSelectedCompany: null, unreadNotifications: 0 }),
 }));

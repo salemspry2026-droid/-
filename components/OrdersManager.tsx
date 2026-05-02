@@ -35,15 +35,20 @@ export function OrdersManager() {
 
   useEffect(() => {
     let timeout: any;
-    if (selectedOrderId) {
+    if (selectedOrderId && orders.length > 0) {
       timeout = setTimeout(() => {
-        setSearchQuery(selectedOrderId);
+        const orderToOpen = orders.find(o => o.id === selectedOrderId);
+        if (orderToOpen) {
+          setSelectedOrderDetails(orderToOpen);
+        } else {
+          setSearchQuery(selectedOrderId);
+        }
         setActiveStatusFilter('all');
         setSelectedOrderId(null);
-      }, 0);
+      }, 100);
     }
     return () => clearTimeout(timeout);
-  }, [selectedOrderId, setSelectedOrderId]);
+  }, [selectedOrderId, setSelectedOrderId, orders]);
 
   useEffect(() => {
     if (!profile?.companyId) return;
@@ -86,6 +91,25 @@ export function OrdersManager() {
         updatedBy: user?.uid
       }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `orders/${orderId}`));
       toast.success('تم تحديث الحالة');
+
+      const isFinalStage = orderStages.length > 0 && newStatus === orderStages[orderStages.length - 1].name;
+      const tOrder = orders.find(o => o.id === orderId);
+      if (!isFinalStage) {
+        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+        await setDoc(doc(db, 'notifications', notifId), {
+          companyId: profile?.companyId,
+          title: 'تحديث حالة الطلب',
+          message: `تم تحديث حالة الطلب للعميل ${tOrder?.customerName || ''} إلى: ${newStatus}`,
+          type: 'status_update',
+          orderId: orderId,
+          readBy: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user?.uid,
+          updatedBy: user?.uid,
+          isDeleted: false
+        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+      }
     } catch (error: any) {
       toast.error(error.message || 'فشل تحديث الحالة');
     }
