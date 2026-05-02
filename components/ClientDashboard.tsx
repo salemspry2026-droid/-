@@ -21,7 +21,7 @@ export function ClientDashboard() {
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">بوابة العملاء</h2>
-            <p className="text-sm text-gray-500 mt-1">{profile?.name || 'عميل'}</p>
+            <p className="text-sm text-gray-500 mt-1">{profile?.displayName || 'عميل'}</p>
           </div>
           <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-green-600 transition-colors">
             <Bell className="w-6 h-6" />
@@ -44,7 +44,7 @@ export function ClientDashboard() {
       <div className="md:hidden bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
         <div>
           <h2 className="text-xl font-bold text-gray-900">بوابة العملاء</h2>
-          <p className="text-xs text-gray-500">{profile?.name || 'عميل'}</p>
+          <p className="text-xs text-gray-500">{profile?.displayName || 'عميل'}</p>
         </div>
         <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-green-600 transition-colors">
           <Bell className="w-6 h-6" />

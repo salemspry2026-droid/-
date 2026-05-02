@@ -27,7 +27,7 @@ export function AdminDashboard() {
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">نظام الطلبات</h2>
-            <p className="text-sm text-gray-500 mt-1">{profile?.name || 'مدير النظام'}</p>
+            <p className="text-sm text-gray-500 mt-1">{profile?.displayName || 'مدير النظام'}</p>
           </div>
           <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
             <Bell className="w-6 h-6" />
@@ -56,7 +56,7 @@ export function AdminDashboard() {
       <div className="md:hidden bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
         <div>
           <h2 className="text-xl font-bold text-gray-900">نظام الطلبات</h2>
-          <p className="text-xs text-gray-500">{profile?.name || 'مدير النظام'}</p>
+          <p className="text-xs text-gray-500">{profile?.displayName || 'مدير النظام'}</p>
         </div>
         <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
           <Bell className="w-6 h-6" />
