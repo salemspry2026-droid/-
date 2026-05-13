@@ -146,6 +146,7 @@ service cloud.firestore {
              data.isDeleted is bool &&
              isValidOptionalString('email', 0, 100) &&
              isValidOptionalString('phone', 0, 50) &&
+             (!('contactNumbers' in data) || isValidContactNumberList(data.contactNumbers)) &&
              isValidOptionalString('address', 0, 500) &&
              isValidOptionalString('notes', 0, 5000) &&
              isValidOptionalString('customerType', 0, 100) &&
@@ -160,7 +161,8 @@ service cloud.firestore {
              data.items is list && data.items.size() >= 0 && data.items.size() <= 200 &&
              data.totalAmountByCurrency is map &&
              isValidString(data.status, 1, 100) &&
-             data.isDeleted is bool;
+             data.isDeleted is bool &&
+             isValidOptionalString('source', 0, 50);
     }
 
     function isValidNotification(data) {

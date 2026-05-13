@@ -261,6 +261,7 @@ export function OrderRegistrationDialog({
           customerName: customer.name,
           customerPhone: customer.phone || '',
           customerAddress: customer.address || 'غير محدد',
+          source: 'company',
           invoiceType, // 'cash', 'pending_cash', 'credit'
           brandId: brandId === 'general' ? null : brandId,
           items: brandItems.map(i => ({

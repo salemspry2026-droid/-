@@ -9,11 +9,23 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Loader2, Plus, Phone, MapPin, Mail, Building } from 'lucide-react';
+import { Search, Loader2, Plus, Phone, MapPin, Mail, Building, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 
+import { AddressSelector } from './AddressSelector';
 import { CustomerDetailsDialog } from './CustomerDetailsDialog';
+
+const COUNTRY_CODES = [
+  { code: '+966', name: 'السعودية (+966)', flag: '🇸🇦' },
+  { code: '+971', name: 'الإمارات (+971)', flag: '🇦🇪' },
+  { code: '+965', name: 'الكويت (+965)', flag: '🇰🇼' },
+  { code: '+974', name: 'قطر (+974)', flag: '🇶🇦' },
+  { code: '+973', name: 'البحرين (+973)', flag: '🇧🇭' },
+  { code: '+968', name: 'عمان (+968)', flag: '🇴🇲' },
+  { code: '+20', name: 'مصر (+20)', flag: '🇪🇬' },
+  { code: '+962', name: 'الأردن (+962)', flag: '🇯🇴' }
+];
 
 export function CustomersManager() {
   const { profile, user } = useStore();
@@ -29,10 +41,40 @@ export function CustomersManager() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [contactNumbers, setContactNumbers] = useState<any[]>([]);
   const [address, setAddress] = useState('');
   const [customerType, setCustomerType] = useState('');
   const [customerTypeOther, setCustomerTypeOther] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const getFullPath = (loc: any, allLocs: any[]) => {
+    let path = [loc.name];
+    let curr = loc;
+    while(curr.parentId && curr.parentId !== 'none') {
+      curr = allLocs.find(l => l.id === curr.parentId);
+      if(curr) {
+         path.unshift(curr.name);
+      } else {
+         break;
+      }
+    }
+    return path.join(' - ');
+  };
+
+  const sortedLocations = locations.map(loc => ({
+    ...loc,
+    fullPath: getFullPath(loc, locations)
+  })).sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+
+  useEffect(() => {
+    if (!profile?.companyId) return;
+    const locQ = query(collection(db, 'locations'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const unsub = onSnapshot(locQ, (snap) => {
+      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [profile?.companyId]);
 
   useEffect(() => {
     if (!profile?.companyId) return;
@@ -61,6 +103,7 @@ export function CustomersManager() {
         name,
         email,
         phone,
+        contactNumbers,
         address,
         customerType,
         customerTypeOther: customerType === 'other' ? customerTypeOther : '',
@@ -94,6 +137,7 @@ export function CustomersManager() {
     setName(customer.name || '');
     setEmail(customer.email || '');
     setPhone(customer.phone || '');
+    setContactNumbers(Array.isArray(customer.contactNumbers) ? customer.contactNumbers : []);
     setAddress(customer.address || '');
     setCustomerType(customer.customerType || '');
     setCustomerTypeOther(customer.customerTypeOther || '');
@@ -110,6 +154,7 @@ export function CustomersManager() {
     setName('');
     setEmail('');
     setPhone('');
+    setContactNumbers([]);
     setAddress('');
     setCustomerType('');
     setCustomerTypeOther('');
@@ -180,13 +225,70 @@ export function CustomersManager() {
                   <Label>رقم الهاتف</Label>
                   <Input value={phone} onChange={e => setPhone(e.target.value)} required dir="ltr" className="text-left" />
                 </div>
+                <div className="space-y-4 md:col-span-2 border-t pt-4 bg-gray-50/50 p-4 rounded-xl">
+                  <Label className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /> أرقام تواصل إضافية (اختياري)</Label>
+                  {(Array.isArray(contactNumbers) ? contactNumbers : []).map((contact, idx) => (
+                    <div key={idx} className="flex flex-col md:flex-row gap-2 items-start md:items-end bg-white p-3 rounded-xl border border-gray-200 relative shadow-sm">
+                      <div className="w-full md:w-1/3 space-y-1">
+                        <Label className="text-xs text-gray-500">الاسم التعريفي (مثال: مستودع)</Label>
+                        <Input value={contact.name} onChange={(e) => {
+                          const newArr = [...contactNumbers];
+                          newArr[idx].name = e.target.value;
+                          setContactNumbers(newArr);
+                        }} placeholder="مثال: الاستقبال"/>
+                      </div>
+                      <div className="w-full md:w-2/3 flex gap-2">
+                        <div className="w-[140px] shrink-0">
+                          <Label className="text-xs text-gray-500 mb-1 block">رمز البلد</Label>
+                          <Select value={contact.countryCode} onValueChange={(val) => {
+                            const newArr = [...contactNumbers];
+                            if (val) newArr[idx].countryCode = val;
+                            setContactNumbers(newArr);
+                          }}>
+                            <SelectTrigger className="bg-white" dir="ltr">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COUNTRY_CODES.map(c => <SelectItem key={c.code} value={c.code} dir="ltr">{c.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-gray-500 mb-1 block">رقم الهاتف (أرقام فقط)</Label>
+                          <div className="flex gap-2">
+                            <Input 
+                              dir="ltr" 
+                              className="text-left bg-white" 
+                              value={contact.number} 
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                const newArr = [...contactNumbers];
+                                newArr[idx].number = val;
+                                setContactNumbers(newArr);
+                              }} 
+                              placeholder="5xxxxxxxxx"
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => {
+                              setContactNumbers(contactNumbers.filter((_, i) => i !== idx));
+                            }} className="text-red-500 hover:bg-red-50 shrink-0">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={() => setContactNumbers([...(Array.isArray(contactNumbers) ? contactNumbers : []), { name: '', countryCode: '+966', number: '' }])} className="w-full border-dashed bg-white">
+                    <Plus className="w-4 h-4 ml-2" /> إضافة رقم تواصل
+                  </Button>
+                </div>
                 <div className="space-y-2">
                   <Label>البريد الإلكتروني (اختياري)</Label>
                   <Input type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" className="text-left" />
                 </div>
-                <div className="space-y-2">
-                  <Label>العنوان</Label>
-                  <Input value={address} onChange={e => setAddress(e.target.value)} />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium border-b pb-2">تفاصيل العنوان</h3>
+                  <AddressSelector locations={locations} value={address} onChange={setAddress} />
                 </div>
                 <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">حفظ العميل</Button>
               </form>

@@ -54,6 +54,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         customerId: user.uid, // For self-service, user is the customer
         customerName: profile?.displayName || 'عميل',
         customerAddress: 'طلب من التطبيق',
+        source: 'customer',
         items: [{
           productId: product.id,
           productName: product.name,

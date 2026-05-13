@@ -11,7 +11,7 @@ import { useStore } from '@/lib/store';
 
 export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { customer: any, isOpen: boolean, onClose: () => void, onEdit?: (customer: any) => void }) {
   const { profile, user } = useStore();
-  const [stats, setStats] = useState({ totalOrders: 0, totalSpent: 0 });
+  const [stats, setStats] = useState({ totalOrders: 0, totalSpent: 0, companyOrders: 0, customerOrders: 0 });
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,12 +32,20 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
         
         let totalOrders = 0;
         let totalSpent = 0;
+        let companyOrders = 0;
+        let customerOrders = 0;
         const fetchedOrders: any[] = [];
         
         snapshot.docs.forEach(doc => {
           const order = { id: doc.id, ...doc.data() } as any;
           fetchedOrders.push(order);
           totalOrders += 1;
+          
+          if (order.source === 'customer') {
+            customerOrders += 1;
+          } else {
+            companyOrders += 1;
+          }
           
           if (order.totalAmountByCurrency) {
               // Just sum up everything for a rough estimate, or sum based on a specific currency.
@@ -56,7 +64,7 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
         });
 
         setOrders(fetchedOrders);
-        setStats({ totalOrders, totalSpent });
+        setStats({ totalOrders, totalSpent, companyOrders, customerOrders });
       } catch (error) {
         console.error("Error fetching customer orders:", error);
       } finally {
@@ -142,27 +150,45 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
                      </div>
                    )}
                </div>
+               
+               {Array.isArray(customer.contactNumbers) && customer.contactNumbers.length > 0 && (
+                 <div className="mt-4 flex flex-wrap gap-2">
+                   {customer.contactNumbers.map((contact: any, i: number) => (
+                     <div key={i} className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+                       <span className="font-semibold text-gray-700">{contact.name || 'أخرى'}</span>
+                       <span className="text-gray-400">|</span>
+                       <span dir="ltr" className="text-gray-600 font-mono text-xs">{contact.countryCode} {contact.number}</span>
+                     </div>
+                   ))}
+                 </div>
+               )}
             </div>
         </div>
 
         {/* Dashboard Stats */}
-        <div className="grid grid-cols-2 gap-4 my-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-6 rounded-xl border border-blue-100 flex items-center justify-between">
              <div>
-                 <p className="text-sm font-bold text-blue-600 mb-1">إجمالي الطلبات المستلمة</p>
-                 <p className="text-3xl font-bold text-gray-900">{stats.totalOrders} <span className="text-sm font-normal text-gray-500">طلب</span></p>
-             </div>
-             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                <ShoppingBag className="w-6 h-6 text-blue-500" />
+                 <p className="text-sm font-bold text-blue-600 mb-1">إجمالي الطلبات</p>
+                 <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
              </div>
           </div>
           <div className="bg-gradient-to-br from-green-50 to-green-100/50 p-6 rounded-xl border border-green-100 flex items-center justify-between">
              <div>
-                 <p className="text-sm font-bold text-green-600 mb-1">إجمالي المشتريات (تقديري)</p>
-                 <p className="text-3xl font-bold text-gray-900">{stats.totalSpent.toLocaleString()}</p>
+                 <p className="text-sm font-bold text-green-600 mb-1">طلبات من المندوب</p>
+                 <p className="text-3xl font-bold text-gray-900">{stats.companyOrders}</p>
              </div>
-             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                <Banknote className="w-6 h-6 text-green-500" />
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 p-6 rounded-xl border border-purple-100 flex items-center justify-between">
+             <div>
+                 <p className="text-sm font-bold text-purple-600 mb-1">طلبات من العميل</p>
+                 <p className="text-3xl font-bold text-gray-900">{stats.customerOrders}</p>
+             </div>
+          </div>
+          <div className="bg-gradient-to-br from-teal-50 to-teal-100/50 p-6 rounded-xl border border-teal-100 flex items-center justify-between">
+             <div>
+                 <p className="text-sm font-bold text-teal-600 mb-1">إجمالي المشتريات (تقديري)</p>
+                 <p className="text-3xl font-bold text-gray-900">{stats.totalSpent.toLocaleString()}</p>
              </div>
           </div>
         </div>
@@ -181,7 +207,14 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
                   return (
                     <div key={order.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-100 transition-colors">
                        <div>
-                          <p className="font-bold text-gray-900 mb-1">طلب رقم #{order.id.slice(-6).toUpperCase()}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-bold text-gray-900">طلب رقم #{order.id.slice(-6).toUpperCase()}</p>
+                            {order.source === 'customer' ? (
+                              <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">طلب العميل</span>
+                            ) : (
+                              <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">طلب المندوب</span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-3 text-xs text-gray-500">
                              <span>{new Date(order.createdAt?.toMillis?.() || Date.now()).toLocaleDateString('ar-SA')}</span>
                              <span>•</span>

@@ -297,7 +297,14 @@ export function OrdersManager() {
                   {order.customerName?.charAt(0) || 'ع'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900">{order.customerName}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900">{order.customerName}</h3>
+                    {order.source === 'customer' ? (
+                      <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">العميل</span>
+                    ) : (
+                      <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">المندوب</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-xs text-gray-500 font-mono">{order.id.substring(0, 8)}</p>
                     {timeString && <p className="text-xs text-gray-400 font-medium whitespace-nowrap">• {timeString}</p>}

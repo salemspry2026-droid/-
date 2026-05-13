@@ -158,6 +158,7 @@ export function CallRecordingsManager() {
         customerId: customer.id,
         customerName: customer.name,
         customerAddress: customer.address || 'غير محدد',
+        source: 'company',
         items: [{
           productId: product.id,
           productName: product.name,

@@ -188,7 +188,14 @@ export function HomeTab() {
             <Package className="w-4 h-4" />
             <span>{todaysOrders.length} طلب</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 opacity-75">
+            <span>(</span>
+            <span className="text-blue-200">{todaysOrders.filter(o => o.source !== 'customer').length} مندوب</span>
+            <span>-</span>
+            <span className="text-purple-200">{todaysOrders.filter(o => o.source === 'customer').length} عميل</span>
+            <span>)</span>
+          </div>
+          <div className="flex items-center gap-1 mr-auto">
             <TrendingUp className="w-4 h-4" />
             <span>متوسط {avgSalesToday.toLocaleString(undefined, {maximumFractionDigits:0})} {companyCurrency}</span>
           </div>
@@ -278,7 +285,14 @@ export function HomeTab() {
                     {order.customerName?.charAt(0) || 'ع'}
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900">{order.customerName}</p>
+                    <div className="flex items-center gap-2">
+                       <p className="font-bold text-gray-900">{order.customerName}</p>
+                       {order.source === 'customer' ? (
+                          <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">العميل</span>
+                        ) : (
+                          <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">المندوب</span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                        <p className="text-xs text-gray-500">{order.id.substring(0, 8)}</p>
                        {timeString && <p className="text-xs text-gray-400 font-medium whitespace-nowrap">• {timeString}</p>}

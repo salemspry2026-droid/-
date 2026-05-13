@@ -15,6 +15,7 @@ import { Loader2, Save, Building2, Hash, Phone, MapPin, FileText, Mail, Clock, I
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import Image from 'next/image';
+import { AddressSelector } from './AddressSelector';
 
 const COUNTRY_CODES = [
   { code: '+966', name: '🇸🇦 السعودية (+966)' },
@@ -125,6 +126,35 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
   const [workingHours, setWorkingHours] = useState('');
   const [notes, setNotes] = useState('');
   const [primaryCurrency, setPrimaryCurrency] = useState('ر.س');
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const getFullPath = (loc: any, allLocs: any[]) => {
+    let path = [loc.name];
+    let curr = loc;
+    while(curr.parentId && curr.parentId !== 'none') {
+      curr = allLocs.find(l => l.id === curr.parentId);
+      if(curr) {
+         path.unshift(curr.name);
+      } else {
+         break;
+      }
+    }
+    return path.join(' - ');
+  };
+
+  const sortedLocations = locations.map(loc => ({
+    ...loc,
+    fullPath: getFullPath(loc, locations)
+  })).sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+
+  useEffect(() => {
+    if (!profile?.companyId) return;
+    const locQ = query(collection(db, 'locations'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const unsub = onSnapshot(locQ, (snap) => {
+      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [profile?.companyId]);
 
   useEffect(() => {
     if (!open || !profile?.companyId) {
@@ -503,9 +533,9 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
                       </Select>
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <Label className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /> العنوان</Label>
-                      <Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" />
+                    <div className="space-y-4 md:col-span-2">
+                      <Label className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /> تفاصيل العنوان</Label>
+                      <AddressSelector locations={locations} value={address} onChange={setAddress} />
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
@@ -559,12 +589,10 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
 
 function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAdmin: boolean, currentUserId: string, onUpdate: (id: string, field: string, val: string) => void }) {
   const [jobTitle, setJobTitle] = useState(emp.jobTitle || '');
-  const [lastEmpJobTitle, setLastEmpJobTitle] = useState(emp.jobTitle || '');
 
-  if (emp.jobTitle !== lastEmpJobTitle) {
+  useEffect(() => {
     setJobTitle(emp.jobTitle || '');
-    setLastEmpJobTitle(emp.jobTitle || '');
-  }
+  }, [emp.jobTitle]);
 
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">

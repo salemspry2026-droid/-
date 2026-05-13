@@ -238,8 +238,6 @@ function CurrenciesManager({ companyId, userId }: { companyId: string, userId: s
 }
 
 function LocationsManager({ companyId, userId }: { companyId: string, userId: string }) {
-  // Simplified for brevity: just managing a flat list of locations with types for now.
-  // A full hierarchical UI would be more complex, but this meets the requirement.
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -289,51 +287,85 @@ function LocationsManager({ companyId, userId }: { companyId: string, userId: st
     switch(t) {
       case 'country': return 'بلد';
       case 'governorate': return 'محافظة';
-      case 'region': return 'منطقة';
+      case 'region': return 'مدينة / منطقة';
       case 'neighborhood': return 'حي';
       default: return t;
     }
   };
 
+  const renderLocationNode = (location: any, level: number = 0) => {
+    const children = locations.filter(l => l.parentId === location.id);
+    
+    return (
+      <div key={location.id} className={`mt-2 ${level > 0 ? 'pr-6 relative' : ''}`}>
+        {level > 0 && (
+          <div className="absolute right-0 top-6 w-4 border-t-2 border-gray-200" />
+        )}
+        <div className="flex justify-between items-center p-3 bg-white hover:bg-gray-50 rounded-xl border border-gray-100 shadow-sm transition-colors">
+          <div className="flex items-center gap-3">
+            <div className={`w-2 h-2 rounded-full ${
+              location.type === 'country' ? 'bg-blue-500' : 
+              location.type === 'governorate' ? 'bg-green-500' : 
+              location.type === 'region' ? 'bg-purple-500' : 'bg-orange-500'
+            }`} />
+            <div>
+              <p className="font-bold text-gray-800">{location.name} <span className="text-xs font-normal text-gray-500 mr-2">({getTypeLabel(location.type)})</span></p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => handleDelete(location.id)} className="text-red-500 hover:bg-red-50 hover:text-red-600 h-8 w-8"><Trash2 className="w-4 h-4" /></Button>
+        </div>
+        {children.length > 0 && (
+          <div className="border-r-2 border-gray-100 mr-3 mt-1">
+            {children.map(c => renderLocationNode(c, level + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const rootLocations = locations.filter(l => !l.parentId || l.type === 'country');
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        <Select value={type} onValueChange={(val) => val && setType(val)}>
-          <SelectTrigger><SelectValue placeholder="النوع" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="country">بلد</SelectItem>
-            <SelectItem value="governorate">محافظة</SelectItem>
-            <SelectItem value="region">منطقة</SelectItem>
-            <SelectItem value="neighborhood">حي</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        {type !== 'country' && (
-          <Select value={parentId} onValueChange={(val) => val && setParentId(val)}>
-            <SelectTrigger><SelectValue placeholder="التابع لـ" /></SelectTrigger>
+      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4">
+        <h4 className="font-bold text-blue-900 border-b border-blue-100 pb-2">إضافة عنوان جديد</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Select value={type} onValueChange={(val) => val && setType(val)}>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="النوع" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">بدون</SelectItem>
-              {locations.filter(l => l.type !== type && l.type !== 'neighborhood').map(l => (
-                <SelectItem key={l.id} value={l.id}>{l.name} ({getTypeLabel(l.type)})</SelectItem>
-              ))}
+              <SelectItem value="country">بلد</SelectItem>
+              <SelectItem value="governorate">محافظة</SelectItem>
+              <SelectItem value="region">مدينة / منطقة</SelectItem>
+              <SelectItem value="neighborhood">حي</SelectItem>
             </SelectContent>
           </Select>
-        )}
-        
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم" className={type === 'country' ? 'md:col-span-2' : ''} />
-        <Button onClick={handleAdd}><Plus className="w-4 h-4 ml-2" /> إضافة</Button>
+          
+          {type !== 'country' && (
+            <Select value={parentId} onValueChange={(val) => val && setParentId(val)}>
+              <SelectTrigger className="bg-white"><SelectValue placeholder="التابع لـ" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">بدون تابع</SelectItem>
+                {locations.filter(l => l.type !== type && l.type !== 'neighborhood').map(l => (
+                  <SelectItem key={l.id} value={l.id}>{l.name} ({getTypeLabel(l.type)})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم العنوان" className={`bg-white ${type === 'country' ? 'md:col-span-2' : ''}`} />
+          <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700 w-full"><Plus className="w-4 h-4 ml-2" /> إضافة</Button>
+        </div>
       </div>
 
-      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-        {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : locations.map(loc => (
-          <div key={loc.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
-            <div>
-              <p className="font-bold">{loc.name}</p>
-              <p className="text-xs text-gray-500">{getTypeLabel(loc.type)} {loc.parentId ? `- تابع لـ ${locations.find(l => l.id === loc.parentId)?.name || 'مجهول'}` : ''}</p>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => handleDelete(loc.id)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-          </div>
-        ))}
+      <div className="space-y-2 max-h-[400px] overflow-y-auto px-1 bg-gray-50/30 rounded-xl p-4 border border-gray-100 shadow-inner">
+        <h4 className="font-bold text-gray-800 mb-4 sticky top-0 bg-white/80 backdrop-blur pb-2 z-10 hidden">خريطة العناوين المضافة</h4>
+        {loading ? (
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500" />
+        ) : rootLocations.length > 0 ? (
+          rootLocations.map(loc => renderLocationNode(loc, 0))
+        ) : (
+          <div className="text-center text-gray-500 py-8">لا توجد عناوين مضافة بعد. أضف "بلد" للبدء بتكوين هيكل العناوين.</div>
+        )}
       </div>
     </div>
   );
