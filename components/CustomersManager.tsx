@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Loader2, Plus, Phone, MapPin, Mail, Building, Trash2 } from 'lucide-react';
+import { Search, Loader2, Plus, Phone, MapPin, Mail, Building, Trash2, Contact } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 
@@ -47,6 +47,13 @@ export function CustomersManager() {
   const [customerTypeOther, setCustomerTypeOther] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [locations, setLocations] = useState<any[]>([]);
+  const [isContactsSupported, setIsContactsSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
+      setIsContactsSupported(true);
+    }
+  }, []);
 
   const getFullPath = (loc: any, allLocs: any[]) => {
     let path = [loc.name];
@@ -93,6 +100,31 @@ export function CustomersManager() {
 
     return () => unsubscribe();
   }, [profile?.companyId]);
+
+  const handleImportContact = async () => {
+    if (typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        const props = ['name', 'tel'];
+        const opts = { multiple: false };
+        const contacts = await (navigator as any).contacts.select(props, opts);
+        if (contacts && contacts.length > 0) {
+          const contact = contacts[0];
+          if (contact.name && contact.name.length > 0) {
+            setName(contact.name[0]);
+          }
+          if (contact.tel && contact.tel.length > 0) {
+            const phoneStr = contact.tel[0].replace(/[^\d+]/g, '');
+            setPhone(phoneStr);
+          }
+          toast.success('تم استيراد جهة الاتصال بنجاح');
+        }
+      } catch (err) {
+        console.error('Contact selection failed:', err);
+      }
+    } else {
+      toast.error('ميزة استيراد جهات الاتصال غير مدعومة في هذا الجهاز');
+    }
+  };
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,9 +223,33 @@ export function CustomersManager() {
                 <DialogTitle>{editingCustomer ? 'تعديل العميل' : 'إضافة عميل جديد'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSaveCustomer} className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>اسم العميل / الشركة</Label>
-                  <Input value={name} onChange={e => setName(e.target.value)} required />
+                <div className="bg-blue-50/40 p-4 border border-blue-100 rounded-xl space-y-4 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-1 h-full bg-blue-400"></div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h4 className="font-semibold text-blue-900 text-sm">البيانات الأساسية</h4>
+                    {isContactsSupported && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleImportContact}
+                        className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-100 bg-white shadow-sm"
+                      >
+                        <Contact className="w-4 h-4" />
+                        استيراد من جهات الاتصال
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>اسم العميل / الشركة</Label>
+                      <Input value={name} onChange={e => setName(e.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>رقم الهاتف</Label>
+                      <Input value={phone} onChange={e => setPhone(e.target.value)} required dir="ltr" className="text-left" />
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
@@ -221,10 +277,6 @@ export function CustomersManager() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label>رقم الهاتف</Label>
-                  <Input value={phone} onChange={e => setPhone(e.target.value)} required dir="ltr" className="text-left" />
-                </div>
                 <div className="space-y-4 md:col-span-2 border-t pt-4 bg-gray-50/50 p-4 rounded-xl">
                   <Label className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /> أرقام تواصل إضافية (اختياري)</Label>
                   {(Array.isArray(contactNumbers) ? contactNumbers : []).map((contact, idx) => (
