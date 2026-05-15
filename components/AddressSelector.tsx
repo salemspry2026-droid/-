@@ -82,12 +82,12 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">البلد</Label>
         <Select 
           value={selectedCountry} 
-          onValueChange={(val) => {
-            setSelectedCountry(val);
+          onValueChange={(val: string) => {
+            setSelectedCountry(val || 'none');
             setSelectedGov('none');
             setSelectedRegion('none');
             setSelectedNeighborhood('none');
-            handleUpdate(val, 'none', 'none', 'none');
+            handleUpdate(val || 'none', 'none', 'none', 'none');
           }}
         >
           <SelectTrigger className="bg-white"><SelectValue placeholder="اختر البلد" /></SelectTrigger>
@@ -102,11 +102,11 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">المحافظة</Label>
         <Select 
           value={selectedGov} 
-          onValueChange={(val) => {
-            setSelectedGov(val);
+          onValueChange={(val: string) => {
+            setSelectedGov(val || 'none');
             setSelectedRegion('none');
             setSelectedNeighborhood('none');
-            handleUpdate(selectedCountry, val, 'none', 'none');
+            handleUpdate(selectedCountry, val || 'none', 'none', 'none');
           }}
           disabled={selectedCountry === 'none'}
         >
@@ -122,10 +122,10 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">المدينة / المنطقة</Label>
         <Select 
           value={selectedRegion} 
-          onValueChange={(val) => {
-            setSelectedRegion(val);
+          onValueChange={(val: string) => {
+            setSelectedRegion(val || 'none');
             setSelectedNeighborhood('none');
-            handleUpdate(selectedCountry, selectedGov, val, 'none');
+            handleUpdate(selectedCountry, selectedGov, val || 'none', 'none');
           }}
           disabled={selectedGov === 'none'}
         >
@@ -141,9 +141,9 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">الحي</Label>
         <Select 
           value={selectedNeighborhood} 
-          onValueChange={(val) => {
-            setSelectedNeighborhood(val);
-            handleUpdate(selectedCountry, selectedGov, selectedRegion, val);
+          onValueChange={(val: string) => {
+            setSelectedNeighborhood(val || 'none');
+            handleUpdate(selectedCountry, selectedGov, selectedRegion, val || 'none');
           }}
           disabled={selectedRegion === 'none'}
         >
