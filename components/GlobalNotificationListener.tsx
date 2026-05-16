@@ -36,32 +36,44 @@ export function GlobalNotificationListener() {
       });
 
       // Stale orders check
-      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-      const qOrders = query(
-        collection(db, 'orders'),
-        where('companyId', '==', profile.companyId),
-        where('isDeleted', '==', false),
-        where('status', 'in', ['pending', 'processing']) // Unconfirmed
-      );
+      let unsubOrders = () => {};
+      
+      if (['admin', 'owner', 'sales'].includes(profile.role)) {
+        const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+        const qOrders = query(
+          collection(db, 'orders'),
+          where('companyId', '==', profile.companyId),
+          where('isDeleted', '==', false),
+          where('status', 'in', ['pending', 'processing']) // Unconfirmed
+        );
 
-      // We just use another snapshot for stale orders to add to the count
-      const unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
-        const stales = ordersSnap.docs.filter((o: any) => {
-          const data = o.data();
-          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-          return createdAt < fourHoursAgo;
+        // We just use another snapshot for stale orders to add to the count
+        unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
+          const stales = ordersSnap.docs.filter((o: any) => {
+            const data = o.data();
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+            return createdAt < fourHoursAgo;
+          });
+          
+          setUnreadNotifications(unreadCount + stales.length);
+          
+          if (hasNewUnread) {
+            // Play sound
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.play().catch(e => console.error("Audio play blocked", e));
+            } catch (err) {}
+          }
         });
-        
-        setUnreadNotifications(unreadCount + stales.length);
-        
+      } else {
+        setUnreadNotifications(unreadCount);
         if (hasNewUnread) {
-          // Play sound
           try {
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
             audio.play().catch(e => console.error("Audio play blocked", e));
           } catch (err) {}
         }
-      });
+      }
 
       initialLoadRef.current = false;
       return () => unsubOrders();

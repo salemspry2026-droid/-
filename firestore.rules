@@ -294,13 +294,11 @@ service cloud.firestore {
       );
       
       allow create: if isAuthenticated() && 
-                    isValidOrder(request.resource.data) && 
                     isCreatedByCurrentUser() && 
                     isUpdatedByCurrentUser() && 
                     (isCompanyMember(request.resource.data.companyId) || getUserRole() == 'client');
 
       allow update: if isAuthenticated() && 
-                    isValidOrder(request.resource.data) && 
                     isUpdatedByCurrentUser() && 
                     isUnchangedOrBackfilled('createdAt') &&
                     isUnchangedOrBackfilled('createdBy') &&

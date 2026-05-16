@@ -41,24 +41,29 @@ export function NotificationsDialog({
 
     // 2. Fetch Stale Orders (unconfirmed for more than 4 hours)
     // Client-side mapping
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-    const qOrders = query(
-      collection(db, 'orders'),
-      where('companyId', '==', profile.companyId),
-      where('isDeleted', '==', false),
-      where('status', 'in', ['pending', 'processing']) // Unconfirmed
-    );
+    let unsubOrders = () => {};
+    if (['admin', 'owner', 'sales'].includes(profile.role)) {
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      const qOrders = query(
+        collection(db, 'orders'),
+        where('companyId', '==', profile.companyId),
+        where('isDeleted', '==', false),
+        where('status', 'in', ['pending', 'processing']) // Unconfirmed
+      );
 
-    const unsubOrders = onSnapshot(qOrders, (snap) => {
-      const allPending = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const stales = allPending.filter((o: any) => {
-        const createdAt = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
-        return createdAt < fourHoursAgo;
+      unsubOrders = onSnapshot(qOrders, (snap) => {
+        const allPending = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const stales = allPending.filter((o: any) => {
+          const createdAt = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
+          return createdAt < fourHoursAgo;
+        });
+        setStaleOrders(stales);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'orders');
       });
-      setStaleOrders(stales);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'orders');
-    });
+    } else {
+      setStaleOrders([]);
+    }
 
     return () => {
       unsubNotifs();

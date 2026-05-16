@@ -16,7 +16,7 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { pro
 
   // We are assuming standard functionality, only calculating stats from 'orders'
   useEffect(() => {
-    if (!product || !isOpen || !profile?.companyId) return;
+    if (!product || !isOpen || !profile?.companyId || profile.role === 'client') return;
     
     // In a real optimized scenario, we would use aggregations or cloud functions
     // For now, doing a client-side aggregation
