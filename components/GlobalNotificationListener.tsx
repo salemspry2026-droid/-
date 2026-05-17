@@ -11,7 +11,24 @@ export function GlobalNotificationListener() {
   const knownNotifIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!profile?.companyId || !user?.uid) return;
+    if (!profile || !user?.uid) return;
+
+    if (profile.role === 'client') {
+      // Clients do not use the company notifications collection since they don't have a fixed companyId.
+      // Instead, we could monitor their orders for changes if needed.
+      const qOrders = query(
+        collection(db, 'orders'),
+        where('createdBy', '==', user.uid),
+        // we can't easily query unread without a field, so we just set unread to 0 for now.
+      );
+      const unsub = onSnapshot(qOrders, (snap) => {
+        // Optionally count orders that have changed status recently. For now we set 0.
+        setUnreadNotifications(0);
+      });
+      return () => unsub();
+    }
+
+    if (!profile.companyId) return;
 
     const qNotifs = query(
       collection(db, 'notifications'), 

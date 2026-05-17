@@ -95,23 +95,25 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { pro
         </DialogHeader>
 
         {/* Dashboard Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center justify-center text-center">
-             <Store className="w-6 h-6 text-blue-500 mb-2" />
-             <p className="text-sm font-bold text-gray-600">مرات الطلب</p>
-             <p className="text-2xl font-bold text-gray-900">{stats.timesOrdered}</p>
+        {profile?.role !== 'client' && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center justify-center text-center">
+               <Store className="w-6 h-6 text-blue-500 mb-2" />
+               <p className="text-sm font-bold text-gray-600">مرات الطلب</p>
+               <p className="text-2xl font-bold text-gray-900">{stats.timesOrdered}</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex flex-col items-center justify-center text-center">
+               <Package className="w-6 h-6 text-green-500 mb-2" />
+               <p className="text-sm font-bold text-gray-600">الوحدات المباعة</p>
+               <p className="text-2xl font-bold text-gray-900">{stats.unitsSold}</p>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col items-center justify-center text-center">
+               <Tag className="w-6 h-6 text-orange-500 mb-2" />
+               <p className="text-sm font-bold text-gray-600">إجمالي المبيعات</p>
+               <p className="text-2xl font-bold text-gray-900">{stats.totalSales.toLocaleString()} <span className="text-sm">{product.currency}</span></p>
+            </div>
           </div>
-          <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex flex-col items-center justify-center text-center">
-             <Package className="w-6 h-6 text-green-500 mb-2" />
-             <p className="text-sm font-bold text-gray-600">الوحدات المباعة</p>
-             <p className="text-2xl font-bold text-gray-900">{stats.unitsSold}</p>
-          </div>
-          <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col items-center justify-center text-center">
-             <Tag className="w-6 h-6 text-orange-500 mb-2" />
-             <p className="text-sm font-bold text-gray-600">إجمالي المبيعات</p>
-             <p className="text-2xl font-bold text-gray-900">{stats.totalSales.toLocaleString()} <span className="text-sm">{product.currency}</span></p>
-          </div>
-        </div>
+        )}
 
         {/* Product Data CV */}
         <div className="space-y-6">

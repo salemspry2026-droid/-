@@ -6,25 +6,38 @@ import { db, auth } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, ShoppingCart, Search, Package, Gift } from 'lucide-react';
+import { Loader2, ShoppingCart, Search, Package, Gift, Plus, Minus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+
+interface CartItem {
+  product: any;
+  quantity: number;
+}
 
 export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { profile, user, clientSelectedCompany } = useStore();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [orderingId, setOrderingId] = useState<string | null>(null);
+  const [isOrdering, setIsOrdering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+
+  // Cart State
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   useEffect(() => {
     if (!clientSelectedCompany?.id) {
       setLoading(false);
       return;
     }
+
+    // Reset cart when company changes
+    setCart([]);
 
     const q = query(
       collection(db, 'products'), 
@@ -42,36 +55,44 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     return () => unsubscribe();
   }, [clientSelectedCompany?.id]);
 
-  const handlePlaceOrder = async (product: any) => {
-    if (!clientSelectedCompany?.id || !user) return;
-    setOrderingId(product.id);
+  const handlePlaceOrder = async () => {
+    if (!clientSelectedCompany?.id || !user || cart.length === 0) return;
+    setIsOrdering(true);
 
     try {
       const orderId = `ord_${Math.random().toString(36).substring(2, 11)}`;
       
+      const items = cart.map(item => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        quantity: item.quantity,
+        price: item.product.specialOffer?.isActive ? item.product.specialOffer.price : item.product.price,
+        currency: item.product.currency
+      }));
+
+      const totalAmountByCurrency: Record<string, number> = {};
+      items.forEach(item => {
+        if (!totalAmountByCurrency[item.currency]) {
+          totalAmountByCurrency[item.currency] = 0;
+        }
+        totalAmountByCurrency[item.currency] += item.price * item.quantity;
+      });
+
       await setDoc(doc(db, 'orders', orderId), {
         companyId: clientSelectedCompany.id,
         customerId: user.uid, // For self-service, user is the customer
         customerName: profile?.displayName || 'عميل',
-        customerAddress: 'طلب من التطبيق',
+        customerAddress: 'طلب عبر التطبيق',
         source: 'customer',
-        items: [{
-          productId: product.id,
-          productName: product.name,
-          quantity: 1,
-          price: product.price,
-          currency: product.currency
-        }],
-        totalAmountByCurrency: {
-          [product.currency]: product.price
-        },
-        status: 'pending',
+        items: items,
+        totalAmountByCurrency: totalAmountByCurrency,
+        status: 'pending', // Order needs confirmation
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
         updatedBy: user.uid,
         isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `orders/${orderId}`));
+      });
 
       const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
       await setDoc(doc(db, 'notifications', notifId), {
@@ -88,13 +109,51 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         isDeleted: false
       }).catch(err => console.error("Failed to create notification", err));
 
-      toast.success('تم إرسال الطلب بنجاح!');
+      toast.success('تم إرسال الطلب بنجاح وهو في انتظار التأكيد!');
+      setCart([]);
+      setIsCheckoutOpen(false);
       if (onNavigate) onNavigate('orders');
     } catch (error: any) {
-      toast.error(error.message || 'فشل إرسال الطلب');
+      handleFirestoreError(error, OperationType.CREATE, 'orders');
+      toast.error('فشل إرسال الطلب برجاء المحاولة لاحقاً');
     } finally {
-      setOrderingId(null);
+      setIsOrdering(false);
     }
+  };
+
+  const getCartQuantity = (productId: string) => {
+    const item = cart.find(item => item.product.id === productId);
+    return item ? item.quantity : 0;
+  };
+
+  const addToCart = (product: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        return prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const updateQuantity = (productId: string, delta: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.product.id === productId) {
+          const newQ = item.quantity + delta;
+          if (newQ < 1) return item; 
+          return { ...item, quantity: newQ };
+        }
+        return item;
+      });
+    });
+  };
+
+  const removeFromCart = (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
   const categories = useMemo(() => {
@@ -108,6 +167,20 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Group cart totals by currency for display
+  const cartTotalsByCurrency = useMemo(() => {
+    const totals: Record<string, number> = {};
+    cart.forEach(item => {
+      const price = item.product.specialOffer?.isActive ? item.product.specialOffer.price : item.product.price;
+      const currency = item.product.currency || 'SAR';
+      if (!totals[currency]) totals[currency] = 0;
+      totals[currency] += price * item.quantity;
+    });
+    return totals;
+  }, [cart]);
 
   if (!clientSelectedCompany) {
     return (
@@ -165,8 +238,11 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
 
       {/* Products List */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filteredProducts.map(product => (
-          <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
+        {filteredProducts.map(product => {
+          const qty = getCartQuantity(product.id);
+          
+          return (
+          <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border ${qty > 0 ? 'border-green-400 bg-green-50/10' : 'border-gray-100'} flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
             <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
@@ -192,7 +268,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
               {product.specialOffer?.isActive && product.specialOffer.bonus && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded mb-2 w-fit">
                   <Gift className="w-3 h-3" />
-                  بونص العرض: {product.specialOffer.bonus}
+                  بونص: {product.specialOffer.bonus}
                 </div>
               )}
               {!product.specialOffer?.isActive && product.bonus && (
@@ -216,23 +292,154 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                   {product.price} <span className="text-xs font-normal text-gray-500">{product.currency} / {product.unit || 'حبة'}</span>
                 </p>
               )}
-              <Button 
-                className="w-full bg-green-600 hover:bg-green-700 text-white h-9 text-xs rounded-lg disabled:opacity-50" 
-                onClick={(e) => { e.stopPropagation(); handlePlaceOrder(product); }}
-                disabled={orderingId === product.id || product.inStock === false}
-              >
-                {orderingId === product.id ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <ShoppingCart className="w-3 h-3 ml-1" />}
-                {product.inStock === false ? 'غير متوفر' : 'طلب الآن'}
-              </Button>
+              
+              {qty > 0 ? (
+                <div className="flex items-center justify-between bg-green-50 rounded-lg p-1" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={(e) => qty === 1 ? removeFromCart(product.id, e) : updateQuantity(product.id, -1, e)}
+                    className="w-8 h-8 flex items-center justify-center bg-white text-green-700 rounded-md shadow-sm hover:bg-green-100"
+                  >
+                    {qty === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
+                  </button>
+                  <span className="font-bold text-green-800">{qty}</span>
+                  <button 
+                    onClick={(e) => updateQuantity(product.id, 1, e)}
+                    className="w-8 h-8 flex items-center justify-center bg-white text-green-700 rounded-md shadow-sm hover:bg-green-100"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700 text-white h-9 text-xs rounded-lg disabled:opacity-50" 
+                  onClick={(e) => addToCart(product, e)}
+                  disabled={product.inStock === false}
+                >
+                  <ShoppingCart className="w-3 h-3 ml-1" />
+                  {product.inStock === false ? 'غير متوفر' : 'أضف للسلة'}
+                </Button>
+              )}
             </div>
           </div>
-        ))}
+        )})}
       </div>
       {filteredProducts.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           لا توجد منتجات متاحة حالياً
         </div>
       )}
+
+      {/* Sticky Cart Toolbar */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-16 md:bottom-6 left-0 right-0 md:left-auto md:right-auto md:w-[calc(100%-16rem)] max-w-7xl mx-auto px-4 z-40 pointer-events-none">
+          <div className="bg-green-600 text-white p-4 rounded-2xl shadow-xl flex items-center justify-between pointer-events-auto">
+             <div className="flex items-center gap-3">
+               <div className="relative">
+                 <ShoppingCart className="w-6 h-6" />
+                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm">
+                   {cartTotalItems}
+                 </span>
+               </div>
+               <div>
+                  <p className="font-bold text-sm">إجمالي السلة</p>
+                  <p className="text-xs text-green-100">
+                    {Object.entries(cartTotalsByCurrency).map(([curr, total]) => (
+                      <span key={curr} className="ml-2">{total} {curr}</span>
+                    ))}
+                  </p>
+               </div>
+             </div>
+             
+             <Button 
+               variant="secondary" 
+               className="bg-white text-green-700 hover:bg-green-50 font-bold px-6"
+               onClick={() => setIsCheckoutOpen(true)}
+             >
+                متابعة الطلب
+             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Dialog */}
+      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>مراجعة الطلب</DialogTitle>
+            <DialogDescription>
+              الرجاء مراجعة الأصناف المحددة قبل إرسال الطلب. الطلب سيكون في انتظار التأكيد من قبل الشركة.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-3">
+              {cart.map((item) => {
+                const price = item.product.specialOffer?.isActive ? item.product.specialOffer.price : item.product.price;
+                return (
+                  <div key={item.product.id} className="flex gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0">
+                      {item.product.imageUrl ? (
+                        <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <Package className="w-8 h-8 text-gray-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm text-gray-900 truncate">{item.product.name}</h4>
+                      <p className="text-xs text-gray-500 mb-2">{price} {item.product.currency}</p>
+                      
+                      <div className="flex items-center gap-3 bg-white w-fit rounded-lg border border-gray-200">
+                        <button 
+                          onClick={() => item.quantity === 1 ? removeFromCart(item.product.id) : updateQuantity(item.product.id, -1)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-r-lg"
+                        >
+                          {item.quantity === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
+                        </button>
+                        <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                        <button 
+                          onClick={() => updateQuantity(item.product.id, 1)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-lg"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="font-bold text-sm text-green-700 whitespace-nowrap">
+                      {price * item.quantity} {item.product.currency}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          <div className="bg-green-50 p-4 rounded-xl mt-4">
+             <h4 className="font-bold text-gray-900 mb-2">الإجمالي</h4>
+             <div className="space-y-1">
+               {Object.entries(cartTotalsByCurrency).map(([curr, total]) => (
+                <div key={curr} className="flex justify-between items-center font-bold text-green-800 text-lg">
+                  <span>{curr}</span>
+                  <span>{total}</span>
+                </div>
+               ))}
+             </div>
+          </div>
+
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="w-full sm:w-auto">
+              تعديل السلة
+            </Button>
+            <Button 
+              className="bg-green-600 w-full sm:w-auto hover:bg-green-700" 
+              onClick={handlePlaceOrder}
+              disabled={isOrdering || cart.length === 0}
+            >
+              {isOrdering ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : null}
+              تأكيد وإرسال الطلب
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ProductDetailsDialog 
         product={selectedProduct} 
@@ -242,3 +449,4 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     </div>
   );
 }
+

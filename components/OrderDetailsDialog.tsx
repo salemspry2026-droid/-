@@ -109,7 +109,7 @@ export function OrderDetailsDialog({
           </button>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+        <div className={cn("flex-1 overflow-y-auto p-4 space-y-4", profile?.role !== 'client' ? "pb-24" : "pb-4")}>
           
           {/* Progress Bar */}
           {stages.length > 0 && (
@@ -118,7 +118,7 @@ export function OrderDetailsDialog({
                {stages.map((stage, idx) => {
                  const isCompleted = idx < activeIndex;
                  const isCurrent = idx === activeIndex;
-                 const isUpcoming = idx > activeIndex;
+                 // const isUpcoming = idx > activeIndex;
 
                  return (
                    <div key={idx} className="relative z-10 flex flex-col items-center gap-2">
@@ -144,23 +144,25 @@ export function OrderDetailsDialog({
           )}
 
           {/* Customer Details */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-             <div className="p-3 border-b flex justify-between items-center text-blue-800 bg-white">
-               <h3 className="font-bold text-sm">العميل</h3>
-               <User className="w-5 h-5 text-blue-600" />
-             </div>
-             <div className="p-4 flex items-center justify-end gap-4 relative">
-                <ChevronLeft className="w-5 h-5 text-gray-300 absolute left-4" />
-                <div className="text-right">
-                  <h4 className="font-bold text-gray-900 text-base mb-1">{order.customerName}</h4>
-                  <p className="text-gray-500 text-sm font-medium" dir="ltr">{order.customerPhone || 'بدون رقم'}</p>
-                  <p className="text-gray-400 text-xs mt-1">{order.customerAddress || 'بدون عنوان'}</p>
-                </div>
-                <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
-                  {order.customerName?.charAt(0) || 'ع'}
-                </div>
-             </div>
-          </div>
+          {profile?.role !== 'client' && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+               <div className="p-3 border-b flex justify-between items-center text-blue-800 bg-white">
+                 <h3 className="font-bold text-sm">العميل</h3>
+                 <User className="w-5 h-5 text-blue-600" />
+               </div>
+               <div className="p-4 flex items-center justify-end gap-4 relative">
+                  <ChevronLeft className="w-5 h-5 text-gray-300 absolute left-4" />
+                  <div className="text-right">
+                    <h4 className="font-bold text-gray-900 text-base mb-1">{order.customerName}</h4>
+                    <p className="text-gray-500 text-sm font-medium" dir="ltr">{order.customerPhone || 'بدون رقم'}</p>
+                    <p className="text-gray-400 text-xs mt-1">{order.customerAddress || 'بدون عنوان'}</p>
+                  </div>
+                  <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                    {order.customerName?.charAt(0) || 'ع'}
+                  </div>
+               </div>
+            </div>
+          )}
 
           {/* Order Info */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -253,25 +255,27 @@ export function OrderDetailsDialog({
         </div>
 
         {/* Bottom Action */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-          {nextStage ? (
-            <Button 
-              onClick={handleMoveToNextStage}
-              disabled={saving}
-              className="w-full h-14 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-base flex justify-center items-center gap-2"
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                <>
-                  <ArrowLeft className="w-5 h-5" /> إرسال لـ {nextStage.name}
-                </>
-              )}
-            </Button>
-          ) : (
-            <div className="w-full h-14 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 font-bold text-base flex justify-center items-center">
-              الطلب في المرحلة النهائية
-            </div>
-          )}
-        </div>
+        {profile?.role !== 'client' && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+            {nextStage ? (
+              <Button 
+                onClick={handleMoveToNextStage}
+                disabled={saving}
+                className="w-full h-14 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-base flex justify-center items-center gap-2"
+              >
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <>
+                    <ArrowLeft className="w-5 h-5" /> إرسال لـ {nextStage.name}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <div className="w-full h-14 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 font-bold text-base flex justify-center items-center">
+                الطلب في المرحلة النهائية
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

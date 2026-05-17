@@ -22,7 +22,14 @@ export function NotificationsDialog({
   const [staleOrders, setStaleOrders] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!open || !profile?.companyId || !user?.uid) return;
+    if (!open || !profile || !user?.uid) return;
+
+    if (profile.role === 'client') {
+      setLoading(false);
+      return;
+    }
+
+    if (!profile.companyId) return;
 
     // 1. Listen to database notifications
     const qNotifs = query(

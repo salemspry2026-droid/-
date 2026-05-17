@@ -8,12 +8,14 @@ import { Loader2, ShoppingBag, Calendar, ChevronLeft } from 'lucide-react';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { OrderDetailsDialog } from './OrderDetailsDialog';
 
 export function ClientOrders() {
-  const { profile, user } = useStore();
+  const { profile, user, clientSelectedCompany } = useStore();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   const { selectedOrderId, setSelectedOrderId } = useStore();
 
@@ -121,12 +123,15 @@ export function ClientOrders() {
                   order.status === 'processing' ? 'bg-orange-50 text-orange-600' :
                   order.status === 'completed' ? 'bg-green-50 text-green-600' :
                   order.status === 'delivered' ? 'bg-gray-100 text-gray-600' :
-                  'bg-red-50 text-red-600'
+                  order.status === 'cancelled' ? 'bg-red-50 text-red-600' :
+                  'bg-teal-50 text-teal-600'
                 )}>
-                  {order.status === 'pending' ? 'جديد' : 
+                  {order.status === 'pending' ? 'جديد (بانتظار التأكيد)' : 
                    order.status === 'processing' ? 'قيد المراجعة' : 
                    order.status === 'completed' ? 'مؤكد' : 
-                   order.status === 'delivered' ? 'مُسلّم' : 'ملغى'}
+                   order.status === 'delivered' ? 'مُسلّم' : 
+                   order.status === 'cancelled' ? 'ملغى' :
+                   order.status}
                 </span>
               </div>
             </div>
@@ -136,7 +141,10 @@ export function ClientOrders() {
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{order.createdAt ? formatDistanceToNow(order.createdAt.toDate(), { addSuffix: true, locale: ar }) : 'الآن'}</span>
               </div>
-              <button className="text-green-600 font-bold flex items-center gap-1">
+              <button 
+                className="text-green-600 font-bold flex items-center gap-1"
+                onClick={() => setSelectedOrder(order)}
+              >
                 التفاصيل <ChevronLeft className="w-3 h-3" />
               </button>
             </div>
@@ -148,6 +156,13 @@ export function ClientOrders() {
           </div>
         )}
       </div>
+
+      <OrderDetailsDialog 
+        open={!!selectedOrder}
+        onOpenChange={(open) => !open && setSelectedOrder(null)}
+        order={selectedOrder}
+        stages={[]} // Client view doesn't fetch custom stages pipeline currently
+      />
     </div>
   );
 }
