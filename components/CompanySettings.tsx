@@ -591,6 +591,7 @@ function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAd
   const [jobTitle, setJobTitle] = useState(emp.jobTitle || '');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setJobTitle(emp.jobTitle || '');
   }, [emp.jobTitle]);
 

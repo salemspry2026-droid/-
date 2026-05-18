@@ -51,6 +51,7 @@ export function CustomersManager() {
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsContactsSupported(true);
     }
   }, []);

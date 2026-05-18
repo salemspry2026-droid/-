@@ -25,6 +25,7 @@ export function NotificationsDialog({
     if (!open || !profile || !user?.uid) return;
 
     if (profile.role === 'client') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }

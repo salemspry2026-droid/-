@@ -24,6 +24,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
       const match = locations.find(l => l.name === nameToMatch);
       if (match) {
         if (match.type === 'neighborhood') {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setSelectedNeighborhood(match.id);
           const region = locations.find(l => l.id === match.parentId);
           if (region) {

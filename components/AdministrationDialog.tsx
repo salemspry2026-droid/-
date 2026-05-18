@@ -364,7 +364,7 @@ function LocationsManager({ companyId, userId }: { companyId: string, userId: st
         ) : rootLocations.length > 0 ? (
           rootLocations.map(loc => renderLocationNode(loc, 0))
         ) : (
-          <div className="text-center text-gray-500 py-8">لا توجد عناوين مضافة بعد. أضف "بلد" للبدء بتكوين هيكل العناوين.</div>
+          <div className="text-center text-gray-500 py-8">لا توجد عناوين مضافة بعد. أضف &quot;بلد&quot; للبدء بتكوين هيكل العناوين.</div>
         )}
       </div>
     </div>
