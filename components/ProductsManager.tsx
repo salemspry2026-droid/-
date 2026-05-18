@@ -19,9 +19,11 @@ import { ProductDetailsDialog } from './ProductDetailsDialog';
 export function ProductsManager() {
   const { profile, user } = useStore();
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategoryId, setActiveCategoryId] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -29,30 +31,35 @@ export function ProductsManager() {
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const q = query(
-      collection(db, 'products'), 
-      where('companyId', '==', profile.companyId),
-      where('isDeleted', '==', false)
-    );
+    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProducts(prods);
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    return () => unsubscribe();
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    return () => { unsubProducts(); unsubCats(); unsubBrands(); };
   }, [profile?.companyId]);
 
-  const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category).filter(Boolean));
-    return ['all', ...Array.from(cats)];
-  }, [products]);
+  const activeCategoriesList = useMemo(() => {
+    // Only show categories that have products, plus 'all'
+    const usedCatIds = new Set(products.map(p => p.categoryId).filter(Boolean));
+    return [{ id: 'all', name: 'الكل' }, ...categories.filter(c => usedCatIds.has(c.id))];
+  }, [products, categories]);
 
   const filteredProducts = products.filter(product => {
+    const catName = categories.find(c => c.id === product.categoryId)?.name || '';
+    const brandName = brands.find(b => b.id === product.brandId)?.name || '';
+    
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.category?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
+                          catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          brandName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategoryId === 'all' || product.categoryId === activeCategoryId;
     return matchesSearch && matchesCategory;
   });
 
@@ -86,16 +93,16 @@ export function ProductsManager() {
 
       {/* Category Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
-        {categories.map(cat => (
+        {activeCategoriesList.map(cat => (
           <button 
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+            key={cat.id}
+            onClick={() => setActiveCategoryId(cat.id)}
             className={cn(
               "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors", 
-              activeCategory === cat ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+              activeCategoryId === cat.id ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"
             )}
           >
-            {cat === 'all' ? 'الكل' : cat}
+            {cat.name}
           </button>
         ))}
       </div>
@@ -120,7 +127,10 @@ export function ProductsManager() {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg leading-tight">{product.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{product.category || 'بدون تصنيف'}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}
+                    {product.brandId && ` • ${brands.find(b => b.id === product.brandId)?.name || ''}`}
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">
@@ -177,6 +187,8 @@ export function ProductsManager() {
             setSelectedProduct(null);
             setEditingProduct(p);
         }} 
+        categories={categories}
+        brands={brands}
       />
 
       <ProductFormDialog 

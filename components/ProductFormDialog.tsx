@@ -36,7 +36,7 @@ export function ProductFormDialog({
     setPrice(p.price?.toString() || '');
     setCurrency(p.currency || '');
     setDescription(p.description || '');
-    setCategory(p.category || '');
+    setCategoryId(p.categoryId || 'none');
     setUnit(p.unit || 'كرتون');
     setBrandId(p.brandId || 'none');
     setImageUrl(p.imageUrl || '');
@@ -76,7 +76,7 @@ export function ProductFormDialog({
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState('none');
   const [unit, setUnit] = useState('كرتون');
   const [brandId, setBrandId] = useState('none');
   
@@ -127,7 +127,7 @@ export function ProductFormDialog({
   }, [open, profile?.companyId]);
 
   const resetForm = () => {
-    setName(''); setPrice(''); setDescription(''); setCategory(''); setUnit('كرتون'); setBrandId('none');
+    setName(''); setPrice(''); setDescription(''); setCategoryId('none'); setUnit('كرتون'); setBrandId('none');
     setInvoiceTypeRestriction('all'); setCurrencyRestrictionType('any'); setSpecificCurrencies([]);
     setBonusType('none'); setBonusFixedPercent(''); setBonusTiers([]);
     setImageUrl(''); setNewBrandName(''); setNewCategoryName(''); setNotes(''); setExpiryDates([]);
@@ -175,8 +175,8 @@ export function ProductFormDialog({
         finalBrandId = newBId;
       }
 
-      let finalCategory = category;
-      if (category === 'other' && newCategoryName.trim()) {
+      let finalCategoryId = categoryId === 'none' ? null : categoryId;
+      if (categoryId === 'other' && newCategoryName.trim()) {
         const newCId = `cat_${Math.random().toString(36).substring(2, 11)}`;
         await setDoc(doc(db, 'productCategories', newCId), {
           companyId: profile.companyId,
@@ -187,7 +187,7 @@ export function ProductFormDialog({
           updatedBy: user.uid,
           isDeleted: false
         });
-        finalCategory = newCategoryName.trim();
+        finalCategoryId = newCId;
       }
 
       const productData: any = {
@@ -195,7 +195,7 @@ export function ProductFormDialog({
         description,
         price: parseFloat(price),
         currency: currency || companyDetails?.primaryCurrency || 'SAR',
-        category: finalCategory,
+        categoryId: finalCategoryId,
         unit,
         brandId: finalBrandId,
         imageUrl,
@@ -341,14 +341,15 @@ export function ProductFormDialog({
               <div className="space-y-2">
                 <Label>التصنيف</Label>
                 <div className="flex flex-col gap-2">
-                  <Select value={category} onValueChange={(v) => setCategory(v || '')}>
+                  <Select value={categoryId} onValueChange={(v) => setCategoryId(v || '')}>
                     <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
                     <SelectContent>
-                        {companyCategories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                        <SelectItem value="none">بدون تصنيف</SelectItem>
+                        {companyCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                         <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة تصنيف جديد)</SelectItem>
                     </SelectContent>
                   </Select>
-                  {category === 'other' && (
+                  {categoryId === 'other' && (
                     <Input placeholder="اسم التصنيف الجديد" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
                   )}
                 </div>

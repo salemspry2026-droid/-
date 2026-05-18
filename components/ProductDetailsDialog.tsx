@@ -9,7 +9,7 @@ import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } fr
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 
-export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { product: any, isOpen: boolean, onClose: () => void, onEdit?: (product: any) => void }) {
+export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categories = [], brands = [] }: { product: any, isOpen: boolean, onClose: () => void, onEdit?: (product: any) => void, categories?: any[], brands?: any[] }) {
   const { profile, user } = useStore();
   const [stats, setStats] = useState({ timesOrdered: 0, unitsSold: 0, totalSales: 0 });
   const [loading, setLoading] = useState(true);
@@ -128,7 +128,10 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit }: { pro
               <div className="flex-1 space-y-3">
                  <div>
                     <h3 className="text-xl font-bold text-gray-900">{product.name}</h3>
-                    <p className="text-gray-500">{product.category || 'بدون تصنيف'} • {product.brandId || 'بدون علامة تجارية'}</p>
+                    <p className="text-gray-500">
+                      {categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'} 
+                      {product.brandId && ` • ${brands.find(b => b.id === product.brandId)?.name || ''}`}
+                    </p>
                  </div>
                  <div className="text-2xl font-bold text-blue-600">
                     {product.price} <span className="text-base text-gray-600">{product.currency} / {product.unit || 'حبة'}</span>

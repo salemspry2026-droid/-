@@ -30,6 +30,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+
   useEffect(() => {
     if (!clientSelectedCompany?.id) {
       setLoading(false);
@@ -39,20 +42,25 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     // Reset cart when company changes
     setCart([]);
 
-    const q = query(
+    const qProducts = query(
       collection(db, 'products'), 
       where('companyId', '==', clientSelectedCompany.id),
       where('isActive', '==', true),
       where('isDeleted', '==', false)
     );
+    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(prods);
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    return () => unsubscribe();
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    return () => { unsubProducts(); unsubCats(); unsubBrands(); };
   }, [clientSelectedCompany?.id]);
 
   const handlePlaceOrder = async () => {
@@ -156,15 +164,19 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
-  const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category).filter(Boolean));
-    return ['all', ...Array.from(cats)];
-  }, [products]);
+  const activeCategoriesList = useMemo(() => {
+    const usedCatIds = new Set(products.map(p => p.categoryId).filter(Boolean));
+    return [{ id: 'all', name: 'الكل' }, ...categories.filter(c => usedCatIds.has(c.id))];
+  }, [products, categories]);
 
   const filteredProducts = products.filter(product => {
+    const catName = categories.find(c => c.id === product.categoryId)?.name || '';
+    const brandName = brands.find(b => b.id === product.brandId)?.name || '';
+
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.category?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
+                          catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          brandName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -222,16 +234,16 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
 
       {/* Category Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
-        {categories.map(cat => (
+        {activeCategoriesList.map(cat => (
           <button 
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
             className={cn(
               "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors", 
-              activeCategory === cat ? "bg-green-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+              activeCategory === cat.id ? "bg-green-600 text-white" : "bg-white text-gray-600 border border-gray-200"
             )}
           >
-            {cat === 'all' ? 'الكل' : cat}
+            {cat.name}
           </button>
         ))}
       </div>
@@ -262,7 +274,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             </div>
             
             <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-1">{product.category || 'بدون تصنيف'}</p>
+              <p className="text-xs text-gray-500 mb-1">{categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}</p>
               <h3 className="font-bold text-gray-900 text-sm leading-tight mb-2 line-clamp-2">{product.name}</h3>
               
               {product.specialOffer?.isActive && product.specialOffer.bonus && (
@@ -445,6 +457,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         product={selectedProduct} 
         isOpen={!!selectedProduct} 
         onClose={() => setSelectedProduct(null)} 
+        categories={categories}
+        brands={brands}
       />
     </div>
   );
