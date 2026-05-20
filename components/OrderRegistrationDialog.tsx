@@ -319,7 +319,7 @@ export function OrderRegistrationDialog({
           discount: { type: discountType, value: discountValue },
           skipReviewPhase: skipReview,
           totalAmountByCurrency: brandTotalsByCurrency,
-          status: skipReview ? (orderStages.length > 2 ? orderStages[2].name : (orderStages.length > 1 ? orderStages[1].name : 'approved')) : defaultInitialStatus,
+          status: skipReview ? (orderStages.length > 1 ? orderStages[1].name : defaultInitialStatus) : defaultInitialStatus,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           createdBy: user.uid,
@@ -757,8 +757,8 @@ export function OrderRegistrationDialog({
                    <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> خيارات المراحل</h3>
                    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
                       <div>
-                        <h4 className="font-bold text-gray-900">تجاوز {orderStages[1]?.name || 'المرحلة التالية'}</h4>
-                        <p className="text-xs text-gray-500 mt-0.5">القفز مباشرة إلى حالة &apos;{orderStages.length > 2 ? orderStages[2].name : (orderStages[1]?.name || 'النهاية')}&apos;</p>
+                        <h4 className="font-bold text-gray-900">تجاوز {orderStages[0]?.name || 'المرحلة الأولى'}</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">القفز مباشرة إلى حالة &apos;{orderStages.length > 1 ? orderStages[1].name : 'المرحلة التالية'}&apos;</p>
                       </div>
                       <button 
                         onClick={() => setSkipReview(!skipReview)}

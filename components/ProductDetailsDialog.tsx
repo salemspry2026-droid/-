@@ -83,14 +83,16 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
         <DialogHeader className="mb-4">
           <DialogTitle className="text-2xl font-bold flex items-center justify-between">
             <span>تفاصيل الصنف: {product.name}</span>
-            <div className="flex gap-2">
-               <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(product)}>
-                 <Edit className="w-4 h-4 mr-2" /> تعديل
-               </Button>
-               <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={handleDelete}>
-                 <Trash2 className="w-4 h-4 mr-2" /> حذف
-               </Button>
-            </div>
+            {profile && ['owner', 'admin', 'sales'].includes(profile.role as string) && (
+              <div className="flex gap-2">
+                 <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(product)}>
+                   <Edit className="w-4 h-4 mr-2" /> تعديل
+                 </Button>
+                 <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={handleDelete}>
+                   <Trash2 className="w-4 h-4 mr-2" /> حذف
+                 </Button>
+              </div>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -215,7 +217,7 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
              </div>
 
              {/* Sales Policies (Only visible to admin/owner) */}
-             {profile?.role !== 'client' && (
+             {profile && ['owner', 'admin', 'sales'].includes(profile.role as string) && (
                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-3 col-span-1 md:col-span-2">
                   <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2">سياسات البيع</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">

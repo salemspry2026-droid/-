@@ -155,6 +155,8 @@ export function OrdersManager() {
       } else {
          dateFilterMatch = false;
       }
+    } else if (activeDateFilter === 'pending_debts') {
+      dateFilterMatch = order.invoiceType === 'pending_cash';
     }
 
     return matchesSearch && stageFilterMatch && dateFilterMatch;
@@ -223,6 +225,13 @@ export function OrdersManager() {
            className={cn("rounded-full whitespace-nowrap shrink-0", activeDateFilter === 'today' ? "bg-blue-600 text-white hover:bg-blue-700 border-transparent" : "bg-white text-gray-600 hover:bg-gray-50")}
         >
           <Calendar className={cn("w-4 h-4 ml-2", activeDateFilter === 'today' ? "text-white" : "text-gray-400")} /> طلبات اليوم
+        </Button>
+        <Button 
+           variant="outline" 
+           onClick={() => setActiveDateFilter('pending_debts')}
+           className={cn("rounded-full whitespace-nowrap shrink-0 transition-colors", activeDateFilter === 'pending_debts' ? "bg-red-600 text-white hover:bg-red-700 border-transparent" : "bg-white text-red-600 hover:bg-red-50 border-red-200")}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ديون معلقة
         </Button>
       </div>
 
@@ -311,7 +320,7 @@ export function OrdersManager() {
                   </div>
                 </div>
               </div>
-              <div className="text-left flex flex-col items-end">
+              <div className="text-left flex flex-col items-end pointer-events-auto">
                   {currencyEntries.length > 0 ? (
                     currencyEntries.map(([curr, amount]) => (
                       <p key={curr} className="font-bold text-gray-900 text-sm leading-tight mb-0.5">
@@ -335,6 +344,23 @@ export function OrdersManager() {
                        return st;
                     })()}
                   </p>
+                  {order.invoiceType === 'pending_cash' && order.customerPhone && (
+                     <button
+                       onClick={(e) => {
+                          e.stopPropagation();
+                          let totalTxt = '';
+                          if (currencyEntries.length > 0) {
+                            totalTxt = currencyEntries.map(([curr, amount]) => `${Number(amount).toLocaleString()} ${curr}`).join(' و ');
+                          }
+                          const text = encodeURIComponent(`مرحباً ${order.customerName}،\nيرجى العلم بأنه توجد مديونية وفاتورة معلقة برقم #${order.id.substring(0, 8)} بمبلغ إجمالي ${totalTxt}.\nنرجو سدادها في أقرب فرصة. وشكراً.`);
+                          window.open(`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
+                       }}
+                       className="mt-2 text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
+                     >
+                       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12.031 0C5.39 0 0 5.39 0 12.03 0 14.65.85 17.07 2.29 19L.8 24l5.14-1.46c1.88 1.3 4.16 2.06 6.59 2.06 6.64 0 12.03-5.39 12.03-12.04S18.67 0 12.031 0zM17.6 16.5c-.29.81-1.63 1.54-2.28 1.62-.61.08-1.39.2-3.96-.86-3.1-1.28-5.06-4.46-5.21-4.66-.15-.2-1.25-1.67-1.25-3.19s.78-2.27 1.05-2.56c.26-.29.58-.36.78-.36.2 0 .4 0 .58.01.2.01.48-.08.75.56.28.67.95 2.33 1.04 2.52.08.19.14.41.01.67-.13.25-.2.41-.39.63-.19.22-.4.48-.57.67-.18.2-.38.41-.16.8 2.2 4.41 3.51 5.09 3.84 5.31.25.17.41.13.57-.05.15-.19.68-.78.86-1.04.19-.27.37-.22.61-.13.23.09 1.48.7 1.73.83.25.12.41.19.47.29.07.1.07.54-.22 1.35z"/></svg>
+                       تنبيه سداد
+                     </button>
+                  )}
               </div>
             </CardContent>
           </Card>

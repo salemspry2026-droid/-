@@ -33,6 +33,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
 
+  const [orderStages, setOrderStages] = useState<any[]>([]);
+
   useEffect(() => {
     if (!clientSelectedCompany?.id) {
       setLoading(false);
@@ -50,6 +52,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     );
     const qCats = query(collection(db, 'productCategories'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
     const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
+    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
 
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -59,8 +62,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
 
     const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)));
 
-    return () => { unsubProducts(); unsubCats(); unsubBrands(); };
+    return () => { unsubProducts(); unsubCats(); unsubBrands(); unsubStages(); };
   }, [clientSelectedCompany?.id]);
 
   const handlePlaceOrder = async () => {
@@ -90,11 +94,11 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         companyId: clientSelectedCompany.id,
         customerId: user.uid, // For self-service, user is the customer
         customerName: profile?.displayName || 'عميل',
-        customerAddress: 'طلب عبر التطبيق',
+        customerAddress: profile?.address || 'طلب عبر التطبيق',
         source: 'customer',
         items: items,
         totalAmountByCurrency: totalAmountByCurrency,
-        status: 'pending', // Order needs confirmation
+        status: orderStages.length > 0 ? orderStages[0].name : 'pending', // Usually the first stage
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
@@ -130,27 +134,27 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     }
   };
 
-  const getCartQuantity = (productId: string) => {
-    const item = cart.find(item => item.product.id === productId);
+  const getCartQuantity = (displayId: string) => {
+    const item = cart.find(item => item.product.displayId === displayId);
     return item ? item.quantity : 0;
   };
 
   const addToCart = (product: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const existing = prev.find(item => item.product.displayId === product.displayId);
       if (existing) {
-        return prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map(item => item.product.displayId === product.displayId ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, { product, quantity: 1 }];
     });
   };
 
-  const updateQuantity = (productId: string, delta: number, e?: React.MouseEvent) => {
+  const updateQuantity = (displayId: string, delta: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setCart(prev => {
       return prev.map(item => {
-        if (item.product.id === productId) {
+        if (item.product.displayId === displayId) {
           const newQ = item.quantity + delta;
           if (newQ < 1) return item; 
           return { ...item, quantity: newQ };
@@ -160,9 +164,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     });
   };
 
-  const removeFromCart = (productId: string, e?: React.MouseEvent) => {
+  const removeFromCart = (displayId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+    setCart(prev => prev.filter(item => item.product.displayId !== displayId));
   };
 
   const activeCategoriesList = useMemo(() => {
@@ -170,7 +174,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     return [{ id: 'all', name: 'الكل' }, ...categories.filter(c => usedCatIds.has(c.id))];
   }, [products, categories]);
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = products.flatMap(product => {
     const catName = categories.find(c => c.id === product.categoryId)?.name || '';
     const brandName = brands.find(b => b.id === product.brandId)?.name || '';
 
@@ -178,7 +182,20 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                           catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           brandName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory;
-    return matchesSearch && matchesCategory;
+    
+    if (!matchesSearch || !matchesCategory) return [];
+
+    const entries = [];
+    
+    // Add regular product entry
+    entries.push({ ...product, isOfferEntry: false, displayId: product.id });
+
+    // Add special offer entry if active
+    if (product.specialOffer?.isActive) {
+      entries.push({ ...product, isOfferEntry: true, displayId: `${product.id}_offer` });
+    }
+    
+    return entries;
   });
 
   const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -252,17 +269,18 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       {/* Products List */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filteredProducts.map(product => {
-          const qty = getCartQuantity(product.id);
+          const qty = getCartQuantity(product.displayId);
+          const isOffer = product.isOfferEntry;
           
           return (
-          <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border ${qty > 0 ? 'border-green-400 bg-green-50/10' : 'border-gray-100'} flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
+          <div key={product.displayId} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border ${qty > 0 ? 'border-green-400 bg-green-50/10' : 'border-gray-100'} flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
             <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
               ) : (
                 <Package className="w-10 h-10 text-green-300" />
               )}
-              {product.specialOffer?.isActive && (
+              {isOffer && (
                 <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
                   عرض خاص
                 </div>
@@ -276,15 +294,15 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             
             <div className="flex-1">
               <p className="text-xs text-gray-500 mb-1">{categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}</p>
-              <h3 className="font-bold text-gray-900 text-sm leading-tight mb-2 line-clamp-2">{product.name}</h3>
+              <h3 className="font-bold text-gray-900 text-sm leading-tight mb-2 line-clamp-2">{product.name} {isOffer ? '(عرض)' : ''}</h3>
               
-              {product.specialOffer?.isActive && product.specialOffer.bonus && (
+              {isOffer && product.specialOffer?.bonus && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded mb-2 w-fit">
                   <Gift className="w-3 h-3" />
                   بونص: {product.specialOffer.bonus}
                 </div>
               )}
-              {!product.specialOffer?.isActive && product.bonus && (
+              {!isOffer && product.bonus && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mb-2 w-fit">
                   <Gift className="w-3 h-3" />
                   {product.bonus}
@@ -293,7 +311,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             </div>
             
             <div className="mt-auto pt-2 border-t border-gray-50">
-              {product.specialOffer?.isActive ? (
+              {isOffer ? (
                 <div className="mb-2">
                   <p className="font-bold text-red-600 text-lg">
                     {product.specialOffer.price} <span className="text-[10px] font-normal text-gray-500">{product.currency} / {product.unit || 'حبة'}</span>
@@ -309,7 +327,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
               {qty > 0 ? (
                 <div className="flex items-center justify-between bg-green-50 rounded-lg p-1" onClick={e => e.stopPropagation()}>
                   <button 
-                    onClick={(e) => qty === 1 ? removeFromCart(product.id, e) : updateQuantity(product.id, -1, e)}
+                    onClick={(e) => qty === 1 ? removeFromCart(product.displayId, e) : updateQuantity(product.displayId, -1, e)}
                     className="w-8 h-8 flex items-center justify-center bg-white text-green-700 rounded-md shadow-sm hover:bg-green-100"
                   >
                     {qty === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
@@ -323,8 +341,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                        const val = parseInt(e.target.value);
                        if (!isNaN(val) && val > 0) {
                          setCart(prev => {
-                           const exists = prev.find(i => i.product.id === product.id);
-                           if (exists) return prev.map(i => i.product.id === product.id ? { ...i, quantity: val } : i);
+                           const exists = prev.find(i => i.product.displayId === product.displayId);
+                           if (exists) return prev.map(i => i.product.displayId === product.displayId ? { ...i, quantity: val } : i);
                            return [...prev, { product, quantity: val }];
                          });
                        }
@@ -332,7 +350,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                     className="font-bold text-green-800 w-10 text-center bg-transparent outline-none"
                   />
                   <button 
-                    onClick={(e) => updateQuantity(product.id, 1, e)}
+                    onClick={(e) => updateQuantity(product.displayId, 1, e)}
                     className="w-8 h-8 flex items-center justify-center bg-white text-green-700 rounded-md shadow-sm hover:bg-green-100"
                   >
                     <Plus className="w-4 h-4" />
