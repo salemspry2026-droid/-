@@ -33,11 +33,10 @@ export function OrderDetailsDialog({
   // Determine current stage index
   const currentStageIndex = stages.findIndex(s => s.name === order.status || s.id === order.status);
   
-  // To handle string based statuses when custom stages aren't matching
-  const hasValidStage = currentStageIndex !== -1;
-  const activeIndex = hasValidStage ? currentStageIndex : 0;
+  const isPending = order.status === 'pending';
+  const activeIndex = currentStageIndex !== -1 ? currentStageIndex : (isPending ? -1 : 0);
   
-  const nextStage = hasValidStage && activeIndex < stages.length - 1 ? stages[activeIndex + 1] : null;
+  const nextStage = activeIndex < stages.length - 1 ? stages[activeIndex + 1] : null;
 
   const handleMoveToNextStage = async () => {
     if (!nextStage) return;

@@ -35,6 +35,7 @@ export function OrderRegistrationDialog({
   // Order State
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [invoiceType, setInvoiceType] = useState('cash'); // 'cash', 'pending_cash', 'credit'
+  const [dueDate, setDueDate] = useState('');
   
   // Custom Flow State
   const [step, setStep] = useState<1 | 2>(1); // 1: Selection, 2: Review
@@ -163,7 +164,46 @@ export function OrderRegistrationDialog({
     setCart(newCart);
   };
 
-  const categories = ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
+  const customerOrderFreq: Record<string, number> = {};
+  const customerOrderQty: Record<string, number> = {};
+  
+  const getPastBonusHistory = (productId: string) => {
+    let totalGiven = 0;
+    let timesOrdered = 0;
+    const pastDetails: string[] = [];
+    
+    customerOrders.forEach(order => {
+      order.items?.forEach((item: any) => {
+        if (item.productId === productId || item.productId === `${productId}_offer`) {
+          timesOrdered++;
+          if (item.bonusQuantity > 0) {
+            totalGiven += item.bonusQuantity;
+            if (pastDetails.length < 2) {
+              pastDetails.push(`${item.bonusQuantity} في ${new Date(order.createdAt?.seconds * 1000 || Date.now()).toLocaleDateString('ar-SA')}`);
+            }
+          }
+        }
+      });
+    });
+    
+    return { totalGiven, timesOrdered, pastDetails };
+  };
+
+  customerOrders.forEach(order => {
+    order.items?.forEach((item: any) => {
+       const pid = item.productId.replace('_offer', '');
+       customerOrderFreq[pid] = (customerOrderFreq[pid] || 0) + 1;
+       customerOrderQty[pid] = (customerOrderQty[pid] || 0) + item.quantity;
+    });
+  });
+
+  const categories = [
+    { id: 'all', name: 'الكل' },
+    { id: 'smart_freq', name: 'يطلبها باستمرار 🔥' },
+    { id: 'smart_qty', name: 'الأكثر كمية 📦' },
+    { id: 'smart_never', name: 'لم تُطلب سابقاً 🆕' },
+    ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).map(c => ({ id: c, name: c }))
+  ];
 
   const updateItemCurrency = (index: number, newCurrency: string) => {
     const newCart = [...cart];
@@ -263,13 +303,15 @@ export function OrderRegistrationDialog({
           customerAddress: customer.address || 'غير محدد',
           source: 'company',
           invoiceType, // 'cash', 'pending_cash', 'credit'
+          dueDate: invoiceType !== 'cash' ? dueDate : null,
           brandId: brandId === 'general' ? null : brandId,
           items: brandItems.map(i => ({
             productId: i.productId,
             productName: i.productName,
             quantity: i.quantity,
             note: i.note || '',
-            bonusQuantity: calculateBonus(i),
+            bonusQuantity: i.isManualBonus ? (i.bonusQuantity || 0) : calculateBonus(i),
+            isManualBonus: !!i.isManualBonus,
             price: i.price,
             currency: i.currency,
             total: calculateItemTotal(i)
@@ -317,9 +359,16 @@ export function OrderRegistrationDialog({
     }
   };
 
-  const expandedFilteredProducts = products.flatMap(p => {
+  let expandedFilteredProducts = products.flatMap(p => {
     const matchesSearch = p.name?.toLowerCase().includes(productSearch.toLowerCase());
-    const matchesCategory = activeCategory === 'all' || p.category === activeCategory;
+    
+    let matchesCategory = false;
+    if (activeCategory === 'all') matchesCategory = true;
+    else if (activeCategory === 'smart_freq') matchesCategory = !!customerOrderFreq[p.id];
+    else if (activeCategory === 'smart_qty') matchesCategory = !!customerOrderQty[p.id];
+    else if (activeCategory === 'smart_never') matchesCategory = !customerOrderFreq[p.id];
+    else matchesCategory = p.category === activeCategory;
+
     if (!matchesSearch || !matchesCategory) return [];
     
     const entries = [];
@@ -334,6 +383,12 @@ export function OrderRegistrationDialog({
     
     return entries;
   });
+
+  if (activeCategory === 'smart_freq') {
+    expandedFilteredProducts.sort((a, b) => (customerOrderFreq[b.id] || 0) - (customerOrderFreq[a.id] || 0));
+  } else if (activeCategory === 'smart_qty') {
+    expandedFilteredProducts.sort((a, b) => (customerOrderQty[b.id] || 0) - (customerOrderQty[a.id] || 0));
+  }
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
   const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
@@ -431,14 +486,15 @@ export function OrderRegistrationDialog({
                      <div className="flex overflow-x-auto hide-scrollbar px-4 pb-3 pt-1 gap-2">
                        {categories.map(cat => (
                          <button 
-                           key={cat}
-                           onClick={() => setActiveCategory(cat)}
+                           key={cat.id}
+                           onClick={() => setActiveCategory(cat.id)}
                            className={cn(
                              "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors border", 
-                             activeCategory === cat ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                             activeCategory === cat.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50",
+                             cat.id.startsWith('smart_') && activeCategory !== cat.id ? "bg-orange-50/50 text-orange-700 border-orange-200 hover:bg-orange-100" : ""
                            )}
                          >
-                           {cat === 'all' ? 'الكل' : cat}
+                           {cat.name}
                          </button>
                        ))}
                      </div>
@@ -567,7 +623,20 @@ export function OrderRegistrationDialog({
                              <div className="flex items-center gap-3">
                                <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 h-9">
                                  <button onClick={() => updateQuantity(idx, 1)} className="w-9 h-full hover:bg-blue-50 text-blue-600 flex items-center justify-center"><Plus className="w-4 h-4" /></button>
-                                 <span className="text-sm font-bold w-6 text-center select-none bg-blue-600 text-white leading-9">{item.quantity}</span>
+                                 <input 
+                                   type="number"
+                                   min="1"
+                                   value={item.quantity}
+                                   onChange={(e) => {
+                                      const val = parseInt(e.target.value);
+                                      if (!isNaN(val) && val > 0) {
+                                        const nc = [...cart];
+                                        nc[idx].quantity = val;
+                                        setCart(nc);
+                                      }
+                                   }}
+                                   className="w-10 h-full text-center text-sm font-bold bg-blue-600 text-white outline-none"
+                                 />
                                  <button onClick={() => updateQuantity(idx, -1)} disabled={item.quantity <= 1} className={cn("w-9 h-full flex items-center justify-center", item.quantity > 1 ? "hover:bg-red-50 text-red-500" : "text-gray-300 pointer-events-none")}><Minus className="w-4 h-4" /></button>
                                </div>
                                <button onClick={() => { const nc = [...cart]; nc.splice(idx,1); setCart(nc); if(nc.length===0) setStep(1); }} className="p-2 hover:bg-red-50 text-red-400 rounded-lg border border-transparent hover:border-red-100 transition-colors">
@@ -575,12 +644,47 @@ export function OrderRegistrationDialog({
                                </button>
                              </div>
 
-                             {computedBonus > 0 && (
-                               <div className="mt-3 flex items-center gap-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1.5 rounded">
+                             <div className="mt-3 flex flex-col gap-2">
+                               <div className="flex items-center gap-2 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1.5 rounded w-full">
                                  <Gift className="w-3.5 h-3.5" />
-                                 بونص: {computedBonus} مجاناً
+                                 بونص: 
+                                 <input 
+                                   type="number"
+                                   min="0"
+                                   value={item.isManualBonus ? (item.bonusQuantity || 0) : computedBonus}
+                                   onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const nc = [...cart];
+                                      nc[idx].bonusQuantity = val;
+                                      nc[idx].isManualBonus = true;
+                                      setCart(nc);
+                                   }}
+                                   className="w-16 h-6 px-1 text-center font-bold bg-white border border-orange-200 rounded text-orange-600"
+                                 />
+                                 مجاناً
+                                 {item.isManualBonus && (
+                                   <button 
+                                     onClick={() => {
+                                       const nc = [...cart];
+                                       nc[idx].isManualBonus = false;
+                                       setCart(nc);
+                                     }}
+                                     className="text-[10px] underline text-orange-400 mr-2"
+                                   >إعادة للآلي</button>
+                                 )}
                                </div>
-                             )}
+                               
+                               {(() => {
+                                 const history = getPastBonusHistory(item.productId.replace('_offer', ''));
+                                 if (history.totalGiven === 0) return null;
+                                 return (
+                                   <div className="text-[10px] text-gray-500 bg-gray-50 px-2 py-1 rounded w-fit border border-gray-100">
+                                     <span className="font-bold">تاريخ البونص للعميل:</span> إجمالي {history.totalGiven} ممنوح سابقاً 
+                                     {history.pastDetails.length > 0 && ` (آخرها: ${history.pastDetails.join('، ')})`}
+                                   </div>
+                                 );
+                               })()}
+                             </div>
 
                              <div className="mt-3">
                                <Input 
@@ -635,6 +739,17 @@ export function OrderRegistrationDialog({
                         </button>
                       ))}
                    </div>
+                   {invoiceType !== 'cash' && (
+                     <div className="mt-4 bg-white border border-gray-200 rounded-xl p-3 flex flex-col gap-2 shadow-sm">
+                       <Label className="text-sm font-bold text-gray-700">تاريخ الاستحقاق (موعد السداد)</Label>
+                       <Input 
+                         type="date" 
+                         value={dueDate} 
+                         onChange={(e) => setDueDate(e.target.value)} 
+                         className="h-10 text-sm"
+                       />
+                     </div>
+                   )}
                  </div>
 
                  {/* Options */}

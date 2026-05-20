@@ -98,6 +98,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
+        createdByName: profile?.displayName || user.displayName || 'عميل',
         updatedBy: user.uid,
         isDeleted: false
       });
@@ -313,7 +314,23 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                   >
                     {qty === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
                   </button>
-                  <span className="font-bold text-green-800">{qty}</span>
+                  <input 
+                    type="number"
+                    min="1"
+                    value={qty}
+                    onClick={e => e.stopPropagation()}
+                    onChange={(e) => {
+                       const val = parseInt(e.target.value);
+                       if (!isNaN(val) && val > 0) {
+                         setCart(prev => {
+                           const exists = prev.find(i => i.product.id === product.id);
+                           if (exists) return prev.map(i => i.product.id === product.id ? { ...i, quantity: val } : i);
+                           return [...prev, { product, quantity: val }];
+                         });
+                       }
+                    }}
+                    className="font-bold text-green-800 w-10 text-center bg-transparent outline-none"
+                  />
                   <button 
                     onClick={(e) => updateQuantity(product.id, 1, e)}
                     className="w-8 h-8 flex items-center justify-center bg-white text-green-700 rounded-md shadow-sm hover:bg-green-100"
@@ -407,7 +424,18 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                         >
                           {item.quantity === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
                         </button>
-                        <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                        <input 
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => {
+                             const val = parseInt(e.target.value);
+                             if (!isNaN(val) && val > 0) {
+                               setCart(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: val } : i));
+                             }
+                          }}
+                          className="font-bold text-sm w-10 text-center outline-none bg-transparent"
+                        />
                         <button 
                           onClick={() => updateQuantity(item.product.id, 1)}
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-lg"

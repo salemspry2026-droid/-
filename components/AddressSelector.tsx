@@ -21,7 +21,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
       // Find the deepest location that matches
       const parts = value.split(' - ');
       const nameToMatch = parts[parts.length - 1];
-      const match = locations.find(l => l.name === nameToMatch);
+      const match = locations.find(l => l.name === nameToMatch || l.id === nameToMatch);
       if (match) {
         if (match.type === 'neighborhood') {
           // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -135,14 +135,17 @@ export function ProductFormDialog({
     setOfferBonus(''); setOfferExpiryDate(''); setOfferQuantity(''); setOfferCondition('quantity'); setOfferEndDate('');
   };
 
-  const handleOpenChange = (v: boolean) => {
-    if(v) {
-        if (!productToEdit) {
-            resetForm();
-        } else {
+  useEffect(() => {
+    if (open) {
+        if (productToEdit) {
             populateForm(productToEdit);
+        } else {
+            resetForm();
         }
     }
+  }, [open, productToEdit]);
+
+  const handleOpenChange = (v: boolean) => {
     if (onOpenChange) onOpenChange(v);
     setInternalOpen(v);
   };
