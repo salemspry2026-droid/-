@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ClientProducts } from './ClientProducts';
 import { ClientOrders } from './ClientOrders';
 import { ClientHomeTab } from './ClientHomeTab';
+import ClientProfile from './ClientProfile';
 import { useStore } from '@/lib/store';
 import { NotificationsDialog } from './NotificationsDialog';
 import { GlobalNotificationListener } from './GlobalNotificationListener';
@@ -61,7 +62,7 @@ export function ClientDashboard() {
           {activeTab === 'home' && <ClientHomeTab onNavigate={setActiveTab} />}
           {activeTab === 'products' && <ClientProducts onNavigate={setActiveTab} />}
           {activeTab === 'orders' && <ClientOrders />}
-          {activeTab === 'profile' && <div className="p-4 text-center text-gray-500">الملف الشخصي (قريباً)</div>}
+          {activeTab === 'profile' && <ClientProfile />}
         </div>
       </main>
 

@@ -488,14 +488,23 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="w-full sm:w-auto">
               تعديل السلة
             </Button>
-            <Button 
-              className="bg-green-600 w-full sm:w-auto hover:bg-green-700" 
-              onClick={handlePlaceOrder}
-              disabled={isOrdering || cart.length === 0}
-            >
-              {isOrdering ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : null}
-              تأكيد وإرسال الطلب
-            </Button>
+            {(!profile?.phone || !profile?.storeName) ? (
+              <Button 
+                className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto text-white" 
+                onClick={() => { setIsCheckoutOpen(false); onNavigate && onNavigate('profile'); }}
+              >
+                أكمل بيانات الحساب أولاً
+              </Button>
+            ) : (
+              <Button 
+                className="bg-green-600 w-full sm:w-auto hover:bg-green-700" 
+                onClick={handlePlaceOrder}
+                disabled={isOrdering || cart.length === 0}
+              >
+                {isOrdering ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : null}
+                تأكيد وإرسال الطلب
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
