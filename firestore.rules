@@ -213,7 +213,7 @@ service cloud.firestore {
     // ===============================================================
 
     match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isCompanyMember(companyId) || getUserRole() == 'client' || isSystemAdmin());
+      allow read: if isAuthenticated();
       
       allow create: if isAuthenticated() && 
                     isValidCompany(request.resource.data) && 
@@ -289,8 +289,8 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
-                  (isCompanyMember(resource.data.companyId) && (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId))) || 
-                  resource.data.createdBy == request.auth.uid
+                  resource.data.createdBy == request.auth.uid ||
+                  (isCompanyMember(resource.data.companyId) && (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId)))
       );
       
       allow create: if isAuthenticated() && 
