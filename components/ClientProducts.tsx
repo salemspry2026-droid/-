@@ -93,7 +93,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       await setDoc(doc(db, 'orders', orderId), {
         companyId: clientSelectedCompany.id,
         customerId: user.uid, // For self-service, user is the customer
-        customerName: profile?.displayName || 'عميل',
+        customerName: profile?.storeName || profile?.displayName || 'عميل',
+        customerPhone: profile?.phone || '',
         customerAddress: profile?.address || 'طلب عبر التطبيق',
         source: 'customer',
         items: items,

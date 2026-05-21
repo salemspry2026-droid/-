@@ -81,7 +81,7 @@ export function StaffManager() {
       {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {staff.map(emp => (
-            <EmployeeCard key={emp.id} emp={emp} isAdmin={isAdmin} currentUserId={user?.uid!} onUpdate={handleUpdateEmployee} />
+            <EmployeeCard key={`${emp.id}-${emp.jobTitle || ''}`} emp={emp} isAdmin={isAdmin} currentUserId={user?.uid!} onUpdate={handleUpdateEmployee} />
           ))}
         </div>
       )}
@@ -91,10 +91,6 @@ export function StaffManager() {
 
 function EmployeeCard({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAdmin: boolean, currentUserId: string, onUpdate: (id: string, field: string, val: string) => void }) {
   const [jobTitle, setJobTitle] = useState(emp.jobTitle || '');
-
-  useEffect(() => {
-    setJobTitle(emp.jobTitle || '');
-  }, [emp.jobTitle]);
 
   return (
     <Card className="border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">

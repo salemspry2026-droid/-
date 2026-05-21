@@ -10,7 +10,7 @@ import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
@@ -27,6 +27,97 @@ export function OrderDetailsDialog({
 }) {
   const [saving, setSaving] = useState(false);
   const { user, profile } = useStore();
+  const [matchStatus, setMatchStatus] = useState<'checking' | 'matched' | 'no_match'>('checked');
+  const [matchingCustomers, setMatchingCustomers] = useState<any[]>([]);
+  const [merging, setMerging] = useState(false);
+
+  useEffect(() => {
+    if (!order || order.source !== 'customer' || order.linkedCrmCustomerId) {
+      setMatchStatus('checked');
+      return;
+    }
+
+    const checkMatch = async () => {
+      setMatchStatus('checking');
+      try {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const q = query(
+          collection(db, 'customers'),
+          where('companyId', '==', order.companyId),
+          where('isDeleted', '==', false)
+        );
+        const snapshot = await getDocs(q);
+        const customers = snapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
+
+        const matches = customers.filter(c => 
+          (order.customerPhone && c.phone === order.customerPhone) ||
+          (order.customerName && c.name && (c.name.includes(order.customerName) || order.customerName.includes(c.name)))
+        );
+
+        if (matches.length > 0) {
+          setMatchingCustomers(matches);
+          setMatchStatus('matched');
+        } else {
+          setMatchStatus('no_match');
+        }
+      } catch (err) {
+        setMatchStatus('no_match');
+      }
+    };
+    checkMatch();
+  }, [order?.id, order?.source, order?.companyId, order?.customerPhone, order?.customerName, order?.linkedCrmCustomerId]);
+
+  const handleMergeCustomer = async (crmCustomerId: string, crmCustomerName: string) => {
+    setMerging(true);
+    try {
+      await updateDoc(doc(db, 'orders', order.id), {
+        customerId: crmCustomerId,
+        linkedCrmCustomerId: crmCustomerId,
+        customerName: crmCustomerName,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || 'system'
+      });
+      toast.success('تمت عملية الدمج بنجاح وتم تحديث الطلب');
+      onOpenChange(false);
+    } catch (e) {
+      toast.error('حدث خطأ أثناء الدمج');
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const handleApproveNewCustomer = async () => {
+    setMerging(true);
+    try {
+      const { setDoc } = await import('firebase/firestore');
+      const newCustId = `cust_${crypto.randomUUID()}`;
+      await setDoc(doc(db, 'customers', newCustId), {
+        companyId: order.companyId,
+        name: order.customerName,
+        phone: order.customerPhone || '',
+        address: order.customerAddress || '',
+        contactNumbers: order.customerPhone ? [order.customerPhone] : [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user?.uid,
+        updatedBy: user?.uid,
+        isDeleted: false
+      });
+
+      await updateDoc(doc(db, 'orders', order.id), {
+        customerId: newCustId,
+        linkedCrmCustomerId: newCustId,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || 'system'
+      });
+      toast.success('تمت إضافة العميل لقاعدة البيانات والموافقة بنجاح');
+      onOpenChange(false);
+    } catch (e) {
+      toast.error('حدث خطأ أثناء إضافة العميل');
+    } finally {
+      setMerging(false);
+    }
+  };
 
   if (!order) return null;
 
@@ -42,8 +133,35 @@ export function OrderDetailsDialog({
     if (!nextStage) return;
     setSaving(true);
     try {
+      let finalCustomerId = order.customerId;
+      let finalLinkedCrmId = order.linkedCrmCustomerId;
+      const { setDoc } = await import('firebase/firestore');
+
+      if (order.source === 'customer' && !order.linkedCrmCustomerId && activeIndex === -1 && matchStatus === 'no_match') {
+        // Automatically add new customer
+        const newCustId = `cust_${crypto.randomUUID()}`;
+        await setDoc(doc(db, 'customers', newCustId), {
+          companyId: order.companyId,
+          name: order.customerName,
+          phone: order.customerPhone || '',
+          address: order.customerAddress || '',
+          contactNumbers: order.customerPhone ? [order.customerPhone] : [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user?.uid,
+          updatedBy: user?.uid,
+          isDeleted: false
+        });
+        finalCustomerId = newCustId;
+        finalLinkedCrmId = newCustId;
+      }
+
       await updateDoc(doc(db, 'orders', order.id), {
         status: nextStage.name,
+        ...(finalCustomerId !== order.customerId && {
+          customerId: finalCustomerId,
+          linkedCrmCustomerId: finalLinkedCrmId
+        }),
         updatedAt: serverTimestamp(),
         updatedBy: user?.uid || 'system'
       });
@@ -160,6 +278,42 @@ export function OrderDetailsDialog({
                     {order.customerName?.charAt(0) || 'ع'}
                   </div>
                </div>
+
+               {order.source === 'customer' && !order.linkedCrmCustomerId && (
+                 <div className="p-4 bg-orange-50 border-t border-orange-100 text-right">
+                   {matchStatus === 'checking' && <p className="text-sm text-orange-600">جاري التحقق من سجل العميل...</p>}
+                   {matchStatus === 'no_match' && (
+                     <div className="space-y-2 text-right">
+                       <p className="text-sm font-bold text-orange-700">العميل غير مسجل بقاعدة بيانات الشركة</p>
+                       <p className="text-xs text-orange-600">انقر هنا لإضافة العميل وإنشاء سجل له.</p>
+                       <Button onClick={handleApproveNewCustomer} disabled={merging} className="bg-orange-600 hover:bg-orange-700 text-white rounded-lg h-9 text-xs w-full mt-2">
+                         {merging ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : null} موافقة إضافة العميل كجديد
+                       </Button>
+                     </div>
+                   )}
+                   {matchStatus === 'matched' && (
+                     <div className="space-y-3 text-right">
+                       <p className="text-sm font-bold text-orange-700">تم العثور على حساب مطابق للعميل</p>
+                       <div className="space-y-2">
+                         {matchingCustomers.map((c, i) => (
+                           <div key={i} className="flex justify-between items-center bg-white p-2 border border-orange-200 rounded-lg">
+                             <Button onClick={() => handleMergeCustomer(c.id, c.name)} disabled={merging} variant="outline" className="border-orange-200 text-orange-700 hover:bg-orange-100 h-8 text-xs shrink-0">
+                               {merging ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : null} دمج الحساب
+                             </Button>
+                             <div className="text-right">
+                               <p className="font-bold text-gray-900 text-xs">{c.name}</p>
+                               <p className="text-[10px] text-gray-500" dir="ltr">{c.phone}</p>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                       <Button onClick={handleApproveNewCustomer} disabled={merging} variant="ghost" className="text-orange-700 hover:bg-orange-100 w-full text-xs h-8">
+                         إضافة كعميل جديد بدلاً من الدمج
+                       </Button>
+                     </div>
+                   )}
+                 </div>
+               )}
             </div>
           )}
 
