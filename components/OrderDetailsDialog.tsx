@@ -26,7 +26,7 @@ export function OrderDetailsDialog({
   stages: any[];
 }) {
   const [saving, setSaving] = useState(false);
-  const { user } = useStore();
+  const { user, profile } = useStore();
 
   if (!order) return null;
 
