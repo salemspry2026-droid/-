@@ -94,16 +94,16 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       let existingLinkedCrmCustomerId = null;
       let existingCustomerId = user.uid;
       try {
-        const { getDocs, limit, orderBy } = await import('firebase/firestore');
+        const { getDocs } = await import('firebase/firestore');
         const qOrders = query(
           collection(db, 'orders'),
-          where('createdBy', '==', user.uid),
-          where('companyId', '==', clientSelectedCompany.id),
-          where('isDeleted', '==', false),
-          limit(5)
+          where('createdBy', '==', user.uid)
         );
         const prevOrdersSnap = await getDocs(qOrders);
-        const linkedOrder = prevOrdersSnap.docs.find(d => d.data().linkedCrmCustomerId);
+        const linkedOrder = prevOrdersSnap.docs.find(d => {
+          const data = d.data();
+          return data.companyId === clientSelectedCompany.id && !data.isDeleted && data.linkedCrmCustomerId;
+        });
         if (linkedOrder) {
           existingLinkedCrmCustomerId = linkedOrder.data().linkedCrmCustomerId;
           existingCustomerId = existingLinkedCrmCustomerId;

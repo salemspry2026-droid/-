@@ -14,8 +14,11 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
   const [stats, setStats] = useState({ totalOrders: 0, totalSpent: 0, companyOrders: 0, customerOrders: 0 });
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   useEffect(() => {
+    // Reset delete confirm state when dialog opens or customer changes
+    setDeleteConfirm(false);
     if (!customer || !isOpen || !profile?.companyId) return;
     
     // Fetch orders for this customer to calculate real stats and show history
@@ -76,18 +79,17 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
   }, [customer, isOpen, profile?.companyId]);
 
   const handleDelete = async () => {
-    if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا العميل بشكل نهائي؟')) {
-       try {
-         await updateDoc(doc(db, 'customers', customer.id), {
-           isDeleted: true,
-           updatedAt: serverTimestamp(),
-           updatedBy: user?.uid
-         });
-         toast.success('تم حذف العميل بنجاح');
-         onClose();
-       } catch (error) {
-         toast.error('حدث خطأ أثناء الحذف');
-       }
+    try {
+      await updateDoc(doc(db, 'customers', customer.id), {
+        isDeleted: true,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid
+      });
+      toast.success('تم حذف العميل بنجاح');
+      setDeleteConfirm(false);
+      onClose();
+    } catch (error) {
+      toast.error('حدث خطأ أثناء الحذف');
     }
   };
 
@@ -100,12 +102,25 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
           <DialogTitle className="text-2xl font-bold flex items-center justify-between">
             <span>ملف العميل</span>
             <div className="flex gap-2">
-               <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(customer)}>
-                 <Edit className="w-4 h-4 mr-2" /> تعديل
-               </Button>
-               <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={handleDelete}>
-                 <Trash2 className="w-4 h-4 mr-2" /> حذف
-               </Button>
+               {!deleteConfirm ? (
+                 <>
+                   <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(customer)}>
+                     <Edit className="w-4 h-4 mr-2" /> تعديل
+                   </Button>
+                   <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={() => setDeleteConfirm(true)}>
+                     <Trash2 className="w-4 h-4 mr-2" /> حذف
+                   </Button>
+                 </>
+               ) : (
+                 <>
+                   <Button variant="outline" size="sm" className="text-gray-600 border-gray-200" onClick={() => setDeleteConfirm(false)}>
+                     إلغاء
+                   </Button>
+                   <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDelete}>
+                     <Trash2 className="w-4 h-4 mr-2" /> تأكيد الحذف
+                   </Button>
+                 </>
+               )}
             </div>
           </DialogTitle>
         </DialogHeader>
