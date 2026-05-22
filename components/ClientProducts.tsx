@@ -90,9 +90,32 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         totalAmountByCurrency[item.currency] += item.price * item.quantity;
       });
 
+      // Find if this user already has a linked CRM customer ID for this company
+      let existingLinkedCrmCustomerId = null;
+      let existingCustomerId = user.uid;
+      try {
+        const { getDocs, limit, orderBy } = await import('firebase/firestore');
+        const qOrders = query(
+          collection(db, 'orders'),
+          where('createdBy', '==', user.uid),
+          where('companyId', '==', clientSelectedCompany.id),
+          where('isDeleted', '==', false),
+          limit(5)
+        );
+        const prevOrdersSnap = await getDocs(qOrders);
+        const linkedOrder = prevOrdersSnap.docs.find(d => d.data().linkedCrmCustomerId);
+        if (linkedOrder) {
+          existingLinkedCrmCustomerId = linkedOrder.data().linkedCrmCustomerId;
+          existingCustomerId = existingLinkedCrmCustomerId;
+        }
+      } catch (err) {
+        console.error('Error fetching past orders for linking:', err);
+      }
+
       await setDoc(doc(db, 'orders', orderId), {
         companyId: clientSelectedCompany.id,
-        customerId: user.uid, // For self-service, user is the customer
+        customerId: existingCustomerId, // Use linked CRM ID if known
+        ...(existingLinkedCrmCustomerId && { linkedCrmCustomerId: existingLinkedCrmCustomerId }),
         customerName: profile?.storeName || profile?.displayName || 'عميل',
         customerPhone: profile?.phone || '',
         customerAddress: profile?.address || 'طلب عبر التطبيق',

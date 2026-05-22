@@ -303,8 +303,7 @@ service cloud.firestore {
                     isUnchangedOrBackfilled('createdAt') &&
                     isUnchangedOrBackfilled('createdBy') &&
                     isUnchangedOrBackfilled('companyId') &&
-                    isUnchangedOrBackfilled('customerId') &&
-                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId) || (resource.data.createdBy == request.auth.uid && areImmutableFieldsUnchanged(['status', 'totalAmountByCurrency', 'items', 'companyId'])));
+                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId) || (resource.data.createdBy == request.auth.uid && areImmutableFieldsUnchanged(['status', 'totalAmountByCurrency', 'items', 'companyId', 'customerId', 'linkedCrmCustomerId'])));
     }
 
     match /productCategories/{categoryId} {
