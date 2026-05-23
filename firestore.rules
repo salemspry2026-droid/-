@@ -150,6 +150,7 @@ service cloud.firestore {
              isValidOptionalString('address', 0, 500) &&
              isValidOptionalString('notes', 0, 5000) &&
              isValidOptionalString('customerType', 0, 100) &&
+             isValidOptionalString('appUserId', 0, 100) &&
              isValidOptionalString('customerTypeOther', 0, 100);
     }
 
@@ -162,6 +163,11 @@ service cloud.firestore {
              data.totalAmountByCurrency is map &&
              isValidString(data.status, 1, 100) &&
              data.isDeleted is bool &&
+             isValidOptionalString('linkedCrmCustomerId', 0, 100) &&
+             isValidOptionalString('clientUid', 0, 100) &&
+             isValidOptionalString('customerPhone', 0, 50) &&
+             isValidOptionalString('customerAddress', 0, 500) &&
+             isValidOptionalString('invoiceType', 0, 50) &&
              isValidOptionalString('source', 0, 50);
     }
 
@@ -172,6 +178,7 @@ service cloud.firestore {
              isValidString(data.message, 1, 1000) &&
              isValidString(data.type, 1, 50) &&
              isValidString(data.orderId, 1, 100) &&
+             isValidOptionalString('clientUid', 0, 100) &&
              data.readBy is list && data.readBy.size() <= 1000 &&
              data.isDeleted is bool;
     }
@@ -290,6 +297,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
                   resource.data.createdBy == request.auth.uid ||
+                  (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid) ||
                   (isCompanyMember(resource.data.companyId) && (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId)))
       );
       
@@ -325,9 +333,9 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isCompanyMember(resource.data.companyId);
+      allow read: if isCompanyMember(resource.data.companyId) || (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidNotification(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && (isCompanyAdmin(request.resource.data.companyId) || isCompanySales(request.resource.data.companyId) || isCompanyClient(request.resource.data.companyId));
-      allow update: if isAuthenticated() && isValidNotification(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'title', 'message', 'type', 'orderId']) && isCompanyMember(resource.data.companyId);
+      allow update: if isAuthenticated() && isValidNotification(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'clientUid', 'title', 'message', 'type', 'orderId']) && (isCompanyMember(resource.data.companyId) || (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid));
     }
 
     match /orderStages/{stageId} {

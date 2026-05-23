@@ -70,9 +70,17 @@ export function OrderDetailsDialog({
   const handleMergeCustomer = async (crmCustomerId: string, crmCustomerName: string) => {
     setMerging(true);
     try {
+      if (order.source === 'customer') {
+        await updateDoc(doc(db, 'customers', crmCustomerId), {
+          appUserId: order.createdBy,
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.uid || 'system'
+        });
+      }
       await updateDoc(doc(db, 'orders', order.id), {
         customerId: crmCustomerId,
         linkedCrmCustomerId: crmCustomerId,
+        clientUid: order.source === 'customer' ? order.createdBy : null,
         customerName: crmCustomerName,
         updatedAt: serverTimestamp(),
         updatedBy: user?.uid || 'system'
@@ -101,12 +109,14 @@ export function OrderDetailsDialog({
         updatedAt: serverTimestamp(),
         createdBy: user?.uid,
         updatedBy: user?.uid,
+        ...(order.source === 'customer' && { appUserId: order.createdBy }),
         isDeleted: false
       });
 
       await updateDoc(doc(db, 'orders', order.id), {
         customerId: newCustId,
         linkedCrmCustomerId: newCustId,
+        clientUid: order.source === 'customer' ? order.createdBy : null,
         updatedAt: serverTimestamp(),
         updatedBy: user?.uid || 'system'
       });
@@ -150,6 +160,7 @@ export function OrderDetailsDialog({
           updatedAt: serverTimestamp(),
           createdBy: user?.uid,
           updatedBy: user?.uid,
+          ...(order.source === 'customer' && { appUserId: order.createdBy }),
           isDeleted: false
         });
         finalCustomerId = newCustId;
@@ -172,8 +183,10 @@ export function OrderDetailsDialog({
       if (!isFinalStage) {
         const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
         const { setDoc } = await import('firebase/firestore');
+        const cUid = order.clientUid || (order.source === 'customer' ? order.createdBy : null);
         await setDoc(doc(db, 'notifications', notifId), {
           companyId: order.companyId,
+          ...(cUid && { clientUid: cUid }),
           title: 'تحديث حالة الطلب',
           message: `تم تحديث حالة الطلب للعميل ${order?.customerName || ''} إلى: ${nextStage.name}`,
           type: 'status_update',

@@ -156,6 +156,7 @@ export function CallRecordingsManager() {
       await setDoc(doc(db, 'orders', orderId), {
         companyId: profile.companyId,
         customerId: customer.id,
+        ...(customer.appUserId && { clientUid: customer.appUserId }),
         customerName: customer.name,
         customerAddress: customer.address || 'غير محدد',
         source: 'company',

@@ -33,18 +33,51 @@ export function ClientOrders() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
+    let myOrders: any[] = [];
+    let mappedOrders: any[] = [];
+
+    const updateCombined = () => {
+      const combined = [...myOrders, ...mappedOrders];
+      // Deduplicate by id
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      // Sort by date desc
+      unique.sort((a, b) => {
+        const da = a.createdAt?.toMillis?.() || 0;
+        const db = b.createdAt?.toMillis?.() || 0;
+        return db - da;
+      });
+      setOrders(unique);
+      setLoading(false);
+    };
+
+    const qSelf = query(
       collection(db, 'orders'), 
       where('createdBy', '==', user.uid)
     );
+    const qClientUid = query(
+      collection(db, 'orders'), 
+      where('clientUid', '==', user.uid)
+    );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Filter out isDeleted in memory because we query by createdBy without a composite index on isDeleted
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted));
-      setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
+    const unsubSelf = onSnapshot(qSelf, (snapshot) => {
+      myOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted);
+      updateCombined();
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders (self)'));
 
-    return () => unsubscribe();
+    const unsubClientUid = onSnapshot(qClientUid, (snapshot) => {
+      mappedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted);
+      updateCombined();
+    }, (error) => {
+      // It's possible clientUid query fails if no index but usually it uses single field index.
+      if ((error as any)?.code !== 'permission-denied') {
+         console.warn("Client UID order fetch error:", error);
+      }
+    });
+
+    return () => {
+      unsubSelf();
+      unsubClientUid();
+    };
   }, [user?.uid, user]);
 
   const filteredOrders = orders.filter(order => {
@@ -111,6 +144,11 @@ export function ClientOrders() {
                   <p className="text-sm text-gray-500 flex items-center gap-1">
                     {order.items?.length || 0} صنف
                   </p>
+                  {order.source === 'company' && (
+                    <span className="inline-block mt-1 bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      تم التسجيل من قبل الشركة
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-left">

@@ -116,6 +116,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         companyId: clientSelectedCompany.id,
         customerId: existingCustomerId, // Use linked CRM ID if known
         ...(existingLinkedCrmCustomerId && { linkedCrmCustomerId: existingLinkedCrmCustomerId }),
+        clientUid: user.uid,
         customerName: profile?.storeName || profile?.displayName || 'عميل',
         customerPhone: profile?.phone || '',
         customerAddress: profile?.address || 'طلب عبر التطبيق',

@@ -14,18 +14,42 @@ export function GlobalNotificationListener() {
     if (!profile || !user?.uid) return;
 
     if (profile.role === 'client') {
-      // Clients do not use the company notifications collection since they don't have a fixed companyId.
-      // Instead, we could monitor their orders for changes if needed.
-      const qOrders = query(
-        collection(db, 'orders'),
-        where('createdBy', '==', user.uid),
-        // we can't easily query unread without a field, so we just set unread to 0 for now.
+      const qNotifs = query(
+        collection(db, 'notifications'), 
+        where('clientUid', '==', user.uid),
+        where('isDeleted', '==', false)
       );
-      const unsub = onSnapshot(qOrders, (snap) => {
-        // Optionally count orders that have changed status recently. For now we set 0.
-        setUnreadNotifications(0);
+      
+      const unsub = onSnapshot(qNotifs, (snap) => {
+        let unreadCount = 0;
+        let hasNewUnread = false;
+
+        snap.docs.forEach(doc => {
+          const data = doc.data();
+          const isRead = data.readBy && data.readBy.includes(user.uid);
+          if (!isRead) {
+            unreadCount++;
+            if (!initialLoadRef.current && !knownNotifIds.current.has(doc.id)) {
+              hasNewUnread = true;
+              toast.info(`إشعار جديد: ${data.title}`);
+            }
+          }
+          knownNotifIds.current.add(doc.id);
+        });
+
+        setUnreadNotifications(unreadCount);
+        
+        if (hasNewUnread) {
+          // Play sound
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(e => console.log('Audio play failed', e));
+        }
+      }, (err) => {
+        if ((err as any)?.code !== 'permission-denied') console.warn("Notif client err:", err);
       });
-      return () => unsub();
+
+      const timer = setTimeout(() => { initialLoadRef.current = false; }, 2000);
+      return () => { unsub(); clearTimeout(timer); };
     }
 
     if (!profile.companyId) return;

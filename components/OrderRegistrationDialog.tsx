@@ -298,6 +298,7 @@ export function OrderRegistrationDialog({
         await setDoc(doc(db, 'orders', orderId), {
           companyId: profile.companyId,
           customerId: customer.id,
+          ...(customer.appUserId && { clientUid: customer.appUserId }),
           customerName: customer.name,
           customerPhone: customer.phone || '',
           customerAddress: customer.address || 'غير محدد',

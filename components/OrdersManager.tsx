@@ -96,8 +96,10 @@ export function OrdersManager() {
       const tOrder = orders.find(o => o.id === orderId);
       if (!isFinalStage) {
         const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+        const cUid = (tOrder?.clientUid) || (tOrder?.source === 'customer' ? tOrder?.createdBy : null);
         await setDoc(doc(db, 'notifications', notifId), {
           companyId: profile?.companyId,
+          ...(cUid && { clientUid: cUid }),
           title: 'تحديث حالة الطلب',
           message: `تم تحديث حالة الطلب للعميل ${tOrder?.customerName || ''} إلى: ${newStatus}`,
           type: 'status_update',

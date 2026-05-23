@@ -25,9 +25,21 @@ export function NotificationsDialog({
     if (!open || !profile || !user?.uid) return;
 
     if (profile.role === 'client') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
-      return;
+      const qNotifs = query(
+        collection(db, 'notifications'), 
+        where('clientUid', '==', user.uid),
+        where('isDeleted', '==', false)
+      );
+      const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+        setDbNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }, (error) => {
+        if ((error as any).code !== 'permission-denied') {
+          handleFirestoreError(error, OperationType.LIST, 'notifications');
+        }
+        setLoading(false);
+      });
+      return () => unsubNotifs();
     }
 
     if (!profile.companyId) return;
