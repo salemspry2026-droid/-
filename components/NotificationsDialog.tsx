@@ -81,15 +81,13 @@ export function NotificationsDialog({
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'orders');
       });
-    } else {
-      setStaleOrders([]);
     }
 
     return () => {
       unsubNotifs();
       unsubOrders();
     };
-  }, [open, profile?.companyId, user?.uid]);
+  }, [open, profile?.companyId, profile?.role, user?.uid]);
 
   const markAsRead = async (notification: any) => {
     if (!user?.uid || notification.readBy?.includes(user?.uid) || notification.isStaleAlert) return;

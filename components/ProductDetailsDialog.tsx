@@ -57,7 +57,7 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
     };
     
     fetchStats();
-  }, [product, isOpen, profile?.companyId]);
+  }, [product, isOpen, profile?.companyId, profile?.role]);
 
   const handleDelete = async () => {
     if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الصنف بشكل نهائي؟')) {

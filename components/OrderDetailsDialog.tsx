@@ -65,7 +65,7 @@ export function OrderDetailsDialog({
       }
     };
     checkMatch();
-  }, [order?.id, order?.source, order?.companyId, order?.customerPhone, order?.customerName, order?.linkedCrmCustomerId]);
+  }, [order]);
 
   const handleMergeCustomer = async (crmCustomerId: string, crmCustomerName: string) => {
     setMerging(true);

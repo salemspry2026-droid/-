@@ -60,9 +60,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)));
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); unsubStages(); };
   }, [clientSelectedCompany?.id]);

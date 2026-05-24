@@ -63,16 +63,16 @@ export function OrderRegistrationDialog({
     const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
     const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
 
-    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
     const unsubStages = onSnapshot(qStages, (snap) => {
         const sortedStages = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index);
         setOrderStages(sortedStages);
-    });
+    }, e => console.error(e));
     const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
       if (docSnap.exists()) setCompanyDetails(docSnap.data());
-    });
+    }, e => console.error(e));
 
     setLoading(false);
 
@@ -98,7 +98,7 @@ export function OrderRegistrationDialog({
         return dbTime - da;
       });
       setCustomerOrders(ordersInfo);
-    });
+    }, e => console.error(e));
     return () => unsub();
   }, [selectedCustomerId, profile?.companyId]);
 
