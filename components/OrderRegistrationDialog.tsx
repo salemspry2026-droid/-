@@ -295,10 +295,31 @@ export function OrderRegistrationDialog({
         
         const defaultInitialStatus = orderStages.length > 0 ? orderStages[0].name : 'pending';
         
+        let finalClientUid = customer.appUserId || null;
+
+        if (!finalClientUid && customer.phone) {
+          try {
+            const { getDocs, query: fq, collection: fcol, where: fwh } = await import('firebase/firestore');
+            const qUsers = fq(fcol(db, 'userProfiles'), fwh('phone', '==', customer.phone), fwh('role', '==', 'client'));
+            const userSnap = await getDocs(qUsers);
+            if (!userSnap.empty) {
+              finalClientUid = userSnap.docs[0].id;
+              const { updateDoc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'customers', customer.id), { 
+                appUserId: finalClientUid,
+                updatedAt: serverTimestamp(),
+                updatedBy: user.uid 
+              });
+            }
+          } catch (err) {
+            console.error("Error looking up app user by phone:", err);
+          }
+        }
+
         await setDoc(doc(db, 'orders', orderId), {
           companyId: profile.companyId,
           customerId: customer.id,
-          ...(customer.appUserId && { clientUid: customer.appUserId }),
+          ...(finalClientUid && { clientUid: finalClientUid }),
           customerName: customer.name,
           customerPhone: customer.phone || '',
           customerAddress: customer.address || 'غير محدد',
@@ -330,7 +351,7 @@ export function OrderRegistrationDialog({
         });
 
         const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
+        const notifData: any = {
           companyId: profile.companyId,
           title: 'طلب جديد',
           message: `تم إنشاء طلب جديد للعميل ${customer.name}`,
@@ -342,7 +363,13 @@ export function OrderRegistrationDialog({
           createdBy: user.uid,
           updatedBy: user.uid,
           isDeleted: false
-        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+        };
+
+        if (finalClientUid) {
+          notifData.clientUid = finalClientUid;
+        }
+
+        await setDoc(doc(db, 'notifications', notifId), notifData).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
       }
 
       toast.success('تم تسجيل الطلب بنجاح');
