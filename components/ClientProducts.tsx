@@ -3,10 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { db, auth } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, ShoppingCart, Search, Package, Gift, Plus, Minus, Trash2 } from 'lucide-react';
+import { Loader2, ShoppingCart, Search, Package, Gift, Plus, Minus, Trash2, Heart, Info, Clock, MapPin, Building2, AlignLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
@@ -30,10 +30,31 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
-  const [categories, setCategories] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
+  const [invoiceType, setInvoiceType] = useState('cash'); // 'cash', 'pending_cash', 'credit'
+  const [showCompanyInfo, setShowCompanyInfo] = useState(false);
 
-  const [orderStages, setOrderStages] = useState<any[]>([]);
+  // Derive allowed invoice types based on cart
+  const allowedInvoiceTypes = useMemo(() => {
+    let allowsPending = true;
+    let allowsCredit = true;
+    for (const item of cart) {
+      const rest = item.product.invoiceTypeRestriction;
+      if (rest === 'cash_only') {
+        allowsPending = false;
+        allowsCredit = false;
+        break;
+      } else if (rest === 'cash_or_pending') {
+        allowsCredit = false;
+      }
+    }
+    return { cash: true, pending: allowsPending, credit: allowsCredit };
+  }, [cart]);
+
+  useEffect(() => {
+    if (!allowedInvoiceTypes.credit && invoiceType === 'credit') setInvoiceType('cash');
+    if (!allowedInvoiceTypes.pending && invoiceType === 'pending_cash') setInvoiceType('cash');
+  }, [allowedInvoiceTypes, invoiceType]);
+
 
   useEffect(() => {
     if (!clientSelectedCompany?.id) {
@@ -124,6 +145,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         items: items,
         totalAmountByCurrency: totalAmountByCurrency,
         status: orderStages.length > 0 ? orderStages[0].name : 'pending', // Usually the first stage
+        invoiceType: invoiceType,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
@@ -223,6 +245,22 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     return entries;
   });
 
+  const toggleFavorite = async (product: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const isFav = profile?.favoriteProductIds?.includes(product.id);
+      await updateDoc(doc(db, 'userProfiles', user.uid), {
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+        favoriteProductIds: isFav ? arrayRemove(product.id) : arrayUnion(product.id)
+      });
+      toast.success(isFav ? 'تم الإزالة من المفضلة' : 'تمت الإضافة للمفضلة');
+    } catch (err) {
+      toast.error('حدث خطأ');
+    }
+  };
+
   const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Group cart totals by currency for display
@@ -258,7 +296,12 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     <div className="space-y-4 pb-24">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">المنتجات</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">{clientSelectedCompany.name} - المنتجات</h2>
+          <Button variant="link" onClick={() => setShowCompanyInfo(true)} className="px-0 h-auto text-blue-600 font-bold flex items-center gap-1 mt-1">
+            <Info className="w-4 h-4" /> معلومات الشركة وسياستها
+          </Button>
+        </div>
         <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
           {products.length} منتج
         </span>
@@ -300,6 +343,12 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
           return (
           <div key={product.displayId} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border ${qty > 0 ? 'border-green-400 bg-green-50/10' : 'border-gray-100'} flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
             <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative">
+              <button 
+                onClick={(e) => toggleFavorite(product, e)}
+                className="absolute top-2 left-2 z-10 w-8 h-8 flex items-center justify-center bg-white/80 rounded-full hover:scale-110 transition-transform shadow-sm"
+              >
+                <Heart className={cn("w-5 h-5", profile?.favoriteProductIds?.includes(product.id) ? "fill-red-500 text-red-500" : "text-gray-400")} />
+              </button>
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
               ) : (
@@ -497,6 +546,29 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
           </div>
           
           <div className="bg-green-50 p-4 rounded-xl mt-4">
+             <h4 className="font-bold text-gray-900 mb-3">نوع الدفع / الفاتورة</h4>
+             <div className="flex gap-2 mb-4">
+               <Button variant="outline" className={cn("flex-1", invoiceType === 'cash' ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600" : "bg-white border-gray-200")} onClick={() => setInvoiceType('cash')}>
+                 نقدي
+               </Button>
+               {allowedInvoiceTypes.pending && (
+                 <Button variant="outline" className={cn("flex-1", invoiceType === 'pending_cash' ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600" : "bg-white border-gray-200")} onClick={() => setInvoiceType('pending_cash')}>
+                   نقدي معلق
+                 </Button>
+               )}
+               {allowedInvoiceTypes.credit && (
+                 <Button variant="outline" className={cn("flex-1", invoiceType === 'credit' ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600" : "bg-white border-gray-200")} onClick={() => setInvoiceType('credit')}>
+                   آجل
+                 </Button>
+               )}
+             </div>
+             {!allowedInvoiceTypes.pending && !allowedInvoiceTypes.credit && (
+               <p className="text-xs text-red-600 font-bold mb-2 break-words">بعض الأصناف في السلة تشترط الدفع النقدي فقط.</p>
+             )}
+             {!allowedInvoiceTypes.credit && allowedInvoiceTypes.pending && (
+               <p className="text-xs text-orange-600 font-bold mb-2 break-words">بعض الأصناف في السلة لا تسمح بالدفع الآجل.</p>
+             )}
+             <div className="h-px bg-green-200 my-3"></div>
              <h4 className="font-bold text-gray-900 mb-2">الإجمالي</h4>
              <div className="space-y-1">
                {Object.entries(cartTotalsByCurrency).map(([curr, total]) => (
@@ -540,6 +612,50 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         categories={categories}
         brands={brands}
       />
+
+      <Dialog open={showCompanyInfo} onOpenChange={setShowCompanyInfo}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+               {clientSelectedCompany.logoUrl ? <img src={clientSelectedCompany.logoUrl} className="w-8 h-8 rounded" alt="logo" /> : <Building2 className="w-6 h-6 text-green-600" />}
+               معلومات الشركة وسياساتها
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div>
+              <p className="text-sm font-bold text-gray-500 mb-1">اسم الشركة</p>
+              <p className="font-medium text-gray-900">{clientSelectedCompany.name}</p>
+            </div>
+            {clientSelectedCompany.aboutUs && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><AlignLeft className="w-4 h-4"/> نبذة عن الشركة</p>
+                <p className="text-gray-800 text-sm whitespace-pre-wrap p-3 bg-gray-50 rounded-lg">{clientSelectedCompany.aboutUs}</p>
+              </div>
+            )}
+            {clientSelectedCompany.notes && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><Info className="w-4 h-4"/> سياسات الشركة والملاحظات</p>
+                <p className="text-gray-800 text-sm whitespace-pre-wrap p-3 bg-blue-50/50 rounded-lg border border-blue-100">{clientSelectedCompany.notes}</p>
+              </div>
+            )}
+            {clientSelectedCompany.workingHours && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-4 h-4"/> أوقات العمل</p>
+                <p className="text-gray-800 text-sm">{clientSelectedCompany.workingHours}</p>
+              </div>
+            )}
+            {clientSelectedCompany.address && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-4 h-4"/> العنوان</p>
+                <p className="text-gray-800 text-sm">{clientSelectedCompany.address}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowCompanyInfo(false)} className="bg-green-600 hover:bg-green-700 text-white w-full">إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

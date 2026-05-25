@@ -5,10 +5,11 @@ import { ClientProducts } from './ClientProducts';
 import { ClientOrders } from './ClientOrders';
 import { ClientHomeTab } from './ClientHomeTab';
 import ClientProfile from './ClientProfile';
+import { ClientFavorites } from './ClientFavorites';
 import { useStore } from '@/lib/store';
 import { NotificationsDialog } from './NotificationsDialog';
 import { GlobalNotificationListener } from './GlobalNotificationListener';
-import { LayoutGrid, ShoppingBag, ReceiptText, User, Bell } from 'lucide-react';
+import { LayoutGrid, ShoppingBag, ReceiptText, User, Bell, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function ClientDashboard() {
@@ -35,6 +36,7 @@ export function ClientDashboard() {
         </div>
         <nav className="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-4">
           <SidebarItem icon={<LayoutGrid className="w-5 h-5" />} label="الرئيسية" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+          <SidebarItem icon={<Heart className="w-5 h-5" />} label="المفضلة" isActive={activeTab === 'favorites'} onClick={() => setActiveTab('favorites')} />
           <SidebarItem icon={<ShoppingBag className="w-5 h-5" />} label="المنتجات" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
           <SidebarItem icon={<ReceiptText className="w-5 h-5" />} label="طلباتي" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
           <SidebarItem icon={<User className="w-5 h-5" />} label="حسابي" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
@@ -60,6 +62,7 @@ export function ClientDashboard() {
       <main className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto transition-all duration-300">
         <div className="w-full">
           {activeTab === 'home' && <ClientHomeTab onNavigate={setActiveTab} />}
+          {activeTab === 'favorites' && <ClientFavorites onNavigate={setActiveTab} />}
           {activeTab === 'products' && <ClientProducts onNavigate={setActiveTab} />}
           {activeTab === 'orders' && <ClientOrders />}
           {activeTab === 'profile' && <ClientProfile />}
@@ -78,6 +81,7 @@ export function ClientDashboard() {
       {/* Bottom Navigation (Mobile Only) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 px-6 py-2 flex justify-between items-center mx-auto">
         <NavItem icon={<LayoutGrid className="w-6 h-6" />} label="الرئيسية" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+        <NavItem icon={<Heart className="w-6 h-6" />} label="المفضلة" isActive={activeTab === 'favorites'} onClick={() => setActiveTab('favorites')} />
         <NavItem icon={<ShoppingBag className="w-6 h-6" />} label="المنتجات" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
         <NavItem icon={<ReceiptText className="w-6 h-6" />} label="طلباتي" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
         <NavItem icon={<User className="w-6 h-6" />} label="حسابي" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
