@@ -263,7 +263,7 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || getUserRole() == 'client');
+      allow read: if isAuthenticated();
       
       allow create: if isAuthenticated() && 
                     isValidProduct(request.resource.data) && 
@@ -315,19 +315,19 @@ service cloud.firestore {
     }
 
     match /productCategories/{categoryId} {
-      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || getUserRole() == 'client');
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidProductCategory(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidProductCategory(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
 
     match /productBrands/{brandId} {
-      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || getUserRole() == 'client');
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidProductBrand(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidProductBrand(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
 
     match /locations/{locationId} {
-      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || getUserRole() == 'client');
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidLocation(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidLocation(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
