@@ -30,6 +30,10 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [orderStages, setOrderStages] = useState<any[]>([]);
+
   const [invoiceType, setInvoiceType] = useState('cash'); // 'cash', 'pending_cash', 'credit'
   const [showCompanyInfo, setShowCompanyInfo] = useState(false);
 
