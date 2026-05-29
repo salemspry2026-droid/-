@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { setClientSelectedCompany, profile, user, setIsNotificationsOpen, unreadNotifications } = useStore();
   const [companies, setCompanies] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -28,20 +29,66 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
 
     const unsubCompanies = onSnapshot(qCompanies, (snapshot) => {
       setCompanies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'companies');
+    });
+
+    // Fetch all active products for stock logic & product search
+    const qProducts = query(
+      collection(db, 'products'),
+      where('isDeleted', '==', false)
+    );
+
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
-    return () => unsubCompanies();
+    return () => {
+      unsubCompanies();
+      unsubProducts();
+    };
   }, [user?.uid]);
 
-  const filteredCompanies = companies.filter(c => 
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.companyType?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.address?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizeStr = (str: string) => {
+    if (!str) return '';
+    return str.replace(/[أإآا]/g, 'ا')
+              .replace(/[ةه]/g, 'ه')
+              .replace(/[يى]/g, 'ي')
+              .toLowerCase();
+  };
+
+  const normalizedQuery = normalizeStr(searchQuery);
+
+  const visibleCompanies = companies.filter(c => {
+    if (!c.isVisibleToClients) return false;
+    // Check if company has at least one active product in stock
+    const hasActiveProduct = products.some(p => p.companyId === c.id && p.inStock !== false);
+    return hasActiveProduct;
+  });
+
+  const filteredCompanies = visibleCompanies
+    .map(c => {
+      const cName = normalizeStr(c.name);
+      const cType = normalizeStr(c.companyType);
+      const cTypeOther = normalizeStr(c.companyTypeOther);
+      const cAddress = normalizeStr(c.address);
+
+      const matchesCompany = cName.includes(normalizedQuery) || cType.includes(normalizedQuery) || cTypeOther.includes(normalizedQuery) || cAddress.includes(normalizedQuery);
+      
+      const matchedProducts = products.filter(p => 
+        p.companyId === c.id && 
+        p.inStock !== false && 
+        normalizeStr(p.name).includes(normalizedQuery)
+      );
+
+      return {
+        ...c,
+        matchesCompany,
+        matchedProducts: normalizedQuery.length > 0 ? matchedProducts : []
+      };
+    })
+    .filter(c => c.matchesCompany || c.matchedProducts.length > 0);
 
   const handleSelectCompany = (company: any) => {
     setClientSelectedCompany(company);
@@ -94,7 +141,7 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <Input 
-            placeholder="ابحث عن شركة، مجال المقاولات، الأدوية..." 
+            placeholder="ابحث عن شركة، صنف..." 
             className="pl-4 pr-10 bg-white border-transparent focus-visible:ring-green-500 rounded-xl h-12 text-base shadow-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -128,12 +175,12 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
               {filteredCompanies.map(company => (
                 <Card 
                   key={company.id} 
-                  className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer bg-white border border-gray-100 rounded-2xl group"
+                  className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer bg-white border border-gray-100 rounded-2xl group flex flex-col"
                   onClick={() => handleSelectCompany(company)}
                 >
-                  <CardContent className="p-0">
-                    <div className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4 relative z-10 w-full">
+                  <CardContent className="p-0 flex flex-col h-full">
+                    <div className="p-4 flex flex-col min-h-0 flex-1">
+                      <div className="flex items-center gap-4 relative z-10 w-full mb-3">
                         <div className="w-14 h-14 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center shrink-0 relative overflow-hidden group-hover:border-green-200 transition-colors">
                           {company.logoUrl ? (
                             <Image src={company.logoUrl} alt={company.name} fill className="object-contain p-2" sizes="56px" referrerPolicy="no-referrer" />
@@ -160,6 +207,21 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
                         </div>
                         <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-green-600 transition-colors shrink-0 mr-2" />
                       </div>
+                      
+                      {company.matchedProducts && company.matchedProducts.length > 0 && (
+                        <div className="mt-auto border-t border-gray-50 pt-2 pb-1 space-y-2">
+                           <p className="text-xs font-bold text-gray-500">أصناف متطابقة ({company.matchedProducts.length}):</p>
+                           {company.matchedProducts.slice(0, 3).map((p: any) => (
+                             <div key={p.id} className="flex justify-between items-center bg-green-50/50 p-2 rounded-lg border border-green-100/50">
+                               <p className="text-sm font-bold text-gray-800 line-clamp-1 flex-1 px-1">{p.name}</p>
+                               <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md shrink-0">متوفر</span>
+                             </div>
+                           ))}
+                           {company.matchedProducts.length > 3 && (
+                             <p className="text-xs text-gray-400 text-center font-medium">+ {company.matchedProducts.length - 3} أصناف أخرى</p>
+                           )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

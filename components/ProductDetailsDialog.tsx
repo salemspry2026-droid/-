@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
+import Image from 'next/image';
 
 export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categories = [], brands = [] }: { product: any, isOpen: boolean, onClose: () => void, onEdit?: (product: any) => void, categories?: any[], brands?: any[] }) {
   const { profile, user } = useStore();
@@ -122,7 +123,7 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
            <div className="flex flex-col md:flex-row gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div className="w-40 h-40 shrink-0 bg-white rounded-xl border flex items-center justify-center overflow-hidden">
                 {product.imageUrl ? (
-                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                   <Image src={product.imageUrl} alt={product.name} fill className="object-cover" referrerPolicy="no-referrer" />
                 ) : (
                    <Package className="w-16 h-16 text-gray-300" />
                 )}
@@ -216,30 +217,28 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
                 )}
              </div>
 
-             {/* Sales Policies (Only visible to admin/owner) */}
-             {profile && ['owner', 'admin', 'sales'].includes(profile.role as string) && (
-               <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-3 col-span-1 md:col-span-2">
-                  <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2">سياسات البيع</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">
-                     <div>
-                        <p className="font-bold text-gray-700">طريقة الدفع المسموحة:</p>
-                        <p className="text-gray-600">
-                           {product.invoiceTypeRestriction === 'all' || !product.invoiceTypeRestriction ? 'مسموح بجميع الطرق (نقدي، آجل)' : ''}
-                           {product.invoiceTypeRestriction === 'cash_only' ? 'نقدي فقط' : ''}
-                           {product.invoiceTypeRestriction === 'cash_or_pending' ? 'نقدي أو معلق (لا يباع بالآجل)' : ''}
-                        </p>
-                     </div>
-                     <div>
-                        <p className="font-bold text-gray-700">قيود بيع العملة:</p>
-                        <p className="text-gray-600">
-                           {product.currencyRestrictionType === 'any' || !product.currencyRestrictionType ? 'مرونة بيع بأي عملة' : ''}
-                           {product.currencyRestrictionType === 'primary_only' ? 'يباع بالعملة الأساسية للصنف فقط' : ''}
-                           {product.currencyRestrictionType === 'specific' ? `يباع بعملات محددة: ${product.specificCurrencies?.join(' ، ')}` : ''}
-                        </p>
-                     </div>
-                  </div>
-               </div>
-             )}
+             {/* Sales Policies */}
+             <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-3 col-span-1 md:col-span-2">
+                <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2">سياسات البيع المطبقة</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">
+                   <div>
+                      <p className="font-bold text-gray-700">طريقة الدفع المسموحة:</p>
+                      <p className="text-gray-600 font-medium">
+                         {product.invoiceTypeRestriction === 'all' || !product.invoiceTypeRestriction ? 'مسموح بجميع الطرق (نقدي، آجل)' : ''}
+                         {product.invoiceTypeRestriction === 'cash_only' ? 'نقدي فقط (غير مسموح بالآجل)' : ''}
+                         {product.invoiceTypeRestriction === 'cash_or_pending' ? 'نقدي أو نقدي معلق (غير مسموح بالآجل)' : ''}
+                      </p>
+                   </div>
+                   <div>
+                      <p className="font-bold text-gray-700">قيود بيع العملة:</p>
+                      <p className="text-gray-600 font-medium">
+                         {product.currencyRestrictionType === 'any' || !product.currencyRestrictionType ? 'مرونة البيع بأي عملة' : ''}
+                         {product.currencyRestrictionType === 'primary_only' ? `يباع بالعملة الأساسية للصنف فقط (${product.currency})` : ''}
+                         {product.currencyRestrictionType === 'specific' ? `يباع بعملات محددة: ${product.specificCurrencies?.join(' ، ')}` : ''}
+                      </p>
+                   </div>
+                </div>
+             </div>
            </div>
 
         </div>

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import Image from 'next/image';
 
 interface CartItem {
   product: any;
@@ -354,7 +355,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                 <Heart className={cn("w-5 h-5", profile?.favoriteProductIds?.includes(product.id) ? "fill-red-500 text-red-500" : "text-gray-400")} />
               </button>
               {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                <Image src={product.imageUrl} alt={product.name} fill className="object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <Package className="w-10 h-10 text-green-300" />
               )}
@@ -504,7 +505,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                   <div key={item.product.id} className="flex gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
                     <div className="w-16 h-16 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0">
                       {item.product.imageUrl ? (
-                        <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover rounded-lg" />
+                        <Image src={item.product.imageUrl} alt={item.product.name} fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
                       ) : (
                         <Package className="w-8 h-8 text-gray-300" />
                       )}
@@ -621,37 +622,57 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-               {clientSelectedCompany.logoUrl ? <img src={clientSelectedCompany.logoUrl} className="w-8 h-8 rounded" alt="logo" /> : <Building2 className="w-6 h-6 text-green-600" />}
-               معلومات الشركة وسياساتها
+               {clientSelectedCompany.logoUrl ? (
+                 <a href={clientSelectedCompany.logoUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity">
+                   <div className="w-10 h-10 relative rounded overflow-hidden">
+                     <Image src={clientSelectedCompany.logoUrl} fill className="object-cover" alt="logo" referrerPolicy="no-referrer" />
+                   </div>
+                 </a>
+               ) : <Building2 className="w-6 h-6 text-green-600 shrink-0" />}
+               معلومات الشركة
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            <div>
-              <p className="text-sm font-bold text-gray-500 mb-1">اسم الشركة</p>
-              <p className="font-medium text-gray-900">{clientSelectedCompany.name}</p>
-            </div>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 px-1">
+            {clientSelectedCompany.name && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1">اسم الشركة</p>
+                <p className="font-medium text-gray-900 border-b border-gray-100 pb-2">{clientSelectedCompany.name}</p>
+              </div>
+            )}
+            {clientSelectedCompany.phone && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1">رقم التواصل</p>
+                <p className="font-medium text-gray-900 border-b border-gray-100 pb-2" dir="ltr">{clientSelectedCompany.phone}</p>
+              </div>
+            )}
+            {clientSelectedCompany.email && (
+              <div>
+                <p className="text-sm font-bold text-gray-500 mb-1">البريد الإلكتروني</p>
+                <p className="font-medium text-gray-900 border-b border-gray-100 pb-2">{clientSelectedCompany.email}</p>
+              </div>
+            )}
             {clientSelectedCompany.aboutUs && (
               <div>
                 <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><AlignLeft className="w-4 h-4"/> نبذة عن الشركة</p>
                 <p className="text-gray-800 text-sm whitespace-pre-wrap p-3 bg-gray-50 rounded-lg">{clientSelectedCompany.aboutUs}</p>
               </div>
             )}
-            {clientSelectedCompany.notes && (
+            {clientSelectedCompany.address && (
               <div>
-                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><Info className="w-4 h-4"/> سياسات الشركة والملاحظات</p>
-                <p className="text-gray-800 text-sm whitespace-pre-wrap p-3 bg-blue-50/50 rounded-lg border border-blue-100">{clientSelectedCompany.notes}</p>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-4 h-4"/> العنوان</p>
+                <p className="text-gray-800 text-sm border-b border-gray-100 pb-2">{clientSelectedCompany.address}</p>
               </div>
             )}
             {clientSelectedCompany.workingHours && (
               <div>
                 <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-4 h-4"/> أوقات العمل</p>
-                <p className="text-gray-800 text-sm">{clientSelectedCompany.workingHours}</p>
+                <p className="text-gray-800 text-sm border-b border-gray-100 pb-2">{clientSelectedCompany.workingHours}</p>
               </div>
             )}
-            {clientSelectedCompany.address && (
+            {clientSelectedCompany.notes && (
               <div>
-                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-4 h-4"/> العنوان</p>
-                <p className="text-gray-800 text-sm">{clientSelectedCompany.address}</p>
+                <p className="text-sm font-bold text-gray-500 mb-1 flex items-center gap-1"><Info className="w-4 h-4"/> ملاحظات</p>
+                <p className="text-gray-800 text-sm whitespace-pre-wrap p-3 bg-blue-50/50 rounded-lg border border-blue-100">{clientSelectedCompany.notes}</p>
               </div>
             )}
           </div>

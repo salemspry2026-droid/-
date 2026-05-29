@@ -86,6 +86,16 @@ export function ClientOrders() {
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-green-600" /></div>;
 
+  const activeTotalsByCurrency: Record<string, number> = {};
+  filteredOrders.forEach(order => {
+    if (order.totalAmountByCurrency) {
+      Object.entries(order.totalAmountByCurrency).forEach(([curr, amount]) => {
+        if (!activeTotalsByCurrency[curr]) activeTotalsByCurrency[curr] = 0;
+        activeTotalsByCurrency[curr] += (amount as number);
+      });
+    }
+  });
+
   return (
     <div className="space-y-4 pb-24">
       {/* Header */}
@@ -130,6 +140,18 @@ export function ClientOrders() {
         </button>
       </div>
 
+      {/* Summary Chips */}
+      {Object.keys(activeTotalsByCurrency).length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+           <div className="w-full text-xs font-bold text-gray-500 mb-1">إجمالي تعاملات الطلبات المعروضة:</div>
+           {Object.entries(activeTotalsByCurrency).map(([curr, total]) => (
+              <span key={curr} className="bg-green-50 border border-green-200 text-green-800 px-3 py-1.5 rounded-lg text-sm font-bold">
+                 {total.toLocaleString()} <span className="text-xs">{curr}</span>
+              </span>
+           ))}
+        </div>
+      )}
+
       {/* Orders List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredOrders.map(order => (
@@ -141,20 +163,30 @@ export function ClientOrders() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg">طلب #{order.id.substring(0, 6)}</h3>
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                  <p className="text-sm text-gray-500 flex items-center gap-1 mb-1">
                     {order.items?.length || 0} صنف
                   </p>
-                  {order.source === 'company' && (
-                    <span className="inline-block mt-1 bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                      تم التسجيل من قبل الشركة
+                  {order.source === 'customer' ? (
+                    <span className="inline-block bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      تم الرفع بواسطتك
+                    </span>
+                  ) : (
+                    <span className="inline-block bg-purple-50 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      تم التسجيل بواسطة الشركة
                     </span>
                   )}
                 </div>
               </div>
-              <div className="text-left">
-                <p className="font-bold text-green-700 text-lg">
-                  {String(Object.values(order.totalAmountByCurrency || {})[0] || 0)} ر.س
-                </p>
+              <div className="text-left flex flex-col items-end gap-1">
+                 {order.totalAmountByCurrency ? (
+                    Object.entries(order.totalAmountByCurrency).map(([curr, amount]) => (
+                      <p key={curr} className="font-bold text-green-700 text-sm">
+                        {amount as number} <span className="text-xs">{curr}</span>
+                      </p>
+                    ))
+                 ) : (
+                    <p className="font-bold text-green-700 text-sm">0</p>
+                 )}
                 <span className={cn(
                   "text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-1",
                   order.status === 'pending' ? 'bg-blue-50 text-blue-600' :

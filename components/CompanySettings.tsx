@@ -127,6 +127,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
   const [notes, setNotes] = useState('');
   const [primaryCurrency, setPrimaryCurrency] = useState('ر.س');
   const [locations, setLocations] = useState<any[]>([]);
+  const [isVisibleToClients, setIsVisibleToClients] = useState(false);
 
   const getFullPath = (loc: any, allLocs: any[]) => {
     let path = [loc.name];
@@ -182,6 +183,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
           setWorkingHours(data.workingHours || '');
           setNotes(data.notes || '');
           setPrimaryCurrency(data.primaryCurrency || 'ر.س');
+          setIsVisibleToClients(data.isVisibleToClients || false);
         }
       } catch (error) {
         console.error(error);
@@ -254,6 +256,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
         workingHours,
         notes,
         primaryCurrency,
+        isVisibleToClients,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid
       };
@@ -401,6 +404,20 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
                     </div>
                     <p className="text-xs text-blue-700/80 mt-4 font-medium">شارك هذا الكود مع موظفيك بصلاحيات المبيعات أو فريق الإدارة.</p>
                   </div>
+
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-gray-800">حالة ظهور الشركة للعملاء</h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {company.isVisibleToClients ? 'شركتك ظاهرة حالياً للعملاء ويمكنهم الشراء.' : 'شركتك مخفية، لا تظهر في قائمة الشركات المتاحة للعملاء.'}
+                        </p>
+                      </div>
+                      <div className={`px-4 py-2 rounded-full font-bold text-sm ${company.isVisibleToClients ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                         {company.isVisibleToClients ? 'ظاهرة للعملاء' : 'مخفية'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 /* Edit Mode Form */
@@ -410,6 +427,18 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
                     <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="text-gray-500 hover:bg-gray-200 rounded-full">
                       <X className="w-4 h-4 ml-1" /> إلغاء
                     </Button>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-xl border border-gray-200 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                      <Label className="text-base font-bold text-gray-900 block mb-1">ظهور الشركة للعملاء</Label>
+                      <p className="text-sm text-gray-500">حين تفعيل هذا الخيار، ستظهر الشركة في القائمة العامة للعملاء. (سيتم إخفاؤها تلقائياً إذا لم تكن تحتوي على أصناف متاحة للبيع)</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={isVisibleToClients} onChange={(e) => setIsVisibleToClients(e.target.checked)} />
+                      <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
+                      <span className="mr-3 text-sm font-medium text-gray-700">{isVisibleToClients ? 'مُفعّل' : 'معطّل'}</span>
+                    </label>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
