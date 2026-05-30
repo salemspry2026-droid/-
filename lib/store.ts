@@ -17,7 +17,11 @@ export interface UserProfile {
   isDeleted?: boolean;
   storeName?: string;
   phone?: string;
-  address?: string;
+  address?: string; // legacy or combined
+  addressCountry?: string;
+  addressGov?: string;
+  addressCity?: string;
+  addressNeighborhood?: string;
   logoUrl?: string;
   activityType?: string;
   activityTypeOther?: string;
