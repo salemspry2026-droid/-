@@ -13,10 +13,12 @@ import { toast } from 'sonner';
 import { Onboarding } from '@/components/Onboarding';
 import { AdminDashboard } from '@/components/AdminDashboard';
 import { ClientDashboard } from '@/components/ClientDashboard';
+import { LandingPage } from '@/components/LandingPage';
 
 export default function Home() {
   const { user, profile, isAuthReady, isProfileLoaded } = useStore();
   
+  const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -96,14 +98,21 @@ export default function Home() {
   }
 
   if (!user) {
+    if (!showLogin) {
+      return <LandingPage onLoginClick={() => setShowLogin(true)} />;
+    }
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#F0F2F5] p-4" dir="rtl">
-        <Card className="w-full max-w-md border-none shadow-lg rounded-2xl">
-          <CardHeader className="text-center pb-2">
+        <Card className="w-full max-w-md border-none shadow-lg rounded-2xl relative">
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4" onClick={() => setShowLogin(false)}>
+            <LogOut className="w-5 h-5 text-gray-400 rotate-180" />
+          </Button>
+          <CardHeader className="text-center pb-2 pt-8">
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">نظام إدارة الطلبات</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 mt-2">نظام إدارة الطلبات</CardTitle>
             <CardDescription className="text-gray-500">
               {authMode === 'login' && 'تسجيل الدخول للمتابعة'}
               {authMode === 'register' && 'إنشاء حساب جديد'}
