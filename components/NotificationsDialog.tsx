@@ -62,11 +62,11 @@ export function NotificationsDialog({
     // 2. Fetch Stale Orders (unconfirmed for more than 4 hours)
     // Client-side mapping
     let unsubOrders = () => {};
-    if (['admin', 'owner', 'sales'].includes(profile.role)) {
+    if (profile.role && ['admin', 'owner', 'sales'].includes(profile.role) && profile.companyId) {
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
       const qOrders = query(
         collection(db, 'orders'),
-        where('companyId', '==', profile.companyId),
+        where('companyId', '==', profile.companyId as string),
         where('isDeleted', '==', false),
         where('status', 'in', ['pending', 'processing']) // Unconfirmed
       );

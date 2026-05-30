@@ -83,7 +83,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">البلد</Label>
         <Select 
           value={selectedCountry} 
-          onValueChange={(val: string) => {
+          onValueChange={(val: any) => {
             setSelectedCountry(val || 'none');
             setSelectedGov('none');
             setSelectedRegion('none');
@@ -103,7 +103,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">المحافظة</Label>
         <Select 
           value={selectedGov} 
-          onValueChange={(val: string) => {
+          onValueChange={(val: any) => {
             setSelectedGov(val || 'none');
             setSelectedRegion('none');
             setSelectedNeighborhood('none');
@@ -123,7 +123,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">المدينة / المنطقة</Label>
         <Select 
           value={selectedRegion} 
-          onValueChange={(val: string) => {
+          onValueChange={(val: any) => {
             setSelectedRegion(val || 'none');
             setSelectedNeighborhood('none');
             handleUpdate(selectedCountry, selectedGov, val || 'none', 'none');
@@ -142,7 +142,7 @@ export function AddressSelector({ locations, value, onChange }: { locations: Loc
         <Label className="text-xs text-gray-500">الحي</Label>
         <Select 
           value={selectedNeighborhood} 
-          onValueChange={(val: string) => {
+          onValueChange={(val: any) => {
             setSelectedNeighborhood(val || 'none');
             handleUpdate(selectedCountry, selectedGov, selectedRegion, val || 'none');
           }}

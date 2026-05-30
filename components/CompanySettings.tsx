@@ -166,7 +166,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
     const fetchCompany = async () => {
       setLoading(true);
       try {
-        const docSnap = await getDoc(doc(db, 'companies', profile.companyId)).catch(err => handleFirestoreError(err, OperationType.GET, `companies/${profile.companyId}`));
+        const docSnap = await getDoc(doc(db, 'companies', profile.companyId as string)).catch(err => handleFirestoreError(err, OperationType.GET, `companies/${profile.companyId}`));
         if (docSnap && docSnap.exists()) {
           const data = docSnap.data();
           setCompany({ id: docSnap.id, ...data });

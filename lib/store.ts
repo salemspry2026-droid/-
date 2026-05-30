@@ -7,7 +7,7 @@ export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
-  companyId: string;
+  companyId: string | null;
   role: UserRole;
   companyName?: string;
   createdAt?: any;
@@ -15,6 +15,14 @@ export interface UserProfile {
   createdBy?: string;
   updatedBy?: string;
   isDeleted?: boolean;
+  storeName?: string;
+  phone?: string;
+  address?: string;
+  logoUrl?: string;
+  activityType?: string;
+  activityTypeOther?: string;
+  notes?: string;
+  favoriteProductIds?: string[];
 }
 
 interface AppState {

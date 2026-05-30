@@ -27,7 +27,7 @@ export function OrderDetailsDialog({
 }) {
   const [saving, setSaving] = useState(false);
   const { user, profile } = useStore();
-  const [matchStatus, setMatchStatus] = useState<'checking' | 'matched' | 'no_match'>('checked');
+  const [matchStatus, setMatchStatus] = useState<'checking' | 'matched' | 'no_match' | 'checked'>('checked');
   const [matchingCustomers, setMatchingCustomers] = useState<any[]>([]);
   const [merging, setMerging] = useState(false);
 

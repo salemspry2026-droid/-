@@ -253,7 +253,7 @@ export function ProductFormDialog({
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       const ai = new GoogleGenAI({ apiKey: apiKey! });
-      const prompt = `اكتب وصفاً تسويقياً قصيراً واحترافياً لمنتج B2B يسمى "${name}". التصنيف: ${category || 'عام'}. اجعله في جملتين كحد أقصى وباللغة العربية.`;
+      const prompt = `اكتب وصفاً تسويقياً قصيراً واحترافياً لمنتج B2B يسمى "${name}". التصنيف: ${categoryId === 'none' ? 'عام' : categoryId}. اجعله في جملتين كحد أقصى وباللغة العربية.`;
       const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
       if (response.text) { setDescription(response.text.trim()); toast.success('تم إنشاء الوصف!'); }
     } catch (error: any) {

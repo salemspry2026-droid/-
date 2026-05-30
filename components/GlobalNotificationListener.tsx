@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 export function GlobalNotificationListener() {
   const { profile, user, setUnreadNotifications } = useStore();
@@ -79,11 +80,11 @@ export function GlobalNotificationListener() {
       // Stale orders check
       let unsubOrders = () => {};
       
-      if (['admin', 'owner', 'sales'].includes(profile.role)) {
+      if (profile.role && ['admin', 'owner', 'sales'].includes(profile.role) && profile.companyId) {
         const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
         const qOrders = query(
           collection(db, 'orders'),
-          where('companyId', '==', profile.companyId),
+          where('companyId', '==', profile.companyId as string),
           where('isDeleted', '==', false),
           where('status', 'in', ['pending', 'processing']) // Unconfirmed
         );

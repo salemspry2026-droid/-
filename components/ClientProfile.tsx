@@ -33,6 +33,7 @@ export default function ClientProfile() {
 
   const [clientOrders, setClientOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [companies, setCompanies] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -62,6 +63,7 @@ export default function ClientProfile() {
       };
       const qSelf = query(collection(db, 'orders'), where('createdBy', '==', user.uid));
       const qClientUid = query(collection(db, 'orders'), where('clientUid', '==', user.uid));
+      const qCompanies = query(collection(db, 'companies'), where('isDeleted', '==', false));
       
       const unsubSelf = onSnapshot(qSelf, (snap) => {
         myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !(d as any).isDeleted);
@@ -71,7 +73,10 @@ export default function ClientProfile() {
         mappedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !(d as any).isDeleted);
         updateCombined();
       });
-      return () => { unsubSelf(); unsubClientUid(); };
+      const unsubCompanies = onSnapshot(qCompanies, (snap) => {
+        setCompanies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      return () => { unsubSelf(); unsubClientUid(); unsubCompanies(); };
     });
   }, [user]);
 
@@ -91,6 +96,50 @@ export default function ClientProfile() {
 
     return { pendingCashTotal, cashTotal, totalItems, orderCount: clientOrders.length };
   }, [clientOrders]);
+
+  const detailedCompanyReports = useMemo(() => {
+    const companyMap = new Map<string, any>();
+
+    clientOrders.forEach(o => {
+      if (o.status !== 'cancelled' && o.status !== 'rejected') {
+        const compId = o.companyId;
+        if (!compId) return;
+        
+        if (!companyMap.has(compId)) {
+           const compData = companies.find(c => c.id === compId);
+           companyMap.set(compId, {
+             companyId: compId,
+             companyName: compData ? compData.name : 'شركة غير معروفة',
+             totalOrders: 0,
+             itemsMap: new Map<string, any>()
+           });
+        }
+        
+        const compReport = companyMap.get(compId);
+        compReport.totalOrders += 1;
+        
+        (o.items || []).forEach((item: any) => {
+           if (!item.productId) return;
+           if (!compReport.itemsMap.has(item.productId)) {
+             compReport.itemsMap.set(item.productId, {
+               productName: item.productName || 'صنف غير معروف',
+               totalQuantity: 0,
+               totalBonusQuantity: 0
+             });
+           }
+           const itemReport = compReport.itemsMap.get(item.productId);
+           itemReport.totalQuantity += (item.quantity || 0);
+           itemReport.totalBonusQuantity += (item.bonusQuantity || 0);
+        });
+      }
+    });
+
+    return Array.from(companyMap.values()).map(comp => ({
+      ...comp,
+      items: Array.from(comp.itemsMap.values() as Iterable<any>)
+        .sort((a, b) => b.totalQuantity - a.totalQuantity)
+    })).sort((a, b) => b.totalOrders - a.totalOrders);
+  }, [clientOrders, companies]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,7 +271,7 @@ export default function ClientProfile() {
                     <Activity className="w-4 h-4 text-gray-400" />
                     نوع النشاط التجاري
                   </Label>
-                  <Select value={formData.activityType} onValueChange={(val) => setFormData(prev => ({ ...prev, activityType: val }))}>
+                  <Select value={formData.activityType} onValueChange={(val) => setFormData(prev => ({ ...prev, activityType: val || '' }))}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="اختر نوع النشاط" />
                     </SelectTrigger>
@@ -353,10 +402,50 @@ export default function ClientProfile() {
                     </div>
                  </div>
 
-                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center mt-8">
-                    <p className="text-gray-600 max-w-md mx-auto text-sm leading-relaxed">
-                      هذا ملخص سريع لمعاملاتك الحالية عبر المنصة. جارٍ العمل على تقارير تفصيلية إضافية تتيح تتبع الكميات لكل صنف بشكل دقيق مع كل شركة على حدة.
-                    </p>
+                 <div className="mt-8 space-y-6">
+                    <h3 className="text-xl font-bold text-gray-900 border-b pb-2">تفاصيل الكميات لكل شركة</h3>
+                    {detailedCompanyReports.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">لا توجد بيانات تفصيلية متاحة بعد.</p>
+                    ) : (
+                      detailedCompanyReports.map(comp => (
+                        <div key={comp.companyId} className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                           <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
+                             <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                               <Store className="w-5 h-5 text-gray-500" />
+                               {comp.companyName}
+                             </h4>
+                             <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold">{comp.totalOrders} طلبات</span>
+                           </div>
+                           <div className="overflow-x-auto">
+                              <table className="w-full text-sm text-right">
+                                <thead className="bg-gray-50/50 text-gray-500">
+                                  <tr>
+                                    <th className="px-4 py-3 font-medium">الصنف</th>
+                                    <th className="px-4 py-3 font-medium w-32">الكمية الأساسية</th>
+                                    <th className="px-4 py-3 font-medium w-32">كمية البونص</th>
+                                    <th className="px-4 py-3 font-medium w-32">إجمالي الوحدات</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {comp.items.map((item: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="px-4 py-3 font-medium text-gray-900">{item.productName}</td>
+                                      <td className="px-4 py-3 text-blue-600 font-bold">{item.totalQuantity}</td>
+                                      <td className="px-4 py-3 text-green-600">{item.totalBonusQuantity > 0 ? `+${item.totalBonusQuantity}` : '-'}</td>
+                                      <td className="px-4 py-3 text-gray-900 font-bold">{item.totalQuantity + item.totalBonusQuantity}</td>
+                                    </tr>
+                                  ))}
+                                  {comp.items.length === 0 && (
+                                    <tr>
+                                      <td colSpan={4} className="px-4 py-4 text-center text-gray-500">لا توجد تفاصيل أصناف لهذه الشركة</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                           </div>
+                        </div>
+                      ))
+                    )}
                  </div>
               </div>
             )}

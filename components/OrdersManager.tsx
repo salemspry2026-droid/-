@@ -29,7 +29,7 @@ export function OrdersManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any>(null);
-  const [activeDateFilter, setActiveDateFilter] = useState<'all' | 'today'>('all');
+  const [activeDateFilter, setActiveDateFilter] = useState<'all' | 'today' | 'pending_debts'>('all');
 
   const { selectedOrderId, setSelectedOrderId } = useStore();
 

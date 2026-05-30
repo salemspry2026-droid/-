@@ -55,7 +55,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
         setFavoriteProducts(allProducts);
 
         // Fetch company info for these products
-        const companyIdsArr = Array.from(new Set(allProducts.map(p => p.companyId).filter(Boolean)));
+        const companyIdsArr = Array.from(new Set(allProducts.map((p: any) => p.companyId).filter(Boolean)));
         const compChunks = [];
         for (let i = 0; i < companyIdsArr.length; i += 30) {
           compChunks.push(companyIdsArr.slice(i, i + 30));
