@@ -1,0 +1,63 @@
+6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+38:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+43:    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+44:    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+6:import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+28:    const unsubscribe = onSnapshot(q, (snapshot) => {
+6:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+24:      const unsub = onSnapshot(qNotifs, (snap) => {
+64:    const unsub = onSnapshot(qNotifs, (snap) => {
+93:        unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
+5:import { doc, onSnapshot } from 'firebase/firestore';
+21:        unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
+6:import { collection, query, where, onSnapshot, updateDoc, doc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
+33:      const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+54:    const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+74:      unsubOrders = onSnapshot(qOrders, (snap) => {
+6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+81:    const unsub = onSnapshot(locQ, (snap) => {
+96:    const unsubscribe = onSnapshot(q, (snapshot) => {
+6:import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
+154:    const unsub = onSnapshot(locQ, (snap) => {
+687:    const unsubscribe = onSnapshot(q, (snapshot) => {
+6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+66:    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+67:    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+68:    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+69:    const unsubStages = onSnapshot(qStages, (snap) => {
+73:    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
+93:    const unsub = onSnapshot(qOrders, (snap) => {
+8:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+30:    const unsubCompanies = onSnapshot(qCompanies, (snapshot) => {
+42:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+8:import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
+34:    const unsubCompany = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
+45:    const unsubStages = onSnapshot(qStages, (snapshot) => {
+55:    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+71:    import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
+84:      const unsubSelf = onSnapshot(qSelf, (snap) => {
+88:      const unsubClientUid = onSnapshot(qClientUid, (snap) => {
+92:      const unsubCompanies = onSnapshot(qCompanies, (snap) => {
+6:import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+103:    const unsub = onSnapshot(doc(db, 'companies', companyId), (docSnap) => {
+249:    const unsub = onSnapshot(q, (snap) => {
+382:    const unsubCat = onSnapshot(qCat, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+385:    const unsubBrand = onSnapshot(qBrand, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+456:    const unsub = onSnapshot(q, (snap) => {
+6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+61:    const unsubStages = onSnapshot(qStages, (snapshot) => {
+65:    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+70:    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
+74:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+6:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+62:    const unsubSelf = onSnapshot(qSelf, (snapshot) => {
+67:    const unsubClientUid = onSnapshot(qClientUid, (snapshot) => {
+6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+83:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+89:    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+90:    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+91:    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
+6:import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
+117:    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+118:    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+119:    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {

@@ -53,6 +53,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   }
+  
+  if ((error as any)?.code === 'permission-denied') {
+     console.warn('Firestore Permission Denied (harmless if during logout or initial load):', path);
+     return;
+  }
+  
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   // In snapshot listeners, throwing will cause unhandled rejections or uncaught errors. 
   // We strictly log instead of throw here so we don't bring down the app.

@@ -1,0 +1,63 @@
+components/ProductsManager.tsx:6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+components/ProductsManager.tsx:38:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+components/ProductsManager.tsx:43:    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+components/ProductsManager.tsx:44:    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+components/StaffManager.tsx:6:import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+components/StaffManager.tsx:28:    const unsubscribe = onSnapshot(q, (snapshot) => {
+components/GlobalNotificationListener.tsx:6:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+components/GlobalNotificationListener.tsx:24:      const unsub = onSnapshot(qNotifs, (snap) => {
+components/GlobalNotificationListener.tsx:64:    const unsub = onSnapshot(qNotifs, (snap) => {
+components/GlobalNotificationListener.tsx:93:        unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
+components/AuthProvider.tsx:5:import { doc, onSnapshot } from 'firebase/firestore';
+components/AuthProvider.tsx:21:        unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
+components/NotificationsDialog.tsx:6:import { collection, query, where, onSnapshot, updateDoc, doc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
+components/NotificationsDialog.tsx:33:      const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+components/NotificationsDialog.tsx:54:    const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+components/NotificationsDialog.tsx:74:      unsubOrders = onSnapshot(qOrders, (snap) => {
+components/CustomersManager.tsx:6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+components/CustomersManager.tsx:81:    const unsub = onSnapshot(locQ, (snap) => {
+components/CustomersManager.tsx:96:    const unsubscribe = onSnapshot(q, (snapshot) => {
+components/CompanySettings.tsx:6:import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
+components/CompanySettings.tsx:154:    const unsub = onSnapshot(locQ, (snap) => {
+components/CompanySettings.tsx:687:    const unsubscribe = onSnapshot(q, (snapshot) => {
+components/OrderRegistrationDialog.tsx:6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+components/OrderRegistrationDialog.tsx:66:    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+components/OrderRegistrationDialog.tsx:67:    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+components/OrderRegistrationDialog.tsx:68:    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+components/OrderRegistrationDialog.tsx:69:    const unsubStages = onSnapshot(qStages, (snap) => {
+components/OrderRegistrationDialog.tsx:73:    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
+components/OrderRegistrationDialog.tsx:93:    const unsub = onSnapshot(qOrders, (snap) => {
+components/ClientHomeTab.tsx:8:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+components/ClientHomeTab.tsx:30:    const unsubCompanies = onSnapshot(qCompanies, (snapshot) => {
+components/ClientHomeTab.tsx:42:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+components/HomeTab.tsx:8:import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
+components/HomeTab.tsx:34:    const unsubCompany = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
+components/HomeTab.tsx:45:    const unsubStages = onSnapshot(qStages, (snapshot) => {
+components/HomeTab.tsx:55:    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+components/ClientProfile.tsx:71:    import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
+components/ClientProfile.tsx:84:      const unsubSelf = onSnapshot(qSelf, (snap) => {
+components/ClientProfile.tsx:88:      const unsubClientUid = onSnapshot(qClientUid, (snap) => {
+components/ClientProfile.tsx:92:      const unsubCompanies = onSnapshot(qCompanies, (snap) => {
+components/AdministrationDialog.tsx:6:import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+components/AdministrationDialog.tsx:103:    const unsub = onSnapshot(doc(db, 'companies', companyId), (docSnap) => {
+components/AdministrationDialog.tsx:249:    const unsub = onSnapshot(q, (snap) => {
+components/AdministrationDialog.tsx:382:    const unsubCat = onSnapshot(qCat, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+components/AdministrationDialog.tsx:385:    const unsubBrand = onSnapshot(qBrand, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+components/AdministrationDialog.tsx:456:    const unsub = onSnapshot(q, (snap) => {
+components/OrdersManager.tsx:6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+components/OrdersManager.tsx:61:    const unsubStages = onSnapshot(qStages, (snapshot) => {
+components/OrdersManager.tsx:65:    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+components/OrdersManager.tsx:70:    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
+components/OrdersManager.tsx:74:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+components/ClientOrders.tsx:6:import { collection, query, where, onSnapshot } from 'firebase/firestore';
+components/ClientOrders.tsx:62:    const unsubSelf = onSnapshot(qSelf, (snapshot) => {
+components/ClientOrders.tsx:67:    const unsubClientUid = onSnapshot(qClientUid, (snapshot) => {
+components/ClientProducts.tsx:6:import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+components/ClientProducts.tsx:83:    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+components/ClientProducts.tsx:89:    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+components/ClientProducts.tsx:90:    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
+components/ClientProducts.tsx:91:    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
+components/ProductFormDialog.tsx:6:import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
+components/ProductFormDialog.tsx:117:    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+components/ProductFormDialog.tsx:118:    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+components/ProductFormDialog.tsx:119:    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {

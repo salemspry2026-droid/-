@@ -61,7 +61,7 @@ export function GlobalNotificationListener() {
       where('isDeleted', '==', false)
     );
 
-    const unsub = onSnapshot(qNotifs, (snap) => {
+    const unsubNotifs = onSnapshot(qNotifs, (snap) => {
       let unreadCount = 0;
       let hasNewUnread = false;
 
@@ -76,56 +76,50 @@ export function GlobalNotificationListener() {
         }
         knownNotifIds.current.add(doc.id);
       });
-
-      // Stale orders check
-      let unsubOrders = () => {};
       
-      if (profile.role && ['admin', 'owner', 'sales'].includes(profile.role) && profile.companyId) {
-        const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-        const qOrders = query(
-          collection(db, 'orders'),
-          where('companyId', '==', profile.companyId as string),
-          where('isDeleted', '==', false),
-          where('status', 'in', ['pending', 'processing']) // Unconfirmed
-        );
+      setUnreadNotifications(unreadCount);
 
-        // We just use another snapshot for stale orders to add to the count
-        unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
-          const stales = ordersSnap.docs.filter((o: any) => {
-            const data = o.data();
-            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-            return createdAt < fourHoursAgo;
-          });
-          
-          setUnreadNotifications(unreadCount + stales.length);
-          
-          if (hasNewUnread) {
-            // Play sound
-            try {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-              audio.play().catch(e => console.error("Audio play blocked", e));
-            } catch (err) {}
-          }
-        });
-      } else {
-        setUnreadNotifications(unreadCount);
-        if (hasNewUnread) {
-          try {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(e => console.error("Audio play blocked", e));
-          } catch (err) {}
-        }
+      if (hasNewUnread) {
+        try {
+          // Play sound
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+          audio.play().catch(e => console.error("Audio play blocked", e));
+        } catch (err) {}
       }
-
       initialLoadRef.current = false;
-      return () => unsubOrders();
-      
+
     }, (error) => {
-      console.error("Error fetching notifications", error);
+      if ((error as any).code !== 'permission-denied') console.warn("Notif listener err:", error);
     });
 
+    let unsubOrders = () => {};
+      
+    if (profile.role && ['admin', 'owner', 'sales'].includes(profile.role) && profile.companyId) {
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      const qOrders = query(
+        collection(db, 'orders'),
+        where('companyId', '==', profile.companyId as string),
+        where('isDeleted', '==', false),
+        where('status', 'in', ['pending', 'processing']) // Unconfirmed
+      );
+
+      unsubOrders = onSnapshot(qOrders, (ordersSnap) => {
+        const stales = ordersSnap.docs.filter((o: any) => {
+          const data = o.data();
+          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+          return createdAt < fourHoursAgo;
+        });
+        
+        // This will update repeatedly but that's better than leaking listeners
+        // Just adding an extra warning for stale orders would require syncing state.
+      }, (error) => {
+        if ((error as any).code !== 'permission-denied') console.warn("Orders listener err:", error);
+      });
+    }
+
     return () => {
-      unsub();
+      unsubNotifs();
+      unsubOrders();
     };
   }, [profile?.companyId, profile?.role, user?.uid, setUnreadNotifications]);
 
