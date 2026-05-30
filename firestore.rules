@@ -236,14 +236,7 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId || 
-        (resource != null && (
-          isCompanyAdmin(resource.data.companyId) || 
-          isCompanySales(resource.data.companyId) || 
-          isCompanyOwner(resource.data.companyId)
-        ))
-      );
+      allow read: if isAuthenticated();
       
       allow create: if isAuthenticated() && 
                     request.auth.uid == userId &&
@@ -279,7 +272,7 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
-      allow read: if isCompanyMember(resource.data.companyId);
+      allow read: if isAuthenticated();
       
       allow create: if isAuthenticated() && 
                     isValidCustomer(request.resource.data) && 
@@ -295,11 +288,7 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (
-                  resource.data.createdBy == request.auth.uid ||
-                  (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid) ||
-                  (isCompanyMember(resource.data.companyId) && (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId)))
-      );
+      allow read: if isAuthenticated();
       
       allow create: if isAuthenticated() && 
                     isCreatedByCurrentUser() && 
@@ -333,13 +322,13 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isCompanyMember(resource.data.companyId) || (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid);
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidNotification(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && (isCompanyAdmin(request.resource.data.companyId) || isCompanySales(request.resource.data.companyId) || isCompanyClient(request.resource.data.companyId));
       allow update: if isAuthenticated() && isValidNotification(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'clientUid', 'title', 'message', 'type', 'orderId']) && (isCompanyMember(resource.data.companyId) || (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid));
     }
 
     match /orderStages/{stageId} {
-      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || getUserRole() == 'client');
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidOrderStage(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidOrderStage(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
