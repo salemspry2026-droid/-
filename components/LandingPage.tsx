@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Network, Smartphone, Clock, PieChart, ServerCrash, CreditCard, ShieldCheck, Phone, Handshake, CheckCircle2, TrendingUp, ArrowLeft, Menu, X, LayoutDashboard, ShoppingBag, Users, Store } from 'lucide-react';
+import { Network, Smartphone, Clock, PieChart, ServerCrash, CreditCard, ShieldCheck, Phone, Handshake, CheckCircle2, TrendingUp, ArrowLeft, Menu, X, LayoutDashboard, ShoppingBag, Users, Store, ReceiptText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LandingPageProps {
@@ -184,7 +184,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                      </div>
                   </div>
 
-                  <AnimatePresence mode="wait">
+                     <AnimatePresence mode="wait">
                     {activePreview === 'admin' ? (
                        <motion.div 
                          key="admin-preview"
@@ -192,33 +192,59 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                          animate={{ opacity: 1, x: 0 }}
                          exit={{ opacity: 0, x: 20 }}
                          transition={{ duration: 0.3 }}
-                         className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[400px]"
+                         className="bg-[#F0F2F5] rounded-2xl border shadow-xl overflow-hidden flex min-h-[450px]"
+                         dir="rtl"
                        >
                          {/* Fake Admin Sidebar */}
-                         <div className="w-full md:w-64 bg-[#163C85] p-6 text-white hidden md:block">
-                            <div className="flex items-center gap-2 mb-10">
-                              <Network className="w-6 h-6 text-blue-300" />
-                              <span className="font-bold text-xl">لوحة الإدارة</span>
+                         <div className="w-64 bg-white border-l border-gray-200 shrink-0 hidden md:flex flex-col z-10 shadow-sm relative">
+                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                              <div>
+                                <h2 className="text-xl font-bold text-gray-900">نظام الطلبات</h2>
+                                <p className="text-xs text-gray-500 mt-1">مدير النظام</p>
+                              </div>
                             </div>
-                            <div className="space-y-4">
-                              <div className="h-10 bg-white/10 rounded-lg flex items-center px-4 gap-3 text-blue-100"><LayoutDashboard className="w-4 h-4" /> نظرة عامة</div>
-                              <div className="h-10 hover:bg-white/5 rounded-lg flex items-center px-4 gap-3 text-blue-200"><ShoppingBag className="w-4 h-4" /> المبيعات والطلبات</div>
-                              <div className="h-10 hover:bg-white/5 rounded-lg flex items-center px-4 gap-3 text-blue-200"><Users className="w-4 h-4" /> العملاء</div>
+                            <div className="flex-1 p-4 space-y-2">
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold"><LayoutDashboard className="w-5 h-5" />الرئيسية</div>
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600"><ShoppingBag className="w-5 h-5" />الطلبات</div>
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600"><Users className="w-5 h-5" />الأصناف</div>
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600"><Users className="w-5 h-5" />العملاء</div>
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600"><ShieldCheck className="w-5 h-5" />الموظفين</div>
+                            </div>
+                            <div className="p-4 border-t border-gray-100">
+                               <div className="w-full h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm">طلب جديد</div>
                             </div>
                          </div>
                          {/* Fake Admin Content */}
-                         <div className="flex-1 p-6 md:p-8">
-                            <div className="h-8 w-48 bg-gray-100 rounded-md mb-8"></div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                              <div className="bg-blue-50 h-24 rounded-xl border border-blue-100 p-4"><div className="h-4 w-16 bg-blue-200 rounded mb-3"></div><div className="h-8 w-24 bg-blue-600 rounded"></div></div>
-                              <div className="bg-green-50 h-24 rounded-xl border border-green-100 p-4"><div className="h-4 w-16 bg-green-200 rounded mb-3"></div><div className="h-8 w-24 bg-green-600 rounded"></div></div>
-                              <div className="bg-orange-50 h-24 rounded-xl border border-orange-100 p-4"><div className="h-4 w-16 bg-orange-200 rounded mb-3"></div><div className="h-8 w-24 bg-orange-600 rounded"></div></div>
-                              <div className="bg-purple-50 h-24 rounded-xl border border-purple-100 p-4"><div className="h-4 w-16 bg-purple-200 rounded mb-3"></div><div className="h-8 w-24 bg-purple-600 rounded"></div></div>
+                         <div className="flex-1 p-6 z-0 flex flex-col gap-6">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                  <h1 className="text-2xl font-bold text-gray-900">مرحباً بك مجدداً 👋</h1>
+                                  <p className="text-gray-500">نظرة عامة على أداء مبيعاتك اليوم</p>
+                              </div>
                             </div>
-                            <div className="bg-gray-50 h-64 rounded-xl border border-gray-100 p-4 flex flex-col gap-3">
-                               <div className="h-10 w-full bg-white rounded border border-gray-100 shadow-sm flex items-center px-4 justify-between"><div className="h-4 w-32 bg-gray-200 rounded"></div><div className="h-6 w-16 bg-green-100 rounded-full"></div></div>
-                               <div className="h-10 w-full bg-white rounded border border-gray-100 shadow-sm flex items-center px-4 justify-between"><div className="h-4 w-40 bg-gray-200 rounded"></div><div className="h-6 w-16 bg-orange-100 rounded-full"></div></div>
-                               <div className="h-10 w-full bg-white rounded border border-gray-100 shadow-sm flex items-center px-4 justify-between"><div className="h-4 w-24 bg-gray-200 rounded"></div><div className="h-6 w-16 bg-green-100 rounded-full"></div></div>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                 <p className="text-sm font-medium text-gray-500 mb-2">طلبات اليوم</p>
+                                 <h3 className="text-2xl font-bold">142</h3>
+                              </div>
+                              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                 <p className="text-sm font-medium text-gray-500 mb-2">مبيعات اليوم</p>
+                                 <h3 className="text-2xl font-bold text-green-600">$4,250</h3>
+                              </div>
+                              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hidden md:block">
+                                 <p className="text-sm font-medium text-gray-500 mb-2">إجمالي العملاء</p>
+                                 <h3 className="text-2xl font-bold">853</h3>
+                              </div>
+                              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hidden md:block">
+                                 <p className="text-sm font-medium text-gray-500 mb-2">الأصناف النشطة</p>
+                                 <h3 className="text-2xl font-bold">45</h3>
+                              </div>
+                            </div>
+
+                            <div className="bg-white flex-1 rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-gray-400 border-dashed">
+                               <PieChart className="w-12 h-12 mb-4 text-gray-200" />
+                               <p className="font-medium text-sm">رسم بياني للمبيعات (محتوى تجريبي)</p>
                             </div>
                          </div>
                        </motion.div>
@@ -229,40 +255,54 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                          animate={{ opacity: 1, x: 0 }}
                          exit={{ opacity: 0, x: -20 }}
                          transition={{ duration: 0.3 }}
-                         className="bg-white rounded-2xl border-4 border-gray-800 shadow-xl overflow-hidden flex flex-col min-h-[400px] max-w-sm mx-auto relative"
+                         className="bg-[#F0F2F5] rounded-[2.5rem] border-[6px] border-gray-900 shadow-2xl overflow-hidden flex flex-col min-h-[550px] max-w-[320px] mx-auto relative pb-20"
+                         dir="rtl"
                        >
                          {/* Mobile notch */}
-                         <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-20">
-                            <div className="w-32 h-6 bg-gray-800 rounded-b-2xl"></div>
+                         <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-50">
+                            <div className="w-24 h-6 bg-gray-900 rounded-b-xl"></div>
                          </div>
                          {/* Fake Client Header */}
-                         <div className="bg-green-600 p-6 pt-10 text-white pb-12">
-                            <div className="flex items-center justify-between mb-4">
-                              <Store className="w-8 h-8 text-white" />
-                              <div className="w-10 h-10 bg-white/20 rounded-full"></div>
+                         <div className="bg-white p-6 pt-12 shadow-sm relative z-10 flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
+                               <Store className="w-8 h-8 text-green-600" />
                             </div>
-                            <div className="h-6 w-32 bg-white/30 rounded mb-2"></div>
-                            <div className="h-4 w-48 bg-white/20 rounded"></div>
+                            <h2 className="text-xl font-bold text-gray-900 leading-tight">متجر أوردر فلو</h2>
+                            <p className="text-sm text-gray-500 mt-1">بوابتك للطلب المباشر</p>
                          </div>
-                         {/* Fake Client Content (floating over header) */}
-                         <div className="flex-1 bg-gray-50 px-4 pb-4 -mt-6">
-                            <div className="bg-white rounded-xl shadow-lg p-4 mb-4 grid grid-cols-2 gap-4">
-                               <div className="text-center p-2"><div className="h-8 w-16 bg-green-100 mx-auto rounded mb-2"></div><div className="h-3 w-12 bg-gray-200 mx-auto rounded"></div></div>
-                               <div className="text-center p-2"><div className="h-8 w-16 bg-orange-100 mx-auto rounded mb-2"></div><div className="h-3 w-12 bg-gray-200 mx-auto rounded"></div></div>
+                         {/* Fake Client Content */}
+                         <div className="flex-1 p-4 flex flex-col gap-4 overflow-y-hidden z-0">
+                            <div className="bg-green-600 rounded-2xl p-4 text-white shadow-lg shadow-green-600/30">
+                               <p className="text-green-100 text-sm mb-1">الرصيد المستخدم</p>
+                               <div className="flex items-end gap-2"><h3 className="text-2xl font-bold">1,250</h3><span className="mb-1 text-green-200">ر.س</span></div>
                             </div>
-                            <div className="space-y-4 pt-2">
-                               <h4 className="font-bold text-gray-700 text-sm">أحدث المنتجات</h4>
-                               <div className="flex gap-4 overflow-hidden">
-                                  <div className="min-w-[120px] h-32 bg-white rounded-xl border border-gray-100 p-2"><div className="w-full h-16 bg-gray-100 rounded-lg mb-2"></div><div className="h-3 w-full bg-gray-200 rounded mb-1"></div><div className="h-4 w-12 bg-green-500 rounded"></div></div>
-                                  <div className="min-w-[120px] h-32 bg-white rounded-xl border border-gray-100 p-2"><div className="w-full h-16 bg-gray-100 rounded-lg mb-2"></div><div className="h-3 w-full bg-gray-200 rounded mb-1"></div><div className="h-4 w-12 bg-green-500 rounded"></div></div>
+                            <div className="space-y-3">
+                               <div className="flex items-center justify-between px-1">
+                                  <h4 className="font-bold text-gray-800 text-sm">الأصناف المميزة</h4>
+                                  <span className="text-xs text-green-600 font-bold">عرض الكل</span>
+                               </div>
+                               <div className="flex gap-3 overflow-hidden">
+                                  <div className="w-32 bg-white rounded-xl shadow-sm border border-gray-100 p-2 shrink-0">
+                                     <div className="w-full h-24 bg-gray-50 rounded-lg mb-2"></div>
+                                     <div className="h-3 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                     <div className="h-3 w-1/2 bg-gray-100 rounded mb-2"></div>
+                                     <div className="h-4 w-12 bg-green-600 rounded"></div>
+                                  </div>
+                                  <div className="w-32 bg-white rounded-xl shadow-sm border border-gray-100 p-2 shrink-0">
+                                     <div className="w-full h-24 bg-gray-50 rounded-lg mb-2"></div>
+                                     <div className="h-3 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                     <div className="h-3 w-1/2 bg-gray-100 rounded mb-2"></div>
+                                     <div className="h-4 w-12 bg-green-600 rounded"></div>
+                                  </div>
                                </div>
                             </div>
                          </div>
                          {/* Fake Client Bottom Nav */}
-                         <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-around px-4">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"><Store className="w-4 h-4 text-green-700" /></div>
-                            <div className="w-6 h-6 bg-gray-200 rounded-md"></div>
-                            <div className="w-6 h-6 bg-gray-200 rounded-md"></div>
+                         <div className="absolute bottom-0 inset-x-0 h-16 bg-white border-t border-gray-100 flex items-center justify-between px-6 z-20 pb-2">
+                            <div className="flex flex-col items-center gap-1 text-green-600"><LayoutDashboard className="w-5 h-5" /><span className="text-[10px] font-bold">الرئيسية</span></div>
+                            <div className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBag className="w-5 h-5" /><span className="text-[10px] font-bold">المنتجات</span></div>
+                            <div className="flex flex-col items-center gap-1 text-gray-400"><ReceiptText className="w-5 h-5" /><span className="text-[10px] font-bold">الطلبات</span></div>
+                            <div className="flex flex-col items-center gap-1 text-gray-400"><Users className="w-5 h-5" /><span className="text-[10px] font-bold">حسابي</span></div>
                          </div>
                        </motion.div>
                     )}
