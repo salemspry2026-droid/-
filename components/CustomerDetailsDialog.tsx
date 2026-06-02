@@ -276,9 +276,9 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
                   let primaryTotal = order.totalAmountByCurrency?.[primaryCurrency] || 0;
                   
                   return (
-                    <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-100 hover:border-blue-200 transition-colors cursor-pointer">
-                       <div>
-                          <div className="flex items-center gap-2 mb-1">
+                    <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-100 hover:border-blue-200 transition-colors cursor-pointer">
+                       <div className="w-full sm:w-auto">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <p className="font-bold text-gray-900">طلب رقم #{order.id.slice(-6).toUpperCase()}</p>
                             {order.source === 'customer' ? (
                               <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">طلب العميل</span>

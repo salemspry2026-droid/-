@@ -242,7 +242,7 @@ export function ProductDetailsDialog({
 
         {/* Dashboard Stats */}
         {profile?.role !== 'client' && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center justify-center text-center">
                <Store className="w-6 h-6 text-blue-500 mb-2" />
                <p className="text-sm font-bold text-gray-600">مرات الطلب</p>
