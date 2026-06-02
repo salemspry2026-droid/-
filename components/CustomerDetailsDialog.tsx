@@ -8,11 +8,15 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
+import { OrderDetailsDialog } from './OrderDetailsDialog';
 
 export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { customer: any, isOpen: boolean, onClose: () => void, onEdit?: (customer: any) => void }) {
   const { profile, user } = useStore();
   const [stats, setStats] = useState({ totalOrders: 0, totalSpent: 0, companyOrders: 0, customerOrders: 0 });
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderStages, setOrderStages] = useState<any[]>([]);
+  const [activeStatusFilter, setActiveStatusFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -25,6 +29,12 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
     const fetchStatsAndOrders = async () => {
       setLoading(true);
       try {
+        // Fetch order stages setup
+        const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+        const stagesSnapshot = await getDocs(qStages);
+        const fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index);
+        setOrderStages(fetchedStages);
+
         const q = query(
           collection(db, 'orders'),
           where('companyId', '==', profile.companyId),
@@ -95,7 +105,29 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
 
   if (!customer) return null;
 
+  const fallbackStages = [
+    { id: 'pending', name: 'جديد' },
+    { id: 'processing', name: 'قيد المراجعة' },
+    { id: 'completed', name: 'مؤكد' },
+    { id: 'delivered', name: 'مُسلّم' },
+    { id: 'cancelled', name: 'ملغى' }
+  ];
+
+  const stagesToDisplay = orderStages.length > 0
+    ? orderStages.map(s => ({ id: s.name, name: s.name }))
+    : fallbackStages;
+
+  const filteredOrders = orders.filter(order => {
+    if (activeStatusFilter === 'all') return true;
+    const activeStage = stagesToDisplay.find(s => s.id === activeStatusFilter);
+    if (activeStage) {
+       return order.status === activeStage.id || order.status === activeStage.name;
+    }
+    return order.status === activeStatusFilter;
+  });
+
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
         <DialogHeader className="mb-4">
@@ -210,17 +242,41 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
 
         {/* Order History */}
         <div className="space-y-4">
-           <h3 className="font-bold text-gray-900 text-lg border-b pb-2">سجل الطلبات</h3>
+           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b pb-4">
+             <h3 className="font-bold text-gray-900 text-lg">سجل الطلبات</h3>
+             <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                <button
+                  onClick={() => setActiveStatusFilter('all')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${activeStatusFilter === 'all' ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
+                >
+                  الكل <span className={activeStatusFilter === 'all' ? "bg-white/20 text-white px-1.5 rounded-md ml-1" : "bg-gray-200 text-gray-700 px-1.5 rounded-md ml-1"}>{orders.length}</span>
+                </button>
+                {stagesToDisplay.map(stage => {
+                  const count = orders.filter(o => o.status === stage.id || o.status === stage.name).length;
+                  const isActive = activeStatusFilter === stage.id;
+                  return (
+                     <button
+                       key={stage.id}
+                       onClick={() => setActiveStatusFilter(stage.id)}
+                       className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${isActive ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
+                     >
+                        {stage.name} <span className={isActive ? "bg-white/20 text-white px-1.5 rounded-md ml-1" : "bg-gray-200 text-gray-700 px-1.5 rounded-md ml-1"}>{count}</span>
+                     </button>
+                  )
+                })}
+             </div>
+           </div>
+
            {loading ? (
              <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600" /></div>
-           ) : orders.length > 0 ? (
+           ) : filteredOrders.length > 0 ? (
              <div className="space-y-3">
-               {orders.map((order, idx) => {
+               {filteredOrders.map((order, idx) => {
                   let primaryCurrency = Object.keys(order.totalAmountByCurrency || {})[0] || 'SAR';
                   let primaryTotal = order.totalAmountByCurrency?.[primaryCurrency] || 0;
                   
                   return (
-                    <div key={order.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-100 transition-colors">
+                    <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-100 hover:border-blue-200 transition-colors cursor-pointer">
                        <div>
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-bold text-gray-900">طلب رقم #{order.id.slice(-6).toUpperCase()}</p>
@@ -229,14 +285,26 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
                             ) : (
                               <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">طلب المندوب</span>
                             )}
+                            <p className="text-xs text-orange-500 bg-orange-50 px-2 py-0.5 rounded inline-block">
+                              {(() => {
+                                 const st = order.status;
+                                 const stage = orderStages.find(s => s.id === st || s.name === st);
+                                 if (stage) return stage.name;
+                                 if (st === 'pending') return orderStages.length > 0 ? orderStages[0].name : 'جديد';
+                                 if (st === 'processing') return 'قيد المراجعة';
+                                 if (st === 'completed') return 'مؤكد';
+                                 if (st === 'approved') return orderStages.length > 1 ? orderStages[1].name : 'معتمد';
+                                 return st;
+                              })()}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <div className="flex items-center gap-3 text-xs text-gray-500 mt-2">
                              <span>{new Date(order.createdAt?.toMillis?.() || Date.now()).toLocaleDateString('ar-SA')}</span>
                              <span>•</span>
                              <span>{order.items?.length || 0} أصناف</span>
                           </div>
                        </div>
-                       <div className="text-left">
+                       <div className="text-left flex items-center gap-4">
                           <p className="font-bold text-blue-600 text-lg">{primaryTotal.toLocaleString()} <span className="text-xs text-gray-500">{primaryCurrency}</span></p>
                        </div>
                     </div>
@@ -245,12 +313,22 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
              </div>
            ) : (
              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-               لا توجد طلبات سابقة لهذا العميل.
+               {activeStatusFilter === 'all' ? 'لا توجد طلبات سابقة لهذا العميل.' : 'لا توجد طلبات مطابقة لهذه الحالة.'}
              </div>
            )}
         </div>
 
       </DialogContent>
     </Dialog>
+
+    {selectedOrder && (
+       <OrderDetailsDialog 
+         open={!!selectedOrder}
+         onOpenChange={(val) => !val && setSelectedOrder(null)}
+         order={selectedOrder}
+         stages={orderStages}
+       />
+    )}
+    </>
   );
 }
