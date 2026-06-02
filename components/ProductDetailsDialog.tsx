@@ -172,9 +172,9 @@ export function ProductDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="w-[95vw] max-w-[95vw] md:max-w-2xl max-h-[90vh] overflow-y-auto px-4 md:px-6" dir="rtl">
         <DialogHeader className="mb-4">
-          <DialogTitle className="text-2xl font-bold flex items-center justify-between">
+          <DialogTitle className="text-xl md:text-2xl font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span>تفاصيل الصنف: {product.name}</span>
             {profile && ['owner', 'admin', 'sales'].includes(profile.role as string) && (
               <div className="flex gap-2">
