@@ -14,6 +14,7 @@ import { Search, Plus, Minus, ShoppingCart, Loader2, Trash2, ChevronRight, Check
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { ProductDetailsDialog } from './ProductDetailsDialog';
 
 export function OrderRegistrationDialog({
   open,
@@ -43,6 +44,7 @@ export function OrderRegistrationDialog({
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [skipReview, setSkipReview] = useState(false);
+  const [selectedProductForDetails, setSelectedProductForDetails] = useState<any>(null);
 
   // Cart State: array of items
   const [cart, setCart] = useState<any[]>([]);
@@ -537,9 +539,9 @@ export function OrderRegistrationDialog({
                          const qty = getProductQty(product.displayId);
                          return (
                            <div key={product.displayId} className={`bg-white border ${product.isOfferEntry ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-xl p-4 flex justify-between items-center shadow-sm ${product.inStock === false && !product.isOfferEntry ? 'opacity-70' : ''}`}>
-                             <div>
+                             <div className="flex-1 cursor-pointer" onClick={() => setSelectedProductForDetails(product)}>
                                <div className="flex items-center gap-2 mb-1">
-                                 <h4 className="font-bold text-gray-900 leading-tight">{product.name}</h4>
+                                 <h4 className="font-bold text-gray-900 leading-tight hover:text-blue-600 transition-colors">{product.name}</h4>
                                  {product.isOfferEntry && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">عرض خاص</span>}
                                </div>
                                <p className={`text-sm font-bold ${product.isOfferEntry ? 'text-red-600' : 'text-blue-600'}`}>
@@ -548,9 +550,10 @@ export function OrderRegistrationDialog({
                                {product.isOfferEntry && product.specialOffer.targetExpiryDate && product.specialOffer.targetExpiryDate !== 'any' && (
                                   <p className="text-xs text-gray-400 mt-0.5 block">صلاحية: <span dir="ltr">{product.specialOffer.targetExpiryDate}</span></p>
                                )}
+                               <p className="text-[10px] text-gray-400 mt-1 underline">اضغط للتفاصيل وإحصائيات العميل</p>
                              </div>
                              
-                             <div className="flex items-center gap-2 border rounded-lg overflow-hidden bg-gray-50 h-10 shadow-sm border-gray-200">
+                             <div className="flex items-center gap-2 border rounded-lg overflow-hidden bg-gray-50 h-10 shadow-sm border-gray-200 ml-4 shrink-0">
                                <button onClick={() => addToCart(product, product.isOfferEntry)} className={`w-10 h-full hover:bg-blue-50 flex items-center justify-center transition-colors ${product.isOfferEntry ? 'text-red-600' : 'text-blue-600'}`}>
                                  <Plus className="w-4 h-4" />
                                </button>
@@ -845,6 +848,24 @@ export function OrderRegistrationDialog({
           </>
         )}
       </DialogContent>
+      
+      {/* Nested Product Details Dialog */}
+      <ProductDetailsDialog 
+        product={selectedProductForDetails}
+        isOpen={!!selectedProductForDetails}
+        onClose={() => setSelectedProductForDetails(null)}
+        categories={categories as any}
+        brands={brands}
+        customerSpecificData={
+          selectedCustomerId && selectedCustomer 
+          ? {
+              customerId: selectedCustomerId,
+              customerName: selectedCustomer.name,
+              customerOrders: customerOrders
+            } 
+          : undefined
+        }
+      />
     </Dialog>
   );
 }

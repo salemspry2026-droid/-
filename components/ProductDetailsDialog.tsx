@@ -10,10 +10,102 @@ import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 import Image from 'next/image';
 
-export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categories = [], brands = [] }: { product: any, isOpen: boolean, onClose: () => void, onEdit?: (product: any) => void, categories?: any[], brands?: any[] }) {
+export function ProductDetailsDialog({ 
+  product, 
+  isOpen, 
+  onClose, 
+  onEdit, 
+  categories = [], 
+  brands = [],
+  customerSpecificData
+}: { 
+  product: any, 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onEdit?: (product: any) => void, 
+  categories?: any[], 
+  brands?: any[],
+  customerSpecificData?: { customerId: string, customerName: string, customerOrders: any[] }
+}) {
   const { profile, user } = useStore();
   const [stats, setStats] = useState({ timesOrdered: 0, unitsSold: 0, totalSales: 0 });
   const [loading, setLoading] = useState(true);
+
+  const custStats = useMemo(() => {
+    if (!customerSpecificData || !product) return null;
+    
+    const orders = [...customerSpecificData.customerOrders].sort((a,b) => {
+      const da = a.createdAt?.toMillis?.() || Date.now();
+      const db = b.createdAt?.toMillis?.() || Date.now();
+      return db - da;
+    });
+
+    const currentYear = new Date().getFullYear();
+    
+    let lastOrderDetails = null;
+    let totalQty = 0;
+    let totalQtyThisYear = 0;
+    let maxQty = 0;
+    let orderCount = 0;
+    let firstOrderDate = null;
+    
+    orders.forEach(order => {
+      let qtyInOrder = 0;
+      let bonusInOrder = 0;
+      
+      order.items?.forEach((item: any) => {
+        if (item.productId === product.id || item.productId === `${product.id}_offer`) {
+          qtyInOrder += item.quantity || 0;
+          bonusInOrder += item.bonusQuantity || 0;
+        }
+      });
+      
+      if (qtyInOrder > 0) {
+        orderCount++;
+        totalQty += qtyInOrder;
+        
+        if (qtyInOrder > maxQty) maxQty = qtyInOrder;
+        
+        const orderDate = new Date(order.createdAt?.seconds * 1000 || Date.now());
+        if (orderDate.getFullYear() === currentYear) {
+          totalQtyThisYear += qtyInOrder;
+        }
+        
+        if (!lastOrderDetails) {
+          lastOrderDetails = {
+             date: orderDate.toLocaleDateString('ar-SA'),
+             qty: qtyInOrder,
+             bonus: bonusInOrder
+          };
+        }
+        
+        if (!firstOrderDate || orderDate < firstOrderDate) {
+          firstOrderDate = orderDate;
+        }
+      }
+    });
+
+    const avgQty = orderCount > 0 ? Math.round(totalQty / orderCount) : 0;
+    
+    let approxMonthlySellRate = 0;
+    if (orderCount > 1 && firstOrderDate) {
+      const msDiff = Date.now() - firstOrderDate.getTime();
+      const monthsDiff = msDiff / (1000 * 3600 * 24 * 30.44);
+      approxMonthlySellRate = monthsDiff > 0.5 ? Math.round(totalQty / monthsDiff) : totalQty;
+    } else if (orderCount === 1) {
+       approxMonthlySellRate = totalQty;
+    }
+
+    return {
+      lastOrderDetails,
+      totalQty,
+      maxQty,
+      avgQty,
+      totalQtyThisYear,
+      approxMonthlySellRate,
+      orderCount
+    };
+  }, [customerSpecificData, product]);
 
   // We are assuming standard functionality, only calculating stats from 'orders'
   useEffect(() => {
@@ -96,6 +188,57 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Customer Specific Stats for New Order Context */}
+        {customerSpecificData && custStats && (
+           <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 shadow-sm mb-6">
+              <h3 className="font-bold text-blue-900 border-b border-blue-200 pb-2 mb-4 text-lg flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                معلومات العميل للصنف ({customerSpecificData.customerName})
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="space-y-3">
+                    <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm flex flex-col">
+                       <span className="text-xs text-blue-600 font-bold mb-1">آخر طلب لهذا الصنف</span>
+                       {custStats.lastOrderDetails ? (
+                         <div className="text-sm">
+                           <p className="font-bold text-gray-900">{custStats.lastOrderDetails.date}</p>
+                           <p className="text-gray-700">الكمية: <span className="font-bold">{custStats.lastOrderDetails.qty}</span></p>
+                           <p className="text-gray-700">البونص الممنوح: <span className="font-bold text-orange-600">{custStats.lastOrderDetails.bonus}</span></p>
+                         </div>
+                       ) : (
+                         <p className="text-sm text-gray-500 italic">لم يقم العميل بطلب هذا الصنف سابقاً</p>
+                       )}
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm flex flex-col justify-center">
+                       <span className="text-xs text-gray-500 mb-1">أعلى كمية طلبها</span>
+                       <span className="font-bold text-lg text-blue-700">{custStats.maxQty}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm flex flex-col justify-center">
+                       <span className="text-xs text-gray-500 mb-1">متوسط الكمية للطلب</span>
+                       <span className="font-bold text-lg text-blue-700">{custStats.avgQty}</span>
+                    </div>
+                 </div>
+              </div>
+
+              {custStats.orderCount > 0 && (
+                <div className="mt-4 pt-4 border-t border-blue-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="flex justify-between items-center bg-white/60 p-2 rounded">
+                      <span className="text-sm text-blue-800 font-bold">إجمالي طلبات السنة الحالية:</span>
+                      <span className="font-bold text-blue-900 px-2 py-1 bg-white rounded shadow-sm">{custStats.totalQtyThisYear} وحدة</span>
+                   </div>
+                   <div className="flex justify-between items-center bg-white/60 p-2 rounded">
+                      <span className="text-sm text-blue-800 font-bold">متوسط التصرّيف الشهري (تقريبي):</span>
+                      <span className="font-bold text-blue-900 px-2 py-1 bg-white rounded shadow-sm">{custStats.approxMonthlySellRate} وحدة / شهر</span>
+                   </div>
+                </div>
+              )}
+           </div>
+        )}
 
         {/* Dashboard Stats */}
         {profile?.role !== 'client' && (
