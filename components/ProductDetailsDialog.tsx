@@ -179,7 +179,7 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
                   <Gift className="w-4 h-4 text-orange-500" />
                   العروض والبونص
                 </h4>
-                {product.specialOffer?.isActive ? (
+                {product.specialOffer?.isActive && (
                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                          <span className="text-gray-600 font-bold">سعر العرض:</span>
@@ -210,11 +210,36 @@ export function ProductDetailsDialog({ product, isOpen, onClose, onEdit, categor
                          </div>
                       )}
                    </div>
-                ) : (
-                   <div className="text-sm text-gray-600">
-                      {product.bonus ? <p><span className="font-bold">البونص الأساسي:</span> {product.bonus}</p> : <p>لا يوجد عروض خاصة أو بونص لهذا الصنف حالياً.</p>}
-                   </div>
                 )}
+                
+                {/* Main Bonus Display */}
+                <div className={`text-sm ${product.specialOffer?.isActive ? 'border-t border-red-100 pt-2 mt-2' : ''}`}>
+                    {product.bonusType === 'fixed' ? (
+                       <p className="font-bold text-gray-800">بونص ثابت: <span className="text-orange-600">{product.bonusFixedPercent}%</span> من الكمية المطلوبة</p>
+                    ) : product.bonusType === 'tiered' && product.bonusTiers?.length > 0 ? (
+                       <div className="space-y-2">
+                          <p className="font-bold text-gray-800 mb-1">بونص شرائح حسب الكمية:</p>
+                          <div className="space-y-1">
+                             {product.bonusTiers.map((tier: any, idx: number) => (
+                                <div key={idx} className="flex flex-wrap gap-2 text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                                   <span className="text-gray-600">من {tier.minQty}</span>
+                                   <span className="text-gray-600">{tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'}</span>
+                                   <span className="font-bold text-orange-600">◀ بونص {tier.percent}%</span>
+                                   {tier.invoiceType && tier.invoiceType !== 'all' && (
+                                      <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px]">
+                                         ({tier.invoiceType === 'cash' ? 'للنقدي' : tier.invoiceType === 'credit' ? 'للآجل' : 'للنقدي المعلق'})
+                                      </span>
+                                   )}
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+                    ) : (!product.specialOffer?.isActive && product.bonus) ? (
+                        <p><span className="font-bold">البونص الأساسي:</span> {product.bonus}</p>
+                    ) : !product.specialOffer?.isActive ? (
+                        <p className="text-gray-500">لا يوجد عروض خاصة أو بونص لهذا الصنف حالياً.</p>
+                    ) : null}
+                </div>
              </div>
 
              {/* Sales Policies */}

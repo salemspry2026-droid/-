@@ -162,7 +162,19 @@ export function ProductsManager() {
                     بونص مميز: {product.specialOffer.bonus}
                   </div>
                 )}
-                {!product.specialOffer?.isActive && product.bonus && (
+                {!product.specialOffer?.isActive && product.bonusType === 'fixed' && (
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded w-fit">
+                    <Gift className="w-3 h-3" />
+                    بونص {product.bonusFixedPercent}%
+                  </div>
+                )}
+                {!product.specialOffer?.isActive && product.bonusType === 'tiered' && product.bonusTiers?.length > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded w-fit">
+                    <Gift className="w-3 h-3" />
+                    بونص شرائح
+                  </div>
+                )}
+                {!product.specialOffer?.isActive && !product.bonusType && product.bonus && (
                   <div className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded">
                     <Gift className="w-3 h-3" />
                     بونص خاص: {product.bonus}
