@@ -129,7 +129,7 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-[700px] md:max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="w-[95vw] sm:max-w-[700px] md:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6" dir="rtl">
         <DialogHeader className="mb-4">
           <DialogTitle className="text-xl md:text-2xl font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span>ملف العميل</span>
@@ -236,7 +236,7 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
         <div className="space-y-4">
            <div className="flex flex-col justify-between gap-4 border-b pb-4">
              <h3 className="font-bold text-gray-900 text-base sm:text-lg">سجل الطلبات</h3>
-             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+             <div className="flex flex-wrap items-center gap-2 pb-2">
                 <button
                   onClick={() => setActiveStatusFilter('all')}
                   className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${activeStatusFilter === 'all' ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 border border-gray-200"}`}

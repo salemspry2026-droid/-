@@ -265,7 +265,7 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6" dir="rtl">
         <DialogHeader>
           <DialogTitle>{productToEdit ? 'تعديل الصنف' : 'إضافة صنف جديد (بخيارات متقدمة)'}</DialogTitle>
         </DialogHeader>

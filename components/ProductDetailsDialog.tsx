@@ -172,7 +172,7 @@ export function ProductDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-[700px] md:max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="w-[95vw] sm:max-w-[700px] md:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6" dir="rtl">
         <DialogHeader className="mb-4">
           <DialogTitle className="text-xl md:text-2xl font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span>تفاصيل الصنف: {product.name}</span>
