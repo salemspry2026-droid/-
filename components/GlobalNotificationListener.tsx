@@ -24,9 +24,16 @@ export function GlobalNotificationListener() {
       const unsub = onSnapshot(qNotifs, (snap) => {
         let unreadCount = 0;
         let hasNewUnread = false;
+        const now = Date.now();
 
         snap.docs.forEach(doc => {
           const data = doc.data();
+          if (data.remindAt && data.remindAt?.toDate) {
+            if (data.remindAt.toDate().getTime() > now) {
+              return; // skip future reminders
+            }
+          }
+
           const isRead = data.readBy && data.readBy.includes(user.uid);
           if (!isRead) {
             unreadCount++;
@@ -61,12 +68,19 @@ export function GlobalNotificationListener() {
       where('isDeleted', '==', false)
     );
 
-    const unsubNotifs = onSnapshot(qNotifs, (snap) => {
+      const unsubNotifs = onSnapshot(qNotifs, (snap) => {
       let unreadCount = 0;
       let hasNewUnread = false;
+      const now = Date.now();
 
       snap.docs.forEach(doc => {
         const data = doc.data();
+        if (data.remindAt && data.remindAt?.toDate) {
+          if (data.remindAt.toDate().getTime() > now) {
+            return; // skip future reminders
+          }
+        }
+
         const isRead = data.readBy && data.readBy.includes(user.uid);
         if (!isRead) {
           unreadCount++;

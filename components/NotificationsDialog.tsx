@@ -111,8 +111,18 @@ export function NotificationsDialog({
   };
 
   // Combine and sort notifications
+  const now = Date.now();
+  const visibleDbNotifications = dbNotifications.filter(n => {
+    if (n.remindAt && n.remindAt?.toDate) {
+      if (n.remindAt.toDate().getTime() > now) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   const combinedNotifications = [
-    ...dbNotifications,
+    ...visibleDbNotifications,
     ...staleOrders.map(order => ({
       id: `stale-${order.id}`,
       title: 'طلب معلق يحتاج تأكيد',

@@ -1,18 +1,20 @@
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, User, Info, ShoppingCart, ReceiptText, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, User, Info, ShoppingCart, ReceiptText, ChevronLeft, Spline, Clock4 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export function OrderDetailsDialog({
   open,
@@ -30,6 +32,13 @@ export function OrderDetailsDialog({
   const [matchStatus, setMatchStatus] = useState<'checking' | 'matched' | 'no_match' | 'checked'>('checked');
   const [matchingCustomers, setMatchingCustomers] = useState<any[]>([]);
   const [merging, setMerging] = useState(false);
+
+  // New states for excluding items
+  const [selectedItemsToExclude, setSelectedItemsToExclude] = useState<number[]>([]);
+  const [showExcludeDialog, setShowExcludeDialog] = useState(false);
+  const [reminderHours, setReminderHours] = useState('24');
+  const [excluding, setExcluding] = useState(false);
+
 
   useEffect(() => {
     if (!order || order.source !== 'customer' || order.linkedCrmCustomerId) {
@@ -207,6 +216,99 @@ export function OrderDetailsDialog({
     }
   };
 
+  const handleExcludeItems = async () => {
+    if (selectedItemsToExclude.length === 0) return;
+    setExcluding(true);
+    try {
+      const remainingItems: any[] = [];
+      const excludedItems: any[] = [];
+      
+      order.items.forEach((item: any, index: number) => {
+        if (selectedItemsToExclude.includes(index)) {
+          excludedItems.push(item);
+        } else {
+          remainingItems.push(item);
+        }
+      });
+
+      if (remainingItems.length === 0) {
+        toast.error('لا يمكن استثناء جميع عناصر الطلب، قم بإلغاء الطلب بدلاً من ذلك.');
+        setExcluding(false);
+        return;
+      }
+
+      // calculate new totals
+      const remainingTotals: Record<string, number> = {};
+      remainingItems.forEach((i: any) => {
+        remainingTotals[i.currency] = (remainingTotals[i.currency] || 0) + Number(i.total);
+      });
+
+      const excludedTotals: Record<string, number> = {};
+      excludedItems.forEach((i: any) => {
+        excludedTotals[i.currency] = (excludedTotals[i.currency] || 0) + Number(i.total);
+      });
+
+      // Update current order
+      await updateDoc(doc(db, 'orders', order.id), {
+        items: remainingItems,
+        totalAmountByCurrency: remainingTotals,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || 'system'
+      });
+
+      // Create new order
+      const newOrderId = `ord_${crypto.randomUUID()}`;
+      // first stage name
+      const initialStageName = stages.length > 0 ? stages[0].name : 'pending';
+      const excludeTotalQty = excludedItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+      const { setDoc, Timestamp } = await import('firebase/firestore');
+
+      await setDoc(doc(db, 'orders', newOrderId), {
+        ...order,
+        id: newOrderId,
+        items: excludedItems,
+        totalAmountByCurrency: excludedTotals,
+        totalQuantity: excludeTotalQty,
+        status: initialStageName, // New order resets to first stage
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user?.uid || 'system',
+        createdByName: user?.displayName || 'System',
+      });
+
+      // Create reminder notification
+      const notifId = `notif_${crypto.randomUUID()}`;
+      const hours = parseInt(reminderHours) || 24;
+      const remindAtTime = Date.now() + hours * 3600 * 1000;
+      
+      await setDoc(doc(db, 'notifications', notifId), {
+        companyId: order.companyId,
+        title: 'تذكير باستكمال صنف مستثنى',
+        message: `طلب مجدول: العميل ${order.customerName} يحتاج لتوفير أصناف نفذت.`,
+        type: 'reminder',
+        orderId: newOrderId,
+        readBy: [],
+        remindAt: Timestamp.fromMillis(remindAtTime),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user?.uid,
+        updatedBy: user?.uid,
+        isDeleted: false
+      }).catch(err => console.error(err));
+
+      toast.success('تم استثناء الأصناف وإنشاء طلب جديد لها بنجاح.');
+      setShowExcludeDialog(false);
+      setSelectedItemsToExclude([]);
+      onOpenChange(false);
+
+    } catch (e) {
+      console.error(e);
+      toast.error('حدث خطأ أثناء استثناء الأصناف.');
+    } finally {
+      setExcluding(false);
+    }
+  };
+
   const invoiceTypeLabels: Record<string, string> = {
     cash: 'نقدي',
     pending_cash: 'نقدي معلق',
@@ -227,7 +329,14 @@ export function OrderDetailsDialog({
   const currencyEntries = Object.entries(currencyTotals);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(val) => {
+      if (!val) {
+        setSelectedItemsToExclude([]);
+        setShowExcludeDialog(false);
+      }
+      onOpenChange(val);
+    }}>
       <DialogContent className="sm:max-w-md h-[90vh] md:h-[800px] flex flex-col p-0 overflow-hidden bg-[#F8FAFC] border-gray-200" dir="rtl">
         {/* Header */}
         <DialogHeader className="p-4 bg-white border-b flex-shrink-0 relative flex items-center justify-center h-16">
@@ -357,18 +466,50 @@ export function OrderDetailsDialog({
 
           {/* Items */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-             <div className="p-3 border-b flex justify-between items-center bg-white">
-               <h3 className="font-bold text-sm">الأصناف ({items.length})</h3>
-               <ShoppingCart className="w-5 h-5 text-blue-600" />
+             <div className="p-3 border-b flex flex-col sm:flex-row justify-between items-center bg-white gap-2">
+               <div className="flex justify-between items-center w-full">
+                 <h3 className="font-bold text-sm">الأصناف ({items.length})</h3>
+                 <ShoppingCart className="w-5 h-5 text-blue-600" />
+               </div>
+               {profile?.role !== 'client' && !(!nextStage) && items.length > 1 && (
+                 <Button 
+                   variant="outline" 
+                   size="sm" 
+                   className="w-full sm:w-auto h-8 text-xs text-orange-600 border-orange-200 hover:bg-orange-50 bg-orange-50/50"
+                   disabled={selectedItemsToExclude.length === 0}
+                   onClick={() => setShowExcludeDialog(true)}
+                 >
+                   <Spline className="w-3.5 h-3.5 ml-1.5" />
+                   استثناء المحدد ({selectedItemsToExclude.length})
+                 </Button>
+               )}
              </div>
              <div className="divide-y divide-gray-50">
-               {items.map((item: any, idx: number) => (
-                 <div key={idx} className="p-4 flex justify-between items-center">
+               {items.map((item: any, idx: number) => {
+                 const isExcluded = selectedItemsToExclude.includes(idx);
+                 return (
+                 <div key={idx} className={cn("p-4 flex justify-between items-center transition-colors", isExcluded ? "bg-orange-50/50" : "")}>
                     <div className="text-left flex flex-col items-start shrink-0 ml-4">
+                      {profile?.role !== 'client' && !(!nextStage) && items.length > 1 && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <Checkbox 
+                            id={`exclude-${idx}`}
+                            checked={isExcluded}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedItemsToExclude(prev => [...prev, idx]);
+                              } else {
+                                setSelectedItemsToExclude(prev => prev.filter(i => i !== idx));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`exclude-${idx}`} className="text-xs text-orange-600 cursor-pointer">استثناء</Label>
+                        </div>
+                      )}
                       <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{Number(item.total).toLocaleString()} <span className="text-xs">{item.currency}</span></span>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                      <span className="font-bold text-gray-900 text-base leading-tight block mb-1">{item.productName}</span>
+                      <span className={cn("font-bold text-base leading-tight block mb-1", isExcluded ? "text-orange-700" : "text-gray-900")}>{item.productName}</span>
                       <span className="text-gray-400 text-sm font-medium">{item.quantity} × {item.price} {item.currency}</span>
                       {item.note && <span className="text-xs text-gray-500 bg-gray-50 px-1 py-0.5 mt-1 inline-block rounded">{item.note}</span>}
                       {item.bonusQuantity > 0 && <span className="text-xs text-green-600 font-bold mt-1 inline-block rounded mr-1">
@@ -376,7 +517,7 @@ export function OrderDetailsDialog({
                       </span>}
                     </div>
                  </div>
-               ))}
+               )})}
              </div>
           </div>
 
@@ -444,5 +585,36 @@ export function OrderDetailsDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    <Dialog open={showExcludeDialog} onOpenChange={setShowExcludeDialog}>
+      <DialogContent className="sm:max-w-[400px]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <Spline className="w-5 h-5" />
+            تأكيد استثناء الأصناف
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <p className="text-sm text-gray-600 text-right">
+            سيتم إزالة الأصناف المحددة من هذا الطلب وإدراجها كطلب جديد مستقل. يمكنك تعيين تذكير لمتابعة توفير هذه الأصناف وإتمامها.
+          </p>
+          <div className="space-y-2">
+            <Label className="text-gray-700 font-bold">ذكرني بعد</Label>
+            <div className="flex gap-2 text-right justify-end" dir="rtl">
+              <Button type="button" variant={reminderHours === '24' ? 'default' : 'outline'} className={cn("flex-1 text-xs", reminderHours === '24' && "bg-orange-600 hover:bg-orange-700")} onClick={() => setReminderHours('24')}>24 ساعة</Button>
+              <Button type="button" variant={reminderHours === '48' ? 'default' : 'outline'} className={cn("flex-1 text-xs", reminderHours === '48' && "bg-orange-600 hover:bg-orange-700")} onClick={() => setReminderHours('48')}>48 ساعة</Button>
+              <Button type="button" variant={reminderHours === '168' ? 'default' : 'outline'} className={cn("flex-1 text-xs", reminderHours === '168' && "bg-orange-600 hover:bg-orange-700")} onClick={() => setReminderHours('168')}>اسبوع</Button>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end w-full mt-2">
+          <Button type="button" variant="outline" onClick={() => setShowExcludeDialog(false)} disabled={excluding}>إلغاء</Button>
+          <Button type="button" onClick={handleExcludeItems} disabled={excluding} className="bg-orange-600 hover:bg-orange-700 text-white min-w-[120px]">
+            {excluding ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} تأكيد واستثناء
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
