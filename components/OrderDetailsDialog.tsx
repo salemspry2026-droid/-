@@ -240,12 +240,14 @@ export function OrderDetailsDialog({
       // calculate new totals
       const remainingTotals: Record<string, number> = {};
       remainingItems.forEach((i: any) => {
-        remainingTotals[i.currency] = (remainingTotals[i.currency] || 0) + Number(i.total);
+        const itemTotal = Number(i.total) || (Number(i.price || 0) * Number(i.quantity || 1));
+        remainingTotals[i.currency || 'SAR'] = (remainingTotals[i.currency || 'SAR'] || 0) + itemTotal;
       });
 
       const excludedTotals: Record<string, number> = {};
       excludedItems.forEach((i: any) => {
-        excludedTotals[i.currency] = (excludedTotals[i.currency] || 0) + Number(i.total);
+        const itemTotal = Number(i.total) || (Number(i.price || 0) * Number(i.quantity || 1));
+        excludedTotals[i.currency || 'SAR'] = (excludedTotals[i.currency || 'SAR'] || 0) + itemTotal;
       });
 
       // Update current order
@@ -506,11 +508,11 @@ export function OrderDetailsDialog({
                           <Label htmlFor={`exclude-${idx}`} className="text-xs text-orange-600 cursor-pointer">استثناء</Label>
                         </div>
                       )}
-                      <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{Number(item.total).toLocaleString()} <span className="text-xs">{item.currency}</span></span>
+                      <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{(Number(item.total) || (Number(item.price || 0) * Number(item.quantity || 1))).toLocaleString()} <span className="text-xs">{item.currency || 'SAR'}</span></span>
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <span className={cn("font-bold text-base leading-tight block mb-1", isExcluded ? "text-orange-700" : "text-gray-900")}>{item.productName}</span>
-                      <span className="text-gray-400 text-sm font-medium">{item.quantity} × {item.price} {item.currency}</span>
+                      <span className="text-gray-400 text-sm font-medium">{item.quantity} × {item.price} {item.currency || 'SAR'}</span>
                       {item.note && <span className="text-xs text-gray-500 bg-gray-50 px-1 py-0.5 mt-1 inline-block rounded">{item.note}</span>}
                       {item.bonusQuantity > 0 && <span className="text-xs text-green-600 font-bold mt-1 inline-block rounded mr-1">
                         <span className="text-red-500 font-bold">{item.bonusQuantity} : {item.quantity}</span> مجاني
@@ -535,7 +537,7 @@ export function OrderDetailsDialog({
                  // Add back discount if we want to show subtotal before discount
                  // (Depends on how discount was applied. If totalAmountByCurrency is AFTER discount,
                  // we might not know the exact subtotal easily unless we sum item totals for this currency).
-                 const itemsTotalForCurr = items.filter((i:any) => i.currency === curr).reduce((s:number, i:any) => s + Number(i.total), 0);
+                 const itemsTotalForCurr = items.filter((i:any) => i.currency === curr).reduce((s:number, i:any) => s + (Number(i.total) || (Number(i.price || 0) * Number(i.quantity || 1))), 0);
                  const hasDiscount = itemsTotalForCurr > Number(amount);
 
                  return (

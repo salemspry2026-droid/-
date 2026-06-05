@@ -57,6 +57,20 @@ export function OrderRegistrationDialog({
   const [orderStages, setOrderStages] = useState<any[]>([]);
 
   useEffect(() => {
+    if (open) {
+      setInvoiceType('cash');
+      setDueDate('');
+      setStep(1);
+      setCart([]);
+      setSelectedCustomerId('');
+      setDiscountValue(0);
+      setSkipReview(false);
+      setProductSearch('');
+      setActiveCategory('all');
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !profile?.companyId) return;
 
     setLoading(true);
@@ -267,6 +281,18 @@ export function OrderRegistrationDialog({
     if (!selectedCustomerId || cart.length === 0 || !profile?.companyId || !user) {
       toast.error('الرجاء إكمال كافة البيانات');
       return;
+    }
+
+    for (const item of cart) {
+      const p = item.productObj;
+      if (p.invoiceTypeRestriction === 'cash_only' && invoiceType !== 'cash') {
+        toast.error(`الطلب غير صالح. الصنف "${p.name}" يباع نقداً فقط.`);
+        return;
+      }
+      if (p.invoiceTypeRestriction === 'cash_or_pending' && invoiceType === 'credit') {
+        toast.error(`الطلب غير صالح. الصنف "${p.name}" لا يباع بالأجل.`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -760,7 +786,20 @@ export function OrderRegistrationDialog({
                       ].map(type => (
                         <button 
                           key={type.id}
-                          onClick={() => setInvoiceType(type.id)}
+                          onClick={() => {
+                            for (const item of cart) {
+                              const p = item.productObj;
+                              if (p.invoiceTypeRestriction === 'cash_only' && type.id !== 'cash') {
+                                toast.error(`لا يمكن اختيار هذا النوع. الصنف "${p.name}" يباع نقداً فقط.`);
+                                return;
+                              }
+                              if (p.invoiceTypeRestriction === 'cash_or_pending' && type.id === 'credit') {
+                                toast.error(`لا يمكن اختيار هذا النوع. الصنف "${p.name}" لا يباع بالأجل.`);
+                                return;
+                              }
+                            }
+                            setInvoiceType(type.id);
+                          }}
                           className={cn(
                             "flex-1 min-w-20 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border",
                             invoiceType === type.id ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-600" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
