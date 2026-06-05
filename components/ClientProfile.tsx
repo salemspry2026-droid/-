@@ -625,7 +625,7 @@ export default function ClientProfile() {
                           إجمالي المبالغ حسب العملة ونوع الفاتورة
                         </h3>
                       </div>
-                      <div className="p-0 overflow-x-auto">
+                      <div className="p-0">
                         <table className="w-full text-sm text-right">
                           <thead className="bg-white border-b text-gray-500">
                             <tr>
@@ -687,7 +687,7 @@ export default function ClientProfile() {
                              </h4>
                              <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold">{comp.totalOrders} طلبات</span>
                            </div>
-                           <div className="overflow-x-auto">
+                           <div>
                               <table className="w-full text-sm text-right">
                                 <thead className="bg-white border-b text-gray-500">
                                   <tr>
