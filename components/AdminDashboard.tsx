@@ -5,6 +5,7 @@ import { ProductsManager } from './ProductsManager';
 import { CustomersManager } from './CustomersManager';
 import { OrdersManager } from './OrdersManager';
 import { StaffManager } from './StaffManager';
+import { hasPermission } from '@/lib/utils';
 import { HomeTab } from './HomeTab';
 import { useStore } from '@/lib/store';
 import { NotificationsDialog } from './NotificationsDialog';
@@ -41,18 +42,26 @@ export function AdminDashboard() {
         </div>
         <nav className="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-4">
           <SidebarItem icon={<LayoutGrid className="w-5 h-5" />} label="الرئيسية" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-          <SidebarItem icon={<ReceiptText className="w-5 h-5" />} label="الطلبات" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
-          <SidebarItem icon={<Package className="w-5 h-5" />} label="الأصناف" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
-          <SidebarItem icon={<Users className="w-5 h-5" />} label="العملاء" isActive={activeTab === 'customers'} onClick={() => setActiveTab('customers')} />
+          {hasPermission(profile, 'orders', 'view') && (
+            <SidebarItem icon={<ReceiptText className="w-5 h-5" />} label="الطلبات" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
+          )}
+          {hasPermission(profile, 'products', 'view') && (
+            <SidebarItem icon={<Package className="w-5 h-5" />} label="الأصناف" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
+          )}
+          {hasPermission(profile, 'customers', 'view') && (
+            <SidebarItem icon={<Users className="w-5 h-5" />} label="العملاء" isActive={activeTab === 'customers'} onClick={() => setActiveTab('customers')} />
+          )}
           {profile?.role === 'owner' || profile?.role === 'admin' ? (
              <SidebarItem icon={<Shield className="w-5 h-5" />} label="الموظفين" isActive={activeTab === 'staff'} onClick={() => setActiveTab('staff')} />
           ) : null}
         </nav>
         <div className="p-4 border-t border-gray-100">
-           <Button onClick={() => setIsOrderRegistrationOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl flex items-center justify-center gap-2">
-             <Plus className="w-5 h-5" />
-             طلب جديد
-           </Button>
+          {hasPermission(profile, 'orders', 'create') && (
+            <Button onClick={() => setIsOrderRegistrationOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" />
+              طلب جديد
+            </Button>
+          )}
         </div>
       </aside>
 
@@ -101,20 +110,28 @@ export function AdminDashboard() {
 
       {/* Floating Action Button (Mobile Only) */}
       <div className="md:hidden fixed bottom-24 right-6 z-50">
-        <Button 
-          onClick={() => setIsOrderRegistrationOpen(true)}
-          className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center text-white"
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
+        {hasPermission(profile, 'orders', 'create') && (
+          <Button 
+            onClick={() => setIsOrderRegistrationOpen(true)}
+            className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center text-white"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+        )}
       </div>
 
       {/* Bottom Navigation (Mobile Only) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 px-6 py-2 flex justify-between items-center mx-auto overflow-x-auto hide-scrollbar gap-2">
         <NavItem icon={<LayoutGrid className="w-6 h-6" />} label="الرئيسية" isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-        <NavItem icon={<ReceiptText className="w-6 h-6" />} label="الطلبات" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
-        <NavItem icon={<Package className="w-6 h-6" />} label="الأصناف" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
-        <NavItem icon={<Users className="w-6 h-6" />} label="العملاء" isActive={activeTab === 'customers'} onClick={() => setActiveTab('customers')} />
+        {hasPermission(profile, 'orders', 'view') && (
+          <NavItem icon={<ReceiptText className="w-6 h-6" />} label="الطلبات" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
+        )}
+        {hasPermission(profile, 'products', 'view') && (
+          <NavItem icon={<Package className="w-6 h-6" />} label="الأصناف" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} />
+        )}
+        {hasPermission(profile, 'customers', 'view') && (
+          <NavItem icon={<Users className="w-6 h-6" />} label="العملاء" isActive={activeTab === 'customers'} onClick={() => setActiveTab('customers')} />
+        )}
         {profile?.role === 'owner' || profile?.role === 'admin' ? (
            <NavItem icon={<Shield className="w-6 h-6" />} label="الموظفين" isActive={activeTab === 'staff'} onClick={() => setActiveTab('staff')} />
         ) : null}

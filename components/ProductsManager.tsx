@@ -10,7 +10,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from 
 import { Label } from '@/components/ui/label';
 import { Search, Loader2, Plus, Sparkles, Package, Gift } from 'lucide-react';
 import { toast } from 'sonner';
-import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
+import { handleFirestoreError, OperationType, cn, hasPermission } from '@/lib/utils';
 import { GoogleGenAI } from '@google/genai';
 import { ProductFormDialog } from './ProductFormDialog';
 
@@ -74,9 +74,11 @@ export function ProductsManager() {
           <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
             {products.length} صنف
           </span>
-          <button type="button" onClick={() => setIsFormOpen(true)} className="inline-flex items-center justify-center shrink-0 w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer">
-            <Plus className="w-5 h-5" />
-          </button>
+          {hasPermission(profile, 'products', 'create') && (
+            <button type="button" onClick={() => setIsFormOpen(true)} className="inline-flex items-center justify-center shrink-0 w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer">
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 

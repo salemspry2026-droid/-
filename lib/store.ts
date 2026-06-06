@@ -3,12 +3,27 @@ import { persist } from 'zustand/middleware';
 
 export type UserRole = 'owner' | 'admin' | 'sales' | 'client' | null;
 
+export interface EntityAccess {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+}
+
+export interface AppPermissions {
+  customers: EntityAccess;
+  products: EntityAccess;
+  orders: EntityAccess;
+  [key: string]: EntityAccess;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
   companyId: string | null;
   role: UserRole;
+  permissions?: AppPermissions;
   companyName?: string;
   createdAt?: any;
   updatedAt?: any;

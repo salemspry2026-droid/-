@@ -63,3 +63,29 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   // In snapshot listeners, throwing will cause unhandled rejections or uncaught errors. 
   // We strictly log instead of throw here so we don't bring down the app.
 }
+
+export function hasPermission(profile: any, moduleName: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean {
+  if (!profile) return false;
+  if (profile.role === 'owner') return true; // Owner always has full access
+  if (profile.role === 'client') return false; // Clients have different logic
+  
+  if (profile.permissions && profile.permissions[moduleName]) {
+    return !!profile.permissions[moduleName][action];
+  }
+
+  // Default permissions if not set explicitly
+  if (profile.role === 'admin') {
+    return true; // Admins default to all
+  }
+
+  if (profile.role === 'sales') {
+    if (moduleName === 'customers' || moduleName === 'orders') {
+      return action !== 'delete'; // Sales can view, create, edit
+    }
+    if (moduleName === 'products') {
+      return action === 'view'; // Sales can only view products
+    }
+  }
+
+  return false;
+}

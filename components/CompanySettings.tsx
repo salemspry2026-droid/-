@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import Image from 'next/image';
 import { AddressSelector } from './AddressSelector';
+import { EmployeePermissionsDialog } from './EmployeePermissionsDialog';
 
 const COUNTRY_CODES = [
   { code: '+966', name: '🇸🇦 السعودية (+966)' },
@@ -669,6 +670,12 @@ function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAd
           />
         </div>
       </div>
+      
+      {isAdmin && emp.role !== 'owner' && emp.id !== currentUserId && (
+        <div className="pt-2 border-t border-gray-50">
+          <EmployeePermissionsDialog emp={emp} isAdmin={isAdmin} />
+        </div>
+      )}
     </div>
   );
 }

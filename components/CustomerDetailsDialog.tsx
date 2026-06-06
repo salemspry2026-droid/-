@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
+import { hasPermission } from '@/lib/utils';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 
 export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { customer: any, isOpen: boolean, onClose: () => void, onEdit?: (customer: any) => void }) {
@@ -136,12 +137,16 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
             <div className="flex gap-2">
                {!deleteConfirm ? (
                  <>
-                   <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(customer)}>
-                     <Edit className="w-4 h-4 mr-2" /> تعديل
-                   </Button>
-                   <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={() => setDeleteConfirm(true)}>
-                     <Trash2 className="w-4 h-4 mr-2" /> حذف
-                   </Button>
+                   {hasPermission(profile, 'customers', 'edit') && (
+                     <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(customer)}>
+                       <Edit className="w-4 h-4 mr-2" /> تعديل
+                     </Button>
+                   )}
+                   {hasPermission(profile, 'customers', 'delete') && (
+                     <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={() => setDeleteConfirm(true)}>
+                       <Trash2 className="w-4 h-4 mr-2" /> حذف
+                     </Button>
+                   )}
                  </>
                ) : (
                  <>

@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
+import { hasPermission } from '@/lib/utils';
 import Image from 'next/image';
 
 export function ProductDetailsDialog({ 
@@ -176,14 +177,18 @@ export function ProductDetailsDialog({
         <DialogHeader className="mb-4">
           <DialogTitle className="text-xl md:text-2xl font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span>تفاصيل الصنف: {product.name}</span>
-            {profile && ['owner', 'admin', 'sales'].includes(profile.role as string) && (
+            {profile && profile.role !== 'client' && (
               <div className="flex gap-2">
-                 <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(product)}>
-                   <Edit className="w-4 h-4 mr-2" /> تعديل
-                 </Button>
-                 <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={handleDelete}>
-                   <Trash2 className="w-4 h-4 mr-2" /> حذف
-                 </Button>
+                 {hasPermission(profile, 'products', 'edit') && (
+                   <Button variant="outline" size="sm" className="text-blue-600 bg-blue-50 border-blue-200" onClick={() => onEdit?.(product)}>
+                     <Edit className="w-4 h-4 mr-2" /> تعديل
+                   </Button>
+                 )}
+                 {hasPermission(profile, 'products', 'delete') && (
+                   <Button variant="outline" size="sm" className="text-red-600 bg-red-50 border-red-200" onClick={handleDelete}>
+                     <Trash2 className="w-4 h-4 mr-2" /> حذف
+                   </Button>
+                 )}
               </div>
             )}
           </DialogTitle>

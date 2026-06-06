@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Loader2, Plus, Phone, MapPin, Mail, Building, Trash2, Contact } from 'lucide-react';
 import { toast } from 'sonner';
-import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
+import { handleFirestoreError, OperationType, cn, hasPermission } from '@/lib/utils';
 
 import { AddressSelector } from './AddressSelector';
 import { CustomerDetailsDialog } from './CustomerDetailsDialog';
@@ -215,9 +215,11 @@ export function CustomersManager() {
           <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
             {customers.length} عميل
           </span>
-          <Button size="icon" className="rounded-full bg-blue-600 hover:bg-blue-700 text-white" onClick={openAddDialog}>
-            <Plus className="w-5 h-5" />
-          </Button>
+          {hasPermission(profile, 'customers', 'create') && (
+            <Button size="icon" className="rounded-full bg-blue-600 hover:bg-blue-700 text-white" onClick={openAddDialog}>
+              <Plus className="w-5 h-5" />
+            </Button>
+          )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" dir="rtl">
               <DialogHeader>
