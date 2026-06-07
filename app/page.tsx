@@ -174,6 +174,26 @@ export default function Home() {
     return <Onboarding />;
   }
 
+  if (profile.role === 'pending_employee') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F2F5] p-4 text-center">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-sm w-full">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">في انتظار موافقة الشركة</h2>
+          <p className="text-gray-500 mb-6 font-medium leading-relaxed">
+            لقد تم إرسال طلب انضمامك إلى "{profile.companyName || 'الشركة'}". يرجى الانتظار حتى يقوم مدير الشركة بقبول طلبك.
+          </p>
+          <Button variant="outline" onClick={handleLogout} className="w-full">
+            <LogOut className="w-4 h-4 ml-2" />
+            تسجيل الخروج
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F0F2F5]">
       {(profile.role === 'admin' || profile.role === 'owner' || profile.role === 'sales') ? (

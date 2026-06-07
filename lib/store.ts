@@ -14,6 +14,7 @@ export interface AppPermissions {
   customers: EntityAccess;
   products: EntityAccess;
   orders: EntityAccess;
+  staff: EntityAccess;
   [key: string]: EntityAccess;
 }
 

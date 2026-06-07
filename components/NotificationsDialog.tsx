@@ -10,11 +10,13 @@ import { Loader2, Bell, Clock, PackageCheck, AlertCircle } from 'lucide-react';
 export function NotificationsDialog({ 
   open, 
   onOpenChange,
-  onSelectOrder
+  onSelectOrder,
+  onJoinRequest
 }: { 
   open: boolean, 
   onOpenChange: (open: boolean) => void,
-  onSelectOrder?: (orderId: string) => void
+  onSelectOrder?: (orderId: string) => void,
+  onJoinRequest?: (notif: any) => void
 }) {
   const { profile, user } = useStore();
   const [loading, setLoading] = useState(true);
@@ -105,7 +107,9 @@ export function NotificationsDialog({
   const handleNotificationClick = (notif: any) => {
     markAsRead(notif);
     onOpenChange(false);
-    if (notif.orderId && onSelectOrder) {
+    if (notif.type === 'join_request' && onJoinRequest) {
+      onJoinRequest(notif);
+    } else if (notif.orderId && onSelectOrder) {
       onSelectOrder(notif.orderId);
     }
   };

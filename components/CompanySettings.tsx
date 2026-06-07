@@ -617,7 +617,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
   );
 }
 
-function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAdmin: boolean, currentUserId: string, onUpdate: (id: string, field: string, val: string) => void }) {
+function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate, onRemove }: { emp: any, isAdmin: boolean, currentUserId: string, onUpdate: (id: string, field: string, val: string) => void, onRemove?: (id: string) => void }) {
   const [jobTitle, setJobTitle] = useState(emp.jobTitle || '');
 
   useEffect(() => {
@@ -672,8 +672,24 @@ function EmployeeRow({ emp, isAdmin, currentUserId, onUpdate }: { emp: any, isAd
       </div>
       
       {isAdmin && emp.role !== 'owner' && emp.id !== currentUserId && (
-        <div className="pt-2 border-t border-gray-50">
-          <EmployeePermissionsDialog emp={emp} isAdmin={isAdmin} />
+        <div className="pt-2 border-t border-gray-50 flex items-center justify-between gap-2">
+          <div className="flex-1">
+            <EmployeePermissionsDialog emp={emp} isAdmin={isAdmin} />
+          </div>
+          {onRemove && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (confirm('هل أنت متأكد من رغبتك في إزالة هذا الموظف من الشركة؟')) {
+                  onRemove(emp.id);
+                }
+              }}
+              className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              حذف
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -713,6 +729,21 @@ function EmployeesManager({ companyId, isAdmin, currentUserId }: { companyId: st
     }
   };
 
+  const handleRemoveEmployee = async (employeeId: string) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'userProfiles', employeeId), {
+        companyId: null,
+        role: null,
+        updatedAt: serverTimestamp(),
+        updatedBy: currentUserId
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `userProfiles/${employeeId}`));
+      toast.success('تم إزالة الموظف بنجاح');
+    } catch (error: any) {
+      toast.error(error.message || 'فشل إزالة الموظف');
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const staff = employees.filter(e => e.role !== 'client');
@@ -732,6 +763,7 @@ function EmployeesManager({ companyId, isAdmin, currentUserId }: { companyId: st
             isAdmin={isAdmin} 
             currentUserId={currentUserId} 
             onUpdate={handleUpdateEmployee} 
+            onRemove={handleRemoveEmployee}
           />
         ))}
         {staff.length === 0 && (

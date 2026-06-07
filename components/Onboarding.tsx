@@ -45,14 +45,16 @@ export function Onboarding() {
       }
 
       const companyDoc = querySnapshot.docs[0];
-      const companyId = companyDoc.id;
+      const selectedCompanyId = companyDoc.id;
 
-      // Create user profile as sales/employee
+      // Create user profile as pending employee
       await setDoc(doc(db, 'userProfiles', user.uid), {
         email: user.email,
         displayName: user.displayName || 'User',
-        companyId: companyId,
-        role: 'sales', // Set to sales (employee) instead of client
+        companyId: null, // Don't give access yet
+        pendingCompanyId: selectedCompanyId,
+        companyName: companyDoc.data().name || '',
+        role: 'pending_employee',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
@@ -60,9 +62,22 @@ export function Onboarding() {
         isDeleted: false
       }).catch(err => handleFirestoreError(err, OperationType.CREATE, `userProfiles/${user.uid}`));
 
-      toast.success('تم الانضمام للشركة كموظف مبيعات بنجاح!');
+      // Also create a join request notification for the owner/admin
+      await setDoc(doc(db, 'notifications', `join_${user.uid}`), {
+        companyId: selectedCompanyId,
+        type: 'join_request',
+        title: 'طلب انضمام جديد',
+        message: `المستخدم ${user.displayName || user.email} يطلب الانضمام كموظف لشركتك.`,
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName,
+        isRead: false,
+        createdAt: serverTimestamp()
+      });
+
+      toast.success('تم إرسال طلب الانضمام! في انتظار موافقة الشركة.');
     } catch (error: any) {
-      toast.error(error.message || 'فشل الانضمام للشركة');
+      toast.error(error.message || 'فشل إرسال طلب الانضمام');
     } finally {
       setLoading(false);
     }

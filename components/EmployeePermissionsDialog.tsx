@@ -18,6 +18,8 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
     customers: { view: false, create: false, edit: false, delete: false },
     products: { view: false, create: false, edit: false, delete: false },
     orders: { view: false, create: false, edit: false, delete: false },
+    staff: { view: false, create: false, edit: false, delete: false },
+    companySettings: { view: false, create: false, edit: false, delete: false },
   };
 
   const [permissions, setPermissions] = useState<AppPermissions>(defaultPermissions);
@@ -29,6 +31,8 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
            customers: { ...defaultPermissions.customers, ...emp.permissions.customers },
            products: { ...defaultPermissions.products, ...emp.permissions.products },
            orders: { ...defaultPermissions.orders, ...emp.permissions.orders },
+           staff: { ...defaultPermissions.staff, ...emp.permissions.staff },
+           companySettings: { ...defaultPermissions.companySettings, ...emp.permissions.companySettings },
         });
       } else {
         // Init based on role heuristics if missing
@@ -38,6 +42,8 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
            customers: { view: true, create: isAdmin || isSales, edit: isAdmin || isSales, delete: isAdmin },
            products: { view: true, create: isAdmin, edit: isAdmin, delete: isAdmin },
            orders: { view: true, create: isAdmin || isSales, edit: isAdmin || isSales, delete: isAdmin },
+           staff: { view: isAdmin, create: isAdmin, edit: isAdmin, delete: isAdmin },
+           companySettings: { view: isAdmin, create: false, edit: isAdmin, delete: false },
         });
       }
     }
@@ -73,6 +79,8 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
     { id: 'customers', label: 'العملاء' },
     { id: 'products', label: 'الأصناف (الكتالوج)' },
     { id: 'orders', label: 'الطلبات' },
+    { id: 'staff', label: 'إدارة الموظفين' },
+    { id: 'companySettings', label: 'معلومات الشركة والإدارة' },
   ];
 
   if (!isAdmin || emp.role === 'owner') return null;

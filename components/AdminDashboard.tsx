@@ -12,6 +12,7 @@ import { NotificationsDialog } from './NotificationsDialog';
 import { CallRecordingsManager } from './CallRecordingsManager';
 import { ActiveCallOverlay } from './ActiveCallOverlay';
 import { OrderRegistrationDialog } from './OrderRegistrationDialog';
+import { JoinRequestDialog } from './JoinRequestDialog';
 import { GlobalNotificationListener } from './GlobalNotificationListener';
 import { LayoutGrid, ReceiptText, Package, Users, Plus, Bell, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,8 @@ import { Button } from './ui/button';
 export function AdminDashboard() {
   const { profile, activeTab, setActiveTab, isNotificationsOpen, setIsNotificationsOpen, setSelectedOrderId, unreadNotifications } = useStore();
   const [isOrderRegistrationOpen, setIsOrderRegistrationOpen] = useState(false);
+  const [isJoinRequestOpen, setIsJoinRequestOpen] = useState(false);
+  const [selectedJoinRequestId, setSelectedJoinRequestId] = useState<any>(null);
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-20 md:pb-0 md:pr-64 flex flex-col transition-all duration-300">
@@ -106,6 +109,16 @@ export function AdminDashboard() {
           setSelectedOrderId(id);
           setActiveTab('orders');
         }}
+        onJoinRequest={(notif) => {
+          setSelectedJoinRequestId(notif);
+          setIsJoinRequestOpen(true);
+        }}
+      />
+
+      <JoinRequestDialog
+        notif={selectedJoinRequestId}
+        open={isJoinRequestOpen}
+        onOpenChange={setIsJoinRequestOpen}
       />
 
       {/* Floating Action Button (Mobile Only) */}
