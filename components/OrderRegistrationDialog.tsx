@@ -45,6 +45,11 @@ export function OrderRegistrationDialog({
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [skipReview, setSkipReview] = useState(false);
   const [selectedProductForDetails, setSelectedProductForDetails] = useState<any>(null);
+  
+  // Quick Add Customer State
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
 
   // Cart State: array of items
   const [cart, setCart] = useState<any[]>([]);
@@ -67,6 +72,9 @@ export function OrderRegistrationDialog({
       setSkipReview(false);
       setProductSearch('');
       setActiveCategory('all');
+      setIsCreatingCustomer(false);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
     }
   }, [open]);
 
@@ -239,6 +247,37 @@ export function OrderRegistrationDialog({
     const index = cart.map(i => i.productId).lastIndexOf(productId);
     if (index >= 0) {
       updateQuantity(index, -1);
+    }
+  };
+
+  const handleQuickAddCustomer = async () => {
+    if (!newCustomerName || !profile?.companyId || !user) {
+      toast.error('الرجاء إدخال اسم العميل');
+      return;
+    }
+    setSaving(true);
+    try {
+      const customerId = `cust_${Math.random().toString(36).substring(2, 11)}`;
+      const { setDoc, doc, serverTimestamp } = await import('firebase/firestore');
+      await setDoc(doc(db, 'customers', customerId), {
+        name: newCustomerName,
+        phone: newCustomerPhone,
+        companyId: profile.companyId,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+        isActive: true,
+        isDeleted: false
+      });
+      toast.success('تمت إضافة العميل بنجاح');
+      setSelectedCustomerId(customerId);
+      setIsCreatingCustomer(false);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
+    } catch (e) {
+      console.error(e);
+      toast.error('فشل إضافة العميل');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -559,12 +598,11 @@ export function OrderRegistrationDialog({
 
                 {/* Products List */}
                 <div className="flex-1 overflow-y-auto px-4 py-2 relative">
-                   {selectedCustomerId ? (
-                     <div className="space-y-3 pb-24">
-                       {expandedFilteredProducts.map(product => {
-                         const qty = getProductQty(product.displayId);
-                         return (
-                           <div key={product.displayId} className={`bg-white border ${product.isOfferEntry ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-xl p-4 flex justify-between items-center shadow-sm ${product.inStock === false && !product.isOfferEntry ? 'opacity-70' : ''}`}>
+                    <div className="space-y-3 pb-24">
+                      {expandedFilteredProducts.map(product => {
+                        const qty = getProductQty(product.displayId);
+                        return (
+                          <div key={product.displayId} className={`bg-white border ${product.isOfferEntry ? 'border-red-200 bg-red-50/20' : 'border-gray-100'} rounded-xl p-4 flex justify-between items-center shadow-sm ${product.inStock === false && !product.isOfferEntry ? 'opacity-70' : ''}`}>
                              <div className="flex-1 cursor-pointer" onClick={() => setSelectedProductForDetails(product)}>
                                <div className="flex items-center gap-2 mb-1">
                                  <h4 className="font-bold text-gray-900 leading-tight hover:text-blue-600 transition-colors">{product.name}</h4>
@@ -583,7 +621,29 @@ export function OrderRegistrationDialog({
                                <button onClick={() => addToCart(product, product.isOfferEntry)} className={`w-10 h-full hover:bg-blue-50 flex items-center justify-center transition-colors ${product.isOfferEntry ? 'text-red-600' : 'text-blue-600'}`}>
                                  <Plus className="w-4 h-4" />
                                </button>
-                               <span className="text-sm font-bold w-6 text-center select-none">{qty}</span>
+                               <input
+                                 type="number"
+                                 value={qty || ''}
+                                 min="0"
+                                 placeholder="0"
+                                 onClick={(e) => {
+                                   (e.target as HTMLInputElement).select();
+                                 }}
+                                 onChange={(e) => {
+                                   const val = parseInt(e.target.value);
+                                   if (!isNaN(val) && val >= 0) {
+                                     const diff = val - qty;
+                                     if (diff > 0) {
+                                       for(let i=0; i<diff; i++) addToCart(product, product.isOfferEntry);
+                                     } else if (diff < 0) {
+                                       for(let i=0; i<Math.abs(diff); i++) handleDecrementProduct(product.displayId);
+                                     }
+                                   } else if (e.target.value === '') {
+                                     for(let i=0; i<qty; i++) handleDecrementProduct(product.displayId);
+                                   }
+                                 }}
+                                 className="text-sm font-bold w-10 text-center outline-none bg-transparent" 
+                               />
                                <button onClick={() => handleDecrementProduct(product.displayId)} disabled={qty === 0} className={cn("w-10 h-full flex items-center justify-center transition-colors", qty > 0 ? "hover:bg-red-50 text-red-500" : "text-gray-300 pointer-events-none")}>
                                  <Minus className="w-4 h-4" />
                                </button>
@@ -591,17 +651,14 @@ export function OrderRegistrationDialog({
                            </div>
                          )
                        })}
-                       {expandedFilteredProducts.length === 0 && (
-                         <div className="text-center py-12 text-gray-400">لا يوجد أصناف متطابقة</div>
-                       )}
-                     </div>
-                   ) : (
-                     <div className="text-center py-12 text-gray-400 text-sm">الرجاء اختيار العميل أولاً لعرض الأصناف</div>
-                   )}
+                      {expandedFilteredProducts.length === 0 && (
+                        <div className="text-center py-12 text-gray-400">لا يوجد أصناف متطابقة</div>
+                      )}
+                    </div>
                 </div>
 
                 {/* Bottom Action Bar */}
-                {cart.length > 0 && selectedCustomerId && (
+                {cart.length > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] flex items-center justify-between z-10">
                     <div>
                       <p className="text-xs text-gray-500 font-bold mb-0.5">{totalCartItems} صنف</p>
@@ -634,26 +691,59 @@ export function OrderRegistrationDialog({
                  <div>
                    <h3 className="text-blue-600 font-bold flex items-center gap-2 mb-3 text-sm"><span className="w-2 h-2 rounded-full bg-blue-600"></span> العميل</h3>
                    <div className="border border-gray-200 bg-white rounded-xl p-4 shadow-sm">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-lg">
-                          {selectedCustomer?.name?.charAt(0) || 'ع'}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900">{selectedCustomer?.name}</h3>
-                          <p className="text-sm text-gray-500">{selectedCustomer?.phone} • {selectedCustomer?.address}</p>
-                          <p className="text-xs text-gray-400 mt-1">{orderCount} طلب • متوسط {avgOrderValue.toLocaleString()} {primaryCurr}</p>
-                        </div>
-                      </div>
-                      {lastOrder && (
-                         <div className="border-t border-gray-100 pt-3 flex justify-between items-end">
-                            <div>
-                              <p className="text-xs text-gray-500">آخر الطلبات</p>
-                              <p className="text-sm font-bold text-gray-700 mt-1">{daysAgo}</p>
+                      {!selectedCustomerId ? (
+                        isCreatingCustomer ? (
+                          <div className="space-y-4">
+                            <h4 className="font-bold text-gray-900 text-sm">إضافة عميل جديد سريعاً</h4>
+                            <div className="space-y-2">
+                              <Label className="text-xs">اسم العميل *</Label>
+                              <Input placeholder="الاسم" value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} />
                             </div>
-                            <p className="text-sm text-gray-600">{lastOrderItemCount} صنف</p>
-                            <p className="text-sm font-bold text-gray-900">{lastOrderTotal.toLocaleString()} {primaryCurr}</p>
-                         </div>
-                       )}
+                            <div className="space-y-2">
+                              <Label className="text-xs">رقم الجوال</Label>
+                              <Input placeholder="رقم الجوال" value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <Button onClick={handleQuickAddCustomer} disabled={!newCustomerName || saving} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                                حفظ ومتابعة
+                              </Button>
+                              <Button variant="outline" onClick={() => setIsCreatingCustomer(false)} className="flex-1">
+                                إلغاء
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 mb-4 text-sm font-bold">لم تقم باختيار عميل لهذا الطلب</p>
+                            <Button onClick={() => setIsCreatingCustomer(true)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full font-bold">
+                              <Plus className="w-4 h-4 mr-1" /> إضافة عميل جديد
+                            </Button>
+                          </div>
+                        )
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-lg">
+                              {selectedCustomer?.name?.charAt(0) || 'ع'}
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-gray-900">{selectedCustomer?.name}</h3>
+                              <p className="text-sm text-gray-500">{selectedCustomer?.phone} • {selectedCustomer?.address}</p>
+                              <p className="text-xs text-gray-400 mt-1">{orderCount} طلب • متوسط {avgOrderValue.toLocaleString()} {primaryCurr}</p>
+                            </div>
+                          </div>
+                          {lastOrder && (
+                             <div className="border-t border-gray-100 pt-3 flex justify-between items-end">
+                                <div>
+                                  <p className="text-xs text-gray-500">آخر الطلبات</p>
+                                  <p className="text-sm font-bold text-gray-700 mt-1">{daysAgo}</p>
+                                </div>
+                                <p className="text-sm text-gray-600">{lastOrderItemCount} صنف</p>
+                                <p className="text-sm font-bold text-gray-900">{lastOrderTotal.toLocaleString()} {primaryCurr}</p>
+                             </div>
+                           )}
+                        </>
+                      )}
                    </div>
                  </div>
 

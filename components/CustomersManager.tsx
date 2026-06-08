@@ -197,7 +197,8 @@ export function CustomersManager() {
 
   const filteredCustomers = customers.filter(customer => {
     const matchesSearch = customer.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          customer.phone?.includes(searchQuery);
+                          customer.phone?.includes(searchQuery) ||
+                          customer.id?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = activeStatusFilter === 'all' || 
                           (activeStatusFilter === 'active' && customer.isActive !== false) ||
                           (activeStatusFilter === 'inactive' && customer.isActive === false);

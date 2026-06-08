@@ -84,6 +84,7 @@ export function ProductFormDialog({
   const [imageUrl, setImageUrl] = useState('');
   const [newBrandName, setNewBrandName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newUnitName, setNewUnitName] = useState('');
   const [notes, setNotes] = useState('');
   const [expiryDates, setExpiryDates] = useState<string[]>([]);
   const [newExpiryDate, setNewExpiryDate] = useState('');
@@ -130,7 +131,7 @@ export function ProductFormDialog({
     setName(''); setPrice(''); setDescription(''); setCategoryId('none'); setUnit('كرتون'); setBrandId('none');
     setInvoiceTypeRestriction('all'); setCurrencyRestrictionType('any'); setSpecificCurrencies([]);
     setBonusType('none'); setBonusFixedPercent(''); setBonusTiers([]);
-    setImageUrl(''); setNewBrandName(''); setNewCategoryName(''); setNotes(''); setExpiryDates([]);
+    setImageUrl(''); setNewBrandName(''); setNewCategoryName(''); setNewUnitName(''); setNotes(''); setExpiryDates([]);
     setNewExpiryDate(''); setInStock(true); setHasSpecialOffer(false); setOfferPrice('');
     setOfferBonus(''); setOfferExpiryDate(''); setOfferQuantity(''); setOfferCondition('quantity'); setOfferEndDate('');
   };
@@ -193,13 +194,22 @@ export function ProductFormDialog({
         finalCategoryId = newCId;
       }
 
+      let finalUnit = unit;
+      if (unit === 'other' && newUnitName.trim()) {
+        finalUnit = newUnitName.trim();
+        // Add to company details
+        await updateDoc(doc(db, 'companies', profile.companyId), {
+          productUnits: arrayUnion(finalUnit)
+        }).catch(e => console.error("Could not save new unit", e));
+      }
+
       const productData: any = {
         name,
         description,
         price: parseFloat(price),
         currency: currency || companyDetails?.primaryCurrency || 'SAR',
         categoryId: finalCategoryId,
-        unit,
+        unit: finalUnit,
         brandId: finalBrandId,
         imageUrl,
         notes,
@@ -323,6 +333,23 @@ export function ProductFormDialog({
                         <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                         <SelectContent>{activeCurrencies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
+                </div>
+              </div>
+              <div className="space-y-2 col-span-2 md:col-span-1">
+                <Label>الوحدة *</Label>
+                <div className="flex flex-col gap-2">
+                  <Select value={unit} onValueChange={(v) => setUnit(v || 'كرتون')}>
+                    <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                    <SelectContent>
+                        {Array.from(new Set(['حبة', 'كرتون', 'مجموعة', 'طقم', ...(companyDetails?.productUnits || [])])).map(u => (
+                          <SelectItem key={u as string} value={u as string}>{u}</SelectItem>
+                        ))}
+                        <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة وحدة جديدة)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {unit === 'other' && (
+                    <Input placeholder="اسم الوحدة الجديدة (مثال: درزن)" value={newUnitName} onChange={e => setNewUnitName(e.target.value)} />
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
