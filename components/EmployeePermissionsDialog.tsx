@@ -9,18 +9,17 @@ import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AppPermissions } from "@/lib/store";
 
+const defaultPermissions: AppPermissions = {
+  customers: { view: false, create: false, edit: false, delete: false },
+  products: { view: false, create: false, edit: false, delete: false },
+  orders: { view: false, create: false, edit: false, delete: false },
+  staff: { view: false, create: false, edit: false, delete: false },
+  companySettings: { view: false, create: false, edit: false, delete: false },
+};
+
 export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  // Default structure
-  const defaultPermissions: AppPermissions = {
-    customers: { view: false, create: false, edit: false, delete: false },
-    products: { view: false, create: false, edit: false, delete: false },
-    orders: { view: false, create: false, edit: false, delete: false },
-    staff: { view: false, create: false, edit: false, delete: false },
-    companySettings: { view: false, create: false, edit: false, delete: false },
-  };
 
   const [permissions, setPermissions] = useState<AppPermissions>(defaultPermissions);
 
@@ -101,7 +100,7 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
         <div className="py-4 space-y-6">
            <div className="bg-yellow-50 text-yellow-800 text-xs p-3 rounded-lg border border-yellow-200">
              تحذير: سيتم تجاوز الصلاحيات الافتراضية بمجرد حفظ الإعدادات من هنا. 
-             تأكد من إعطاء صلاحية "العرض" إذا كنت تريد للموظف التعديل أو الحذف.
+             تأكد من إعطاء صلاحية &quot;العرض&quot; إذا كنت تريد للموظف التعديل أو الحذف.
            </div>
 
            <div className="space-y-4">

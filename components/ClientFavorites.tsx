@@ -24,6 +24,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
   const [isOrdering, setIsOrdering] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!profile || !profile.favoriteProductIds || profile.favoriteProductIds.length === 0) {
       setFavoriteProducts([]);

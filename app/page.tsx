@@ -183,7 +183,7 @@ export default function Home() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">في انتظار موافقة الشركة</h2>
           <p className="text-gray-500 mb-6 font-medium leading-relaxed">
-            لقد تم إرسال طلب انضمامك إلى "{profile.companyName || 'الشركة'}". يرجى الانتظار حتى يقوم مدير الشركة بقبول طلبك.
+            لقد تم إرسال طلب انضمامك إلى &quot;{profile.companyName || 'الشركة'}&quot;. يرجى الانتظار حتى يقوم مدير الشركة بقبول طلبك.
           </p>
           <Button variant="outline" onClick={handleLogout} className="w-full">
             <LogOut className="w-4 h-4 ml-2" />
