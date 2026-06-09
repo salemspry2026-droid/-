@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Sparkles, X, Gift, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
-import { GoogleGenAI } from '@google/genai';
 
 export function ProductFormDialog({ 
   children, 
@@ -261,12 +260,20 @@ export function ProductFormDialog({
     if (!name) { toast.error('الرجاء إدخال اسم الصنف أولاً'); return; }
     setIsGenerating(true);
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      const ai = new GoogleGenAI({ apiKey: apiKey! });
-      const prompt = `اكتب وصفاً تسويقياً قصيراً واحترافياً لمنتج B2B يسمى "${name}". التصنيف: ${categoryId === 'none' ? 'عام' : categoryId}. اجعله في جملتين كحد أقصى وباللغة العربية.`;
-      const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
-      if (response.text) { setDescription(response.text.trim()); toast.success('تم إنشاء الوصف!'); }
+      const response = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, categoryId })
+      });
+      if (!response.ok) throw new Error('Failed to generate description');
+      
+      const data = await response.json();
+      if (data.text) { 
+        setDescription(data.text.trim()); 
+        toast.success('تم إنشاء الوصف!'); 
+      }
     } catch (error: any) {
+      console.error(error);
       toast.error('فشل إنشاء الوصف');
     } finally {
       setIsGenerating(false);
