@@ -4,12 +4,44 @@ import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Package, Search, Gift, Edit, Trash2, CheckCircle, Store, Tag } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 import { hasPermission } from '@/lib/utils';
 import Image from 'next/image';
+import { productService } from '@/lib/services/productService';
+import { orderService, ProductStats } from '@/lib/services/orderService';
+
+// Interfaces for better type safety
+interface OrderItem {
+  productId: string;
+  quantity?: number;
+  bonusQuantity?: number;
+  price?: number;
+}
+
+interface OrderRecord {
+  createdAt?: {
+    seconds?: number;
+    toMillis?: () => number;
+  } | Date | string | number;
+  items?: OrderItem[];
+}
+
+interface CustomerSpecificData {
+  customerId: string;
+  customerName: string;
+  customerOrders: OrderRecord[];
+}
+
+interface ProductDetailsDialogProps {
+  product: any;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit?: (product: any) => void;
+  categories?: any[];
+  brands?: any[];
+  customerSpecificData?: CustomerSpecificData;
+}
 
 export function ProductDetailsDialog({ 
   product, 
@@ -19,26 +51,30 @@ export function ProductDetailsDialog({
   categories = [], 
   brands = [],
   customerSpecificData
-}: { 
-  product: any, 
-  isOpen: boolean, 
-  onClose: () => void, 
-  onEdit?: (product: any) => void, 
-  categories?: any[], 
-  brands?: any[],
-  customerSpecificData?: { customerId: string, customerName: string, customerOrders: any[] }
-}) {
+}: ProductDetailsDialogProps) {
   const { profile, user } = useStore();
-  const [stats, setStats] = useState({ timesOrdered: 0, unitsSold: 0, totalSales: 0 });
+  const [stats, setStats] = useState<ProductStats>({ timesOrdered: 0, unitsSold: 0, totalSales: 0 });
   const [loading, setLoading] = useState(true);
+
+  // Helper to safely parse dates from various formats (Firebase Timestamps, standard JS dates, etc.)
+  const parseDate = (val: any): Date => {
+    if (!val) return new Date();
+    if (typeof val.toMillis === 'function') return new Date(val.toMillis());
+    if (val.seconds) return new Date(val.seconds * 1000);
+    if (val instanceof Date) return val;
+    return new Date(val);
+  };
 
   const custStats = useMemo(() => {
     if (!customerSpecificData || !product) return null;
     
-    const orders = [...customerSpecificData.customerOrders].sort((a,b) => {
-      const da = a.createdAt?.toMillis?.() || Date.now();
-      const db = b.createdAt?.toMillis?.() || Date.now();
-      return db - da;
+    // Safety guard against empty orders array
+    const rawOrders = customerSpecificData.customerOrders || [];
+    
+    const orders = [...rawOrders].sort((a, b) => {
+      const da = parseDate(a.createdAt).getTime();
+      const db = parseDate(b.createdAt).getTime();
+      return db - da; // Descending order
     });
 
     const currentYear = new Date().getFullYear();
@@ -48,16 +84,19 @@ export function ProductDetailsDialog({
     let totalQtyThisYear = 0;
     let maxQty = 0;
     let orderCount = 0;
+    
+    // Explicitly typed to prevent 'implicit any' or 'never' errors
     let firstOrderDate: Date | null = null;
     
     orders.forEach(order => {
       let qtyInOrder = 0;
       let bonusInOrder = 0;
       
-      order.items?.forEach((item: any) => {
+      const items = order.items || [];
+      items.forEach((item) => {
         if (item.productId === product.id || item.productId === `${product.id}_offer`) {
-          qtyInOrder += item.quantity || 0;
-          bonusInOrder += item.bonusQuantity || 0;
+          qtyInOrder += Number(item.quantity) || 0;
+          bonusInOrder += Number(item.bonusQuantity) || 0;
         }
       });
       
@@ -65,9 +104,11 @@ export function ProductDetailsDialog({
         orderCount++;
         totalQty += qtyInOrder;
         
-        if (qtyInOrder > maxQty) maxQty = qtyInOrder;
+        if (qtyInOrder > maxQty) {
+           maxQty = qtyInOrder;
+        }
         
-        const orderDate = new Date(order.createdAt?.seconds * 1000 || Date.now());
+        const orderDate = parseDate(order.createdAt);
         if (orderDate.getFullYear() === currentYear) {
           totalQtyThisYear += qtyInOrder;
         }
@@ -80,7 +121,8 @@ export function ProductDetailsDialog({
           };
         }
         
-        if (!firstOrderDate || orderDate < firstOrderDate) {
+        // Use getTime() for solid date comparison safely
+        if (!firstOrderDate || orderDate.getTime() < firstOrderDate.getTime()) {
           firstOrderDate = orderDate;
         }
       }
@@ -91,8 +133,13 @@ export function ProductDetailsDialog({
     let approxMonthlySellRate = 0;
     if (orderCount > 1 && firstOrderDate) {
       const msDiff = Date.now() - firstOrderDate.getTime();
+      // 30.44 days per month on average
       const monthsDiff = msDiff / (1000 * 3600 * 24 * 30.44);
-      approxMonthlySellRate = monthsDiff > 0.5 ? Math.round(totalQty / monthsDiff) : totalQty;
+      if (monthsDiff > 0.5) {
+         approxMonthlySellRate = Math.round(totalQty / monthsDiff);
+      } else {
+         approxMonthlySellRate = totalQty;
+      }
     } else if (orderCount === 1) {
        approxMonthlySellRate = totalQty;
     }
@@ -108,63 +155,43 @@ export function ProductDetailsDialog({
     };
   }, [customerSpecificData, product]);
 
-  // We are assuming standard functionality, only calculating stats from 'orders'
+  // Aggregate stats separated into a service layer to abstract DB hits
   useEffect(() => {
     if (!product || !isOpen || !profile?.companyId || profile.role === 'client') return;
     
-    // In a real optimized scenario, we would use aggregations or cloud functions
-    // For now, doing a client-side aggregation
+    let isMounted = true;
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, 'orders'),
-          where('companyId', '==', profile.companyId),
-          where('isDeleted', '==', false)
-        );
-        const snapshot = await getDocs(q);
-        
-        let timesOrdered = 0;
-        let unitsSold = 0;
-        let totalSales = 0;
-        
-        snapshot.docs.forEach(doc => {
-          const order = doc.data();
-          if (order.items && Array.isArray(order.items)) {
-            const productItems = order.items.filter((item: any) => item.productId === product.id || item.productId === `${product.id}_offer`);
-            if (productItems.length > 0) {
-              timesOrdered += 1;
-              productItems.forEach((item: any) => {
-                 unitsSold += item.quantity;
-                 totalSales += item.quantity * item.price;
-              });
-            }
-          }
-        });
-        
-        setStats({ timesOrdered, unitsSold, totalSales });
+        const productStats = await orderService.getProductStats(profile.companyId, product.id);
+        if (isMounted) {
+           setStats(productStats);
+        }
       } catch (error) {
         console.error("Error fetching product stats:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     
     fetchStats();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [product, isOpen, profile?.companyId, profile?.role]);
 
   const handleDelete = async () => {
+    if (!product?.id || !user?.uid) return;
+    
     if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الصنف بشكل نهائي؟')) {
        try {
-         await updateDoc(doc(db, 'products', product.id), {
-           isDeleted: true,
-           updatedAt: serverTimestamp(),
-           updatedBy: user?.uid
-         });
+         await productService.softDeleteProduct(product.id, user.uid);
          toast.success('تم حذف الصنف بنجاح');
          onClose();
        } catch (error) {
-         toast.error('حدث خطأ أثناء الحذف');
+         console.error("Error deleting product:", error);
+         toast.error('حدث خطأ أثناء الحذف. يرجى المحاولة لاحقاً.');
        }
     }
   };
