@@ -406,6 +406,29 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
                     <p className="text-xs text-blue-700/80 mt-4 font-medium">شارك هذا الكود مع موظفيك بصلاحيات المبيعات أو فريق الإدارة.</p>
                   </div>
 
+                  <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl border border-green-200 mt-4 text-center shadow-sm">
+                    <Label className="text-green-900 font-bold mb-3 block text-base leading-tight">رابط مشاركة الشركة للعملاء<br/><span className="text-xs font-normal text-green-700">(للنشر والمشاركة)</span></Label>
+                    <div className="relative inline-block w-full max-w-sm mx-auto">
+                       <Input 
+                         readOnly 
+                         value={`${typeof window !== 'undefined' ? window.location.origin : ''}/c/${company.id}`} 
+                         className="bg-white px-4 py-3 rounded-xl border-2 border-green-300 font-mono text-sm text-green-800 shadow-sm text-center w-full" 
+                         dir="ltr" 
+                       />
+                    </div>
+                    <Button 
+                       variant="outline" 
+                       className="mt-4 bg-white text-green-700 border-green-300 hover:bg-green-50 rounded-xl font-bold"
+                       onClick={() => {
+                         navigator.clipboard.writeText(`${window.location.origin}/c/${company.id}`);
+                         toast.success('تم نسخ رابط الشركة بنجاح!');
+                       }}
+                    >
+                       نسخ الرابط
+                    </Button>
+                    <p className="text-xs text-green-700/80 mt-4 font-medium">شارك هذا الرابط مع عملائك ليتمكنوا من تصفح منتجاتك بسهولة وطلبها.</p>
+                  </div>
+
                   <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
                     <div className="flex items-center justify-between">
                       <div>
