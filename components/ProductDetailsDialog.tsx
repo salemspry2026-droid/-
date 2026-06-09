@@ -163,7 +163,7 @@ export function ProductDetailsDialog({
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const productStats = await orderService.getProductStats(profile.companyId, product.id);
+        const productStats = await orderService.getProductStats(profile.companyId as string, product.id);
         if (isMounted) {
            setStats(productStats);
         }
