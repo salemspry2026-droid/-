@@ -86,11 +86,15 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full text-xs h-8 text-blue-600 border-blue-200">
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" className="w-full text-xs h-8 text-blue-600 border-blue-200" />
+        }
+      >
+        <div className="flex items-center">
           <Settings2 className="w-4 h-4 ml-2" />
           الصلاحيات المتقدمة
-        </Button>
+        </div>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] select-none" dir="rtl">
         <DialogHeader>
