@@ -264,7 +264,9 @@ export function OrderRegistrationDialog({
         phone: newCustomerPhone,
         companyId: profile.companyId,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         createdBy: user.uid,
+        updatedBy: user.uid,
         isActive: true,
         isDeleted: false
       });
