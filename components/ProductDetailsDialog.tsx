@@ -43,7 +43,7 @@ export function ProductDetailsDialog({
 
     const currentYear = new Date().getFullYear();
     
-    let lastOrderDetails = null;
+    let lastOrderDetails: { date: string; qty: number; bonus: number; } | null = null;
     let totalQty = 0;
     let totalQtyThisYear = 0;
     let maxQty = 0;
