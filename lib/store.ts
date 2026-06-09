@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type UserRole = 'owner' | 'admin' | 'sales' | 'client' | null;
+export type UserRole = 'owner' | 'admin' | 'sales' | 'client' | 'pending_employee' | null;
 
 export interface EntityAccess {
   view: boolean;

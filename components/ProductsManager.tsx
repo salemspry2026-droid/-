@@ -188,7 +188,7 @@ export function ProductsManager() {
         ))}
         {filteredProducts.length === 0 && (
           <div className="col-span-full text-center py-12 text-gray-500 font-bold bg-white rounded-xl border border-gray-100">
-            لا توجد أصناف مطابقة للبحث "{searchQuery}"
+            لا توجد أصناف مطابقة للبحث &quot;{searchQuery}&quot;
           </div>
         )}
       </div>
