@@ -48,7 +48,7 @@ export function ProductDetailsDialog({
     let totalQtyThisYear = 0;
     let maxQty = 0;
     let orderCount = 0;
-    let firstOrderDate = null;
+    let firstOrderDate: Date | null = null;
     
     orders.forEach(order => {
       let qtyInOrder = 0;
