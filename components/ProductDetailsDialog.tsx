@@ -88,17 +88,17 @@ export function ProductDetailsDialog({
     // Explicitly typed to prevent 'implicit any' or 'never' errors
     let firstOrderDate: Date | null = null;
     
-    orders.forEach(order => {
+    for (const order of orders) {
       let qtyInOrder = 0;
       let bonusInOrder = 0;
       
       const items = order.items || [];
-      items.forEach((item) => {
+      for (const item of items) {
         if (item.productId === product.id || item.productId === `${product.id}_offer`) {
           qtyInOrder += Number(item.quantity) || 0;
           bonusInOrder += Number(item.bonusQuantity) || 0;
         }
-      });
+      }
       
       if (qtyInOrder > 0) {
         orderCount++;
@@ -126,7 +126,7 @@ export function ProductDetailsDialog({
           firstOrderDate = orderDate;
         }
       }
-    });
+    }
 
     const avgQty = orderCount > 0 ? Math.round(totalQty / orderCount) : 0;
     
