@@ -15,6 +15,8 @@ import { AdminDashboard } from '@/components/AdminDashboard';
 import { ClientDashboard } from '@/components/ClientDashboard';
 import { LandingPage } from '@/components/LandingPage';
 
+import { AppLogo, AppLogoText } from '@/components/AppLogo';
+
 export default function Home() {
   const { user, profile, isAuthReady, isProfileLoaded } = useStore();
   
@@ -109,10 +111,12 @@ export default function Home() {
             <LogOut className="w-5 h-5 text-gray-400 rotate-180" />
           </Button>
           <CardHeader className="text-center pb-2 pt-8">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <AppLogo className="w-16 h-16" />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900 mt-2">نظام إدارة الطلبات</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 mt-2 flex justify-center items-center gap-2">
+              <AppLogoText className="text-2xl" />
+            </CardTitle>
             <CardDescription className="text-gray-500">
               {authMode === 'login' && 'تسجيل الدخول للمتابعة'}
               {authMode === 'register' && 'إنشاء حساب جديد'}

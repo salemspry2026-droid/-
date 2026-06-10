@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Network, Smartphone, Clock, PieChart, ServerCrash, CreditCard, ShieldCheck, Phone, Handshake, CheckCircle2, TrendingUp, ArrowLeft, Menu, X, LayoutDashboard, ShoppingBag, Users, Store, ReceiptText } from 'lucide-react';
+import { AppLogo, AppLogoText } from './AppLogo';
+import { Smartphone, Clock, PieChart, ServerCrash, CreditCard, ShieldCheck, Phone, Handshake, CheckCircle2, TrendingUp, ArrowLeft, Menu, X, LayoutDashboard, ShoppingBag, Users, Store, ReceiptText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LandingPageProps {
@@ -34,11 +35,11 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <motion.div 
                 whileHover={{ rotate: 15, scale: 1.1 }}
-                className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-200"
+                className="w-10 h-10 flex items-center justify-center"
               >
-                <Network className="w-6 h-6 text-white" />
+                <AppLogo className="w-10 h-10" />
               </motion.div>
-              <span className="text-2xl font-black text-[#163C85] tracking-tight">OrderFlow</span>
+              <AppLogoText />
             </div>
             
             {/* Desktop Nav */}
@@ -197,9 +198,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                        >
                          {/* Fake Admin Sidebar */}
                          <div className="w-64 bg-white border-l border-gray-200 shrink-0 hidden md:flex flex-col z-10 shadow-sm relative">
-                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                              <div>
-                                <h2 className="text-xl font-bold text-gray-900">نظام الطلبات</h2>
+                            <div className="p-6 border-b border-gray-100 flex items-start justify-between">
+                              <div className="flex flex-col">
+                                <AppLogoText className="text-xl" />
                                 <p className="text-xs text-gray-500 mt-1">مدير النظام</p>
                               </div>
                             </div>
@@ -328,7 +329,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 { icon: PieChart, title: 'مساعد الوصف الذكي (AI)', desc: 'لا تضيع وقتك في كتابة أوصاف المنتجات؛ دع محرك الذكاء الاصطناعي لدينا ينشئ لك أوصافاً إبداعية ومحسنة لمحركات البحث بناءً على بيانات منتجك.', delay: 0.1 },
-                { icon: ServerCrash, title: 'العمل بلا حدود (Offline Mode)', desc: 'سجل طلباتك، أضف عملائك، وتابع عملك حتى بدون إنترنت. سيقوم OrderFlow بمزامنة كل شيء تلقائياً بمجرد عودتك للشبكة.', delay: 0.2 },
+                { icon: ServerCrash, title: 'العمل بلا حدود (Offline Mode)', desc: 'سجل طلباتك، أضف عملائك، وتابع عملك حتى بدون إنترنت. سيقوم Flowexa بمزامنة كل شيء تلقائياً بمجرد عودتك للشبكة.', delay: 0.2 },
                 { icon: TrendingUp, title: 'لوحة تحكم وتحليلات حية', desc: 'راقب أداء مبيعاتك اليومية، وتتبع متوسطات البيع حسب العملات المختلفة في واجهة تفاعلية واحدة ومنظمة تدعم الفرز المتقدم.', delay: 0.3 }
               ].map((feature, idx) => (
                 <motion.div 
@@ -483,7 +484,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-500 to-green-500"></div>
               
               <h2 className="text-4xl md:text-6xl font-black text-[#163C85] mb-8 leading-tight">جاهز لتنظيم تدفق مبيعاتك؟</h2>
-              <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto">انضم إلى OrderFlow اليوم، واختبر الكفاءة الحقيقية في كل طلب وفي كل عملية بيع.</p>
+              <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto">انضم إلى Flowexa اليوم، واختبر الكفاءة الحقيقية في كل طلب وفي كل عملية بيع.</p>
               
               <Button onClick={onLoginClick} className="h-16 px-12 bg-[#2E5CA6] hover:bg-[#163C85] text-white text-xl font-bold rounded-full shadow-2xl shadow-blue-600/30 transition-transform hover:scale-110">
                 تسجيل الدخول الآن
@@ -496,11 +497,11 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 py-8">
-          <p className="text-gray-500 font-medium">© {new Date().getFullYear()} OrderFlow - المنصة المتكاملة لإدارة التجارة</p>
+          <p className="text-gray-500 font-medium">© {new Date().getFullYear()} Flowexa - نُدير أعمالك .. نربط عملاءك .. ننمي مبيعاتك</p>
           <div className="flex items-center gap-2">
-            <span className="text-gray-400 font-bold ml-2">OrderFlow</span>
-            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Network className="w-4 h-4 text-gray-500" />
+            <AppLogoText className="text-gray-400 font-bold ml-2 text-lg" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              <AppLogo className="w-6 h-6 grayscale opacity-50" />
             </div>
           </div>
         </div>

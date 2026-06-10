@@ -1,5 +1,8 @@
 {
-  "name": "OrderFlow",
-  "description": "B2B Customer Order Registration and Management System",
-  "requestFramePermissions": []
+  "name": "Flowexa",
+  "description": "B2B Customer Order Registration and Management System - نُدير أعمالك .. نربط عملاءك .. ننمي مبيعاتك",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

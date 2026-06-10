@@ -9,8 +9,8 @@ import { Toaster } from '@/components/ui/sonner';
 const cairo = Cairo({subsets:['arabic', 'latin'], variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'OrderFlow',
-  description: 'B2B Customer Order Registration and Management System',
+  title: 'Flowexa',
+  description: 'نُدير أعمالك .. نربط عملاءك .. ننمي مبيعاتك',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

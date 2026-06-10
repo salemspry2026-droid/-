@@ -13,6 +13,8 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 
+import { AppLogo, AppLogoText } from './AppLogo';
+
 export function Onboarding() {
   const { user } = useStore();
   const [loading, setLoading] = useState(false);
@@ -161,11 +163,13 @@ export function Onboarding() {
     <div className="flex items-center justify-center min-h-screen bg-[#F0F2F5] p-4">
       <Card className="w-full max-w-md border-none shadow-lg rounded-2xl">
         <CardHeader className="text-center pb-2">
-          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <AppLogo className="w-16 h-16" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">مرحباً بك في نظام إدارة الطلبات</CardTitle>
-          <CardDescription className="text-gray-500">لنقم بإعداد حسابك</CardDescription>
+          <CardTitle className="text-2xl font-bold text-gray-900 flex justify-center items-center gap-2">
+            مرحباً بك في <AppLogoText className="text-2xl" />
+          </CardTitle>
+          <CardDescription className="text-gray-500">نُدير أعمالك .. نربط عملاءك .. ننمي مبيعاتك</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           <Tabs defaultValue="join_client" className="w-full">

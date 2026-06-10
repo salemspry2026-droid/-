@@ -18,6 +18,8 @@ import { LayoutGrid, ReceiptText, Package, Users, Plus, Bell, Shield } from 'luc
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 
+import { AppLogo, AppLogoText } from './AppLogo';
+
 export function AdminDashboard() {
   const { profile, activeTab, setActiveTab, isNotificationsOpen, setIsNotificationsOpen, setSelectedOrderId, unreadNotifications } = useStore();
   const [isOrderRegistrationOpen, setIsOrderRegistrationOpen] = useState(false);
@@ -29,12 +31,12 @@ export function AdminDashboard() {
       <GlobalNotificationListener />
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex flex-col w-64 fixed top-0 bottom-0 right-0 bg-white border-l border-gray-200 z-40 shadow-sm">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">نظام الطلبات</h2>
+        <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+          <div className="flex flex-col">
+            <AppLogoText className="text-2xl" />
             <p className="text-sm text-gray-500 mt-1">{profile?.displayName || 'مدير النظام'}</p>
           </div>
-          <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
+          <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors bg-gray-50 rounded-xl">
             <Bell className="w-6 h-6" />
             {unreadNotifications > 0 && (
               <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
@@ -70,11 +72,14 @@ export function AdminDashboard() {
 
       {/* Mobile Header (Only visible on mobile) */}
       <div className="md:hidden bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">نظام الطلبات</h2>
-          <p className="text-xs text-gray-500">{profile?.displayName || 'مدير النظام'}</p>
+        <div className="flex gap-2 items-center">
+          <AppLogo className="w-8 h-8" />
+          <div className="flex flex-col">
+            <AppLogoText className="text-xl" />
+            <p className="text-xs text-gray-500">{profile?.displayName || 'مدير النظام'}</p>
+          </div>
         </div>
-        <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
+        <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-gray-50 rounded-xl text-gray-500 hover:text-blue-600 transition-colors">
           <Bell className="w-6 h-6" />
           {unreadNotifications > 0 && (
             <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-in zoom-in">
