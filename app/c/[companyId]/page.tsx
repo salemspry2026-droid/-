@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useStore } from '@/lib/store';
-import { Loader2, ArrowRight, UserPlus, Package, MapPin, Phone, Mail, BuildingIcon } from 'lucide-react';
+import { Loader2, ArrowRight, UserPlus, Package, MapPin, Phone, Mail, BuildingIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,13 +48,13 @@ export default function PublicCompanyPage() {
         const productsRef = collection(db, 'products');
         const q = query(
           productsRef,
-          where('companyId', '==', companyId),
-          where('isDeleted', '==', false),
-          where('isActive', '==', true)
+          where('companyId', '==', companyId)
         );
         
         const productsSnap = await getDocs(q);
-        const productsData = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const productsData = productsSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() as any }))
+          .filter(p => p.isDeleted === false && p.isActive === true);
         setProducts(productsData);
       } catch (err: any) {
         console.error("Error fetching company info:", err);
