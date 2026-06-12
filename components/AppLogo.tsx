@@ -8,6 +8,7 @@ export function AppLogo({ className = "w-10 h-10" }: { className?: string }) {
         src="/logo.jpg"
         alt="Flowexa Logo"
         fill
+        sizes="(max-width: 768px) 100vw, 150px"
         className="object-cover"
         referrerPolicy="no-referrer"
       />
