@@ -57,10 +57,23 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error("Auth failed:", error);
-      let msg = 'حدث خطأ غير متوقع';
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      else if (error.code === 'auth/email-already-in-use') msg = 'هذا البريد الإلكتروني مسجل مسبقاً';
-      else if (error.code === 'auth/weak-password') msg = 'كلمة المرور ضعيفة جداً';
+      let msg = 'حدث خطأ غير متوقع: ' + (error.message || error.code || '');
+      
+      const code = error.code as string;
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+        msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+      } else if (code === 'auth/email-already-in-use') {
+        msg = 'هذا البريد الإلكتروني مسجل مسبقاً، يرجى تسجيل الدخول.';
+      } else if (code === 'auth/weak-password') {
+        msg = 'كلمة المرور ضعيفة جداً، يجب أن تكون 6 أحرف على الأقل.';
+      } else if (code === 'auth/unauthorized-domain') {
+        msg = 'النطاق الحالي غير مصرح به. يرجى إضافة رابط Vercel إلى قائمة Authorized domains في إعدادات Firebase Authentication.';
+      } else if (code === 'auth/network-request-failed') {
+        msg = 'فشل الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت أو أن رابط Vercel مسموح به في إعدادات Google Cloud API Key.';
+      } else if (code === 'auth/too-many-requests') {
+        msg = 'تم حظر الحساب مؤقتاً بسبب محاولات تسجيل دخول خاطئة كثيرة. يرجى إعادة المحاولة لاحقاً أو استعادة كلمة المرور.';
+      }
+      
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -70,8 +83,13 @@ export default function Home() {
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google login failed:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+          toast.error('لم يتم تفويض رابط Vercel. يرجى الذهاب إلى إعدادات Firebase Authentication ثم Authorized domains وإضافة رابط Vercel الخاص بك.');
+      } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+          toast.error('فشل الدخول عبر جوجل: ' + (error.message || error.code || 'يرجى التأكد من إضافة رابط Vercel ضمن إعدادات Firebase Auth.'));
+      }
     }
   };
 
