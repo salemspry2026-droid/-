@@ -36,7 +36,7 @@ export default function PublicCompanyPage() {
           return;
         }
 
-        const companyData = { id: companySnap.id, ...companySnap.data() };
+        const companyData: any = { id: companySnap.id, ...companySnap.data() };
         if (companyData.isDeleted) {
            setError('تم حذف هذه الشركة.');
            setLoading(false);
