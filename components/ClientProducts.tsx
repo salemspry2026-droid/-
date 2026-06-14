@@ -347,7 +347,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
           
           return (
           <div key={product.displayId} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-3 shadow-sm border ${qty > 0 ? 'border-green-400 bg-green-50/10' : 'border-gray-100'} flex flex-col cursor-pointer hover:border-green-300 transition-colors ${product.inStock === false ? 'opacity-70' : ''}`}>
-            <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative">
+            <div className="w-full aspect-square rounded-lg bg-green-50 flex items-center justify-center mb-3 overflow-hidden relative p-2">
               <button 
                 onClick={(e) => toggleFavorite(product, e)}
                 className="absolute top-2 left-2 z-10 w-8 h-8 flex items-center justify-center bg-white/80 rounded-full hover:scale-110 transition-transform shadow-sm"
@@ -355,7 +355,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                 <Heart className={cn("w-5 h-5", profile?.favoriteProductIds?.includes(product.id) ? "fill-red-500 text-red-500" : "text-gray-400")} />
               </button>
               {product.imageUrl ? (
-                <Image src={product.imageUrl} alt={product.name} fill className="object-cover" referrerPolicy="no-referrer" />
+                <Image src={product.imageUrl} alt={product.name} fill className="object-contain p-2" referrerPolicy="no-referrer" />
               ) : (
                 <Package className="w-10 h-10 text-green-300" />
               )}
@@ -515,9 +515,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                 const price = item.product.specialOffer?.isActive ? item.product.specialOffer.price : item.product.price;
                 return (
                   <div key={item.product.id} className="flex gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
-                    <div className="w-16 h-16 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0 relative overflow-hidden p-1">
                       {item.product.imageUrl ? (
-                        <Image src={item.product.imageUrl} alt={item.product.name} fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
+                        <Image src={item.product.imageUrl} alt={item.product.name} fill className="object-contain" referrerPolicy="no-referrer" />
                       ) : (
                         <Package className="w-8 h-8 text-gray-300" />
                       )}
