@@ -6,10 +6,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true,
-  },
-  experimental: {
-    memoryBasedWorkersCount: true,
+    ignoreBuildErrors: false,
   },
   // Allow access to remote image placeholder.
   images: {

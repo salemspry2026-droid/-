@@ -49,8 +49,14 @@ export default function PublicCompanyPage() {
         }
         
         setCompany(companyData);
+      } catch (err: any) {
+        console.error("Error fetching company info:", err);
+        setError('حدث خطأ أثناء تحميل بيانات الشركة: ' + err.message);
+        setLoading(false);
+        return;
+      }
 
-        // Fetch products
+      try {
         const productsRef = collection(db, 'products');
         const qProducts = query(productsRef, where('companyId', '==', companyId));
         const productsSnap = await getDocs(qProducts);
@@ -58,8 +64,11 @@ export default function PublicCompanyPage() {
           .map(doc => ({ id: doc.id, ...doc.data() as any }))
           .filter(p => !p.isDeleted && p.isActive !== false);
         setProducts(productsData);
+      } catch (err: any) {
+        console.warn("Product fetch error", err);
+      }
 
-        // Fetch categories
+      try {
         const categoriesRef = collection(db, 'productCategories');
         const qCategories = query(categoriesRef, where('companyId', '==', companyId));
         const categoriesSnap = await getDocs(qCategories);
@@ -67,7 +76,11 @@ export default function PublicCompanyPage() {
           .map(doc => ({ id: doc.id, ...doc.data() as any }))
           .filter(c => !c.isDeleted);
         setCategories(categoriesData);
+      } catch (err: any) {
+         console.warn("Category fetch error", err);
+      }
 
+      try {
         // Fetch brands
         const brandsRef = collection(db, 'productBrands');
         const qBrands = query(brandsRef, where('companyId', '==', companyId));
@@ -76,13 +89,11 @@ export default function PublicCompanyPage() {
           .map(doc => ({ id: doc.id, ...doc.data() as any }))
           .filter(b => !b.isDeleted);
         setBrands(brandsData);
-
       } catch (err: any) {
-        console.error("Error fetching company info:", err);
-        setError('حدث خطأ أثناء تحميل بيانات الشركة. يرجى المحاولة لاحقاً.');
-      } finally {
-        setLoading(false);
+        console.warn("Brand fetch error", err);
       }
+
+      setLoading(false);
     };
 
     fetchCompanyData();
