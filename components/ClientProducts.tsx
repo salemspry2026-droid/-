@@ -355,7 +355,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                 <Heart className={cn("w-5 h-5", profile?.favoriteProductIds?.includes(product.id) ? "fill-red-500 text-red-500" : "text-gray-400")} />
               </button>
               {product.imageUrl ? (
-                <Image src={product.imageUrl} alt={product.name} fill className="object-contain p-2" referrerPolicy="no-referrer" />
+                <Image src={product.imageUrl} alt={product.name} fill className="object-contain p-2 pointer-events-none" referrerPolicy="no-referrer" />
               ) : (
                 <Package className="w-10 h-10 text-green-300" />
               )}
@@ -517,7 +517,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                   <div key={item.product.id} className="flex gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
                     <div className="w-16 h-16 bg-white rounded-lg border border-gray-100 flex items-center justify-center shrink-0 relative overflow-hidden p-1">
                       {item.product.imageUrl ? (
-                        <Image src={item.product.imageUrl} alt={item.product.name} fill className="object-contain" referrerPolicy="no-referrer" />
+                        <Image src={item.product.imageUrl} alt={item.product.name} fill className="object-contain pointer-events-none" referrerPolicy="no-referrer" />
                       ) : (
                         <Package className="w-8 h-8 text-gray-300" />
                       )}

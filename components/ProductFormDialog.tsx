@@ -300,7 +300,7 @@ export function ProductFormDialog({
             <div className="flex flex-col items-center gap-2 mb-6">
               <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 relative group cursor-pointer focus-within:ring-2 focus-within:ring-blue-500">
                 {imageUrl ? (
-                  <img src={imageUrl} alt="Product" className="w-full h-full object-contain p-2" />
+                  <img src={imageUrl} alt="Product" className="w-full h-full object-contain p-2 pointer-events-none" />
                 ) : (
                   <span className="text-gray-400 text-xs text-center p-2">اضف صورة (CV)</span>
                 )}

@@ -298,7 +298,7 @@ export function ProductDetailsDialog({
            <div className="flex flex-col md:flex-row gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div className="relative w-40 h-40 shrink-0 bg-white rounded-xl border flex items-center justify-center overflow-hidden p-2">
                 {product.imageUrl ? (
-                   <Image src={product.imageUrl} alt={product.name} fill className="object-contain" referrerPolicy="no-referrer" />
+                   <Image src={product.imageUrl} alt={product.name} fill className="object-contain pointer-events-none" referrerPolicy="no-referrer" />
                 ) : (
                    <Package className="w-16 h-16 text-gray-300" />
                 )}
