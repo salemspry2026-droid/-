@@ -60,7 +60,7 @@ export default function PublicCompanyPage() {
         setProducts(productsData);
 
         // Fetch categories
-        const categoriesRef = collection(db, 'categories');
+        const categoriesRef = collection(db, 'productCategories');
         const qCategories = query(categoriesRef, where('companyId', '==', companyId));
         const categoriesSnap = await getDocs(qCategories);
         const categoriesData = categoriesSnap.docs
@@ -69,7 +69,7 @@ export default function PublicCompanyPage() {
         setCategories(categoriesData);
 
         // Fetch brands
-        const brandsRef = collection(db, 'brands');
+        const brandsRef = collection(db, 'productBrands');
         const qBrands = query(brandsRef, where('companyId', '==', companyId));
         const brandsSnap = await getDocs(qBrands);
         const brandsData = brandsSnap.docs

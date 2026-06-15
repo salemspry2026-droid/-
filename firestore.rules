@@ -304,13 +304,13 @@ service cloud.firestore {
     }
 
     match /productCategories/{categoryId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && isValidProductCategory(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidProductCategory(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
 
     match /productBrands/{brandId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && isValidProductBrand(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidProductBrand(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
