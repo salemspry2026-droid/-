@@ -23,7 +23,7 @@ export function NotificationsDialog({
   const [dbNotifications, setDbNotifications] = useState<any[]>([]);
   const [staleOrders, setStaleOrders] = useState<any[]>([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!open || !profile || !user?.uid) return;
 
@@ -116,7 +116,8 @@ export function NotificationsDialog({
   };
 
   // Combine and sort notifications
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+   
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const visibleDbNotifications = dbNotifications.filter(n => {
     if (n.remindAt && n.remindAt?.toDate) {

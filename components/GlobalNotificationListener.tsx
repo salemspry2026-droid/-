@@ -11,7 +11,7 @@ export function GlobalNotificationListener() {
   const initialLoadRef = useRef(true);
   const knownNotifIds = useRef<Set<string>>(new Set());
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!profile || !user?.uid) return;
 
