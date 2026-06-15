@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { useStore } from '@/lib/store';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -115,7 +116,7 @@ export function ProductsManager() {
           <div key={product.id} onClick={() => setSelectedProduct(product)} className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:border-blue-300 transition-colors ${product.inStock === false ? 'opacity-75' : ''}`}>
               <div className="w-20 h-20 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 overflow-hidden relative p-1">
               {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain pointer-events-none" />
+                <Image src={product.imageUrl} alt={product.name} fill className="object-contain pointer-events-none p-1" unoptimized referrerPolicy="no-referrer" />
               ) : (
                 <Package className="w-8 h-8 text-blue-300" />
               )}

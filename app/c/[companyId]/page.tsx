@@ -163,9 +163,6 @@ export default function PublicCompanyPage() {
     const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name;
     const isOffer = selectedProduct.specialOffer?.isActive;
     const finalPrice = isOffer ? selectedProduct.specialOffer.price : selectedProduct.price;
-    const bonusText = isOffer && selectedProduct.specialOffer.bonus ? selectedProduct.specialOffer.bonus 
-                      : (selectedProduct.bonusType === 'fixed' && selectedProduct.bonusFixedPercent ? `بونص ${selectedProduct.bonusFixedPercent}%` 
-                      : (!selectedProduct.bonusType && selectedProduct.bonus ? selectedProduct.bonus : null));
 
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300" dir="rtl">
@@ -266,22 +263,129 @@ export default function PublicCompanyPage() {
                 </div>
               )}
   
-              {bonusText && (
+              {selectedProduct.notes && (
                 <div>
-                  <h3 className="font-bold text-base text-gray-900 mb-3">عروض وخصومات</h3>
-                  <div className="flex items-center justify-between bg-gradient-to-l from-red-50 to-orange-50 p-4 rounded-xl border border-red-100 shadow-sm">
-                     <div className="flex flex-col">
-                        <span className="font-black text-red-700 text-lg">بونص خاص</span>
-                        <span className="text-sm font-bold text-orange-600 mt-1">
-                           {bonusText}
-                        </span>
-                     </div>
-                     <div className="w-14 h-14 bg-white/60 text-red-600 rounded-full flex items-center justify-center shadow-inner relative overflow-hidden">
-                        <Percent className="w-6 h-6 absolute" />
-                     </div>
-                  </div>
+                  <h3 className="font-bold text-base text-gray-900 mb-3">ملاحظات</h3>
+                  <p className="text-gray-600 leading-relaxed text-sm bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                    {selectedProduct.notes}
+                  </p>
                 </div>
               )}
+
+              {/* Expiry Dates */}
+              {selectedProduct.expiryDates && selectedProduct.expiryDates.length > 0 && (
+                <div>
+                   <h3 className="font-bold text-base text-gray-900 mb-3 flex items-center gap-2">
+                     <CheckCircle className="w-4 h-4 text-purple-600" />
+                     تواريخ الصلاحية
+                   </h3>
+                   <div className="flex flex-wrap gap-2 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                      {selectedProduct.expiryDates.map((d: string, i: number) => (
+                         <span key={i} className="bg-purple-50 text-purple-800 font-bold px-3 py-1.5 rounded-lg border border-purple-100 shadow-sm" dir="ltr">{d}</span>
+                      ))}
+                   </div>
+                </div>
+              )}
+
+              {/* Main Bonus Display */}
+              <div className="bg-gradient-to-br from-white to-purple-50/30 p-4 rounded-xl border border-purple-100 shadow-sm">
+                 <h3 className="font-bold text-base text-purple-900 mb-3 flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-purple-500" />
+                    عروض وبونص
+                 </h3>
+                 
+                 {isOffer && (
+                    <div className="mb-4 space-y-2 text-sm bg-red-50 p-4 rounded-xl border border-red-100">
+                       <h4 className="font-bold text-red-700 border-b border-red-200 pb-2 mb-2">عرض خاص نشط</h4>
+                       <div className="flex justify-between">
+                          <span className="text-red-900 font-bold">سعر العرض:</span>
+                          <span className="text-red-700 font-bold">{selectedProduct.specialOffer.price} {company.primaryCurrency || 'YER'}</span>
+                       </div>
+                       {selectedProduct.specialOffer.bonus && (
+                          <div className="flex justify-between">
+                             <span className="text-red-900 font-bold">بونص العرض:</span>
+                             <span className="text-orange-600 font-bold">{selectedProduct.specialOffer.bonus}</span>
+                          </div>
+                       )}
+                       {selectedProduct.specialOffer.targetExpiryDate && selectedProduct.specialOffer.targetExpiryDate !== 'any' && (
+                          <div className="flex justify-between">
+                             <span className="text-red-900 font-bold">يستهدف تاريخ:</span>
+                             <span dir="ltr" className="text-gray-700 font-medium">{selectedProduct.specialOffer.targetExpiryDate}</span>
+                          </div>
+                       )}
+                       {selectedProduct.specialOffer.condition === 'quantity' && selectedProduct.specialOffer.quantity && (
+                          <div className="flex justify-between">
+                             <span className="text-red-900 font-bold">كمية العرض المنشطة:</span>
+                             <span>{selectedProduct.specialOffer.quantity}</span>
+                          </div>
+                       )}
+                       {selectedProduct.specialOffer.condition === 'time' && selectedProduct.specialOffer.endDate && (
+                          <div className="flex justify-between text-red-600">
+                             <span className="font-bold">ينتهي في:</span>
+                             <span dir="ltr">{selectedProduct.specialOffer.endDate}</span>
+                          </div>
+                       )}
+                    </div>
+                 )}
+
+                 <div className="text-sm">
+                     {selectedProduct.bonusType === 'fixed' ? (
+                        <p className="font-bold text-gray-800 bg-white p-3 rounded-lg border border-gray-100">
+                          بونص ثابت نسبة: <span className="text-orange-600 font-black text-lg">{selectedProduct.bonusFixedPercent}%</span> من الكمية المطلوبة
+                        </p>
+                     ) : selectedProduct.bonusType === 'tiered' && selectedProduct.bonusTiers && selectedProduct.bonusTiers.length > 0 ? (
+                        <div className="space-y-2">
+                           <p className="font-bold text-gray-800 mb-1">بونص شرائح حسب الكمية (متدرج):</p>
+                           <div className="space-y-2">
+                              {selectedProduct.bonusTiers.map((tier: any, idx: number) => (
+                                 <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                    <div className="flex flex-wrap gap-1 text-gray-700 font-medium items-center">
+                                       <span className="bg-gray-100 px-2 py-1 rounded-md">من {tier.minQty}</span>
+                                       <span className="bg-gray-100 px-2 py-1 rounded-md">{tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'}</span>
+                                       {tier.invoiceType && tier.invoiceType !== 'all' && (
+                                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-[11px] font-bold">
+                                             ({tier.invoiceType === 'cash' ? 'للنقدي' : tier.invoiceType === 'credit' ? 'للآجل' : 'للنقدي المعلق'})
+                                          </span>
+                                       )}
+                                    </div>
+                                    <span className="font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-lg">◀ بونص {tier.percent}%</span>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+                     ) : (!isOffer && selectedProduct.bonus) ? (
+                         <p className="font-bold text-gray-800 bg-white p-3 rounded-lg border border-gray-100"><span className="text-purple-700">البونص الأساسي:</span> {selectedProduct.bonus}</p>
+                     ) : !isOffer ? (
+                         <p className="text-gray-500 italic">لا يوجد عروض خاصة أو بونص لهذا الصنف حالياً.</p>
+                     ) : null}
+                 </div>
+              </div>
+
+              {/* Sales Policies */}
+              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-4">
+                 <h3 className="font-bold text-indigo-900 border-b border-indigo-200 pb-2 text-base flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                    سياسات البيع المطبقة
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">
+                    <div className="bg-white p-3 rounded-xl border border-indigo-50 shadow-sm">
+                       <p className="font-bold text-gray-700 mb-1">طريقة الدفع المسموحة:</p>
+                       <p className="text-indigo-700 font-bold">
+                          {selectedProduct.invoiceTypeRestriction === 'all' || !selectedProduct.invoiceTypeRestriction ? 'مسموح بجميع الطرق (نقدي، آجل)' : ''}
+                          {selectedProduct.invoiceTypeRestriction === 'cash_only' ? 'نقدي فقط (غير مسموح بالآجل)' : ''}
+                          {selectedProduct.invoiceTypeRestriction === 'cash_or_pending' ? 'نقدي أو نقدي معلق (غير مسموح بالآجل)' : ''}
+                       </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-indigo-50 shadow-sm">
+                       <p className="font-bold text-gray-700 mb-1">قيود بيع العملة:</p>
+                       <p className="text-indigo-700 font-bold">
+                          {selectedProduct.currencyRestrictionType === 'any' || !selectedProduct.currencyRestrictionType ? 'مرونة البيع بأي عملة متوفرة' : ''}
+                          {selectedProduct.currencyRestrictionType === 'primary_only' ? `بواسطة العملة الأساسية للصنف فقط (${selectedProduct.currency})` : ''}
+                          {selectedProduct.currencyRestrictionType === 'specific' ? `يباع بعملات محددة فقط: ${selectedProduct.specificCurrencies?.join(' ، ')}` : ''}
+                       </p>
+                    </div>
+                 </div>
+              </div>
   
            </div>
         </div>
@@ -303,7 +407,7 @@ export default function PublicCompanyPage() {
         <div className="bg-gradient-to-br from-[#2E0B5B] to-[#4C1D95] text-white pt-10 pb-20 relative rounded-b-[40px] shadow-lg overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl opacity-50 pointer-events-none" />
           
-          <div className="container mx-auto max-w-lg relative z-10 px-4 text-center pb-4">
+          <div className="container mx-auto max-w-7xl relative z-10 px-4 text-center pb-4">
             <div className="w-24 h-24 mx-auto bg-white rounded-2xl shadow-2xl flex items-center justify-center p-2 mb-5 border-[3px] border-white/20 relative group">
                {company.logoUrl ? (
                   <Image src={company.logoUrl} alt="Logo" fill className="object-contain p-2 rounded-xl" unoptimized referrerPolicy="no-referrer" />
@@ -322,7 +426,7 @@ export default function PublicCompanyPage() {
         </div>
 
         {/* Stats Flow */}
-        <div className="container mx-auto max-w-lg px-4 -mt-10 relative z-20">
+        <div className="container mx-auto max-w-7xl px-4 -mt-10 relative z-20">
           <div className="bg-white rounded-2xl shadow-xl p-5 flex justify-between items-center text-center divide-x divide-x-reverse divide-gray-100 border border-purple-50/50 backdrop-blur-sm">
              <div className="flex-1">
                <div className="text-purple-700 font-black text-2xl mb-1">+{products.length}</div>
@@ -340,7 +444,7 @@ export default function PublicCompanyPage() {
         </div>
 
         {/* Contact Strip */}
-        <div className="container mx-auto max-w-lg px-4 mt-6">
+        <div className="container mx-auto max-w-7xl px-4 mt-6">
           <div className="flex justify-between items-center bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-sm">
             <div className="flex items-center gap-2 text-gray-600">
               <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
@@ -359,7 +463,7 @@ export default function PublicCompanyPage() {
         </div>
 
         {/* Search & Categories */}
-        <div className="container mx-auto max-w-lg px-4 mt-8 space-y-4">
+        <div className="container mx-auto max-w-7xl px-4 mt-8 space-y-4">
            <h2 className="text-lg font-black text-gray-900 mx-1">جميع الأصناف</h2>
            <div className="relative group">
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400 group-focus-within:text-purple-600 transition-colors" />
@@ -392,7 +496,7 @@ export default function PublicCompanyPage() {
         </div>
 
         {/* Product List */}
-        <div className="container mx-auto max-w-lg px-4 mt-6">
+        <div className="container mx-auto max-w-7xl px-4 mt-6">
           {filteredProducts.length === 0 ? (
              <div className="bg-white rounded-3xl p-10 text-center shadow-sm border border-gray-100 flex flex-col items-center justify-center">
                  <Package className="w-16 h-16 text-gray-200 mb-3" />
@@ -400,7 +504,7 @@ export default function PublicCompanyPage() {
                  <p className="text-sm text-gray-500">حاول البحث بكلمات أخرى أو تغيير التصنيف.</p>
              </div>
           ) : (
-            <div className="space-y-4 relative pb-28">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative pb-28">
                {filteredProducts.map(p => {
                  const isOffer = p.specialOffer?.isActive;
                  const bonusTxt = p.specialOffer?.isActive && p.specialOffer.bonus ? p.specialOffer.bonus : p.bonus;
@@ -475,9 +579,9 @@ export default function PublicCompanyPage() {
 
       {/* --- Printable PDF Price List (Hidden on Screen, Visible on Print) --- */}
       <div className="hidden print:block w-full bg-white text-black p-4" dir="rtl">
-        <div className="flex justify-between items-end border-b-4 border-purple-800 pb-4 mb-6">
+          <div className="flex justify-between items-end border-b-4 border-purple-800 pb-4 mb-6">
           <div className="flex items-center gap-4">
-             {company.logoUrl && <img src={company.logoUrl} alt="Logo" className="w-20 h-20 object-contain" />}
+             {company.logoUrl && <div className="w-20 h-20 relative shrink-0"><Image src={company.logoUrl} alt="Logo" fill className="object-contain" unoptimized referrerPolicy="no-referrer" /></div>}
              <div>
                <h1 className="text-3xl font-black text-purple-900 mb-1">{company.name}</h1>
                {company.companyType && <p className="text-sm font-bold text-gray-600">{company.companyType}</p>}
@@ -547,10 +651,10 @@ export default function PublicCompanyPage() {
                   <td className="p-3 text-center text-gray-500 font-bold">{idx + 1}</td>
                   <td className="p-3 font-bold flex items-center gap-3">
                     {p.imageUrl ? (
-                      <div className="w-10 h-10 border border-gray-100 rounded bg-white flex items-center justify-center p-1 shrink-0">
-                        <img src={p.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
+                      <div className="w-10 h-10 border border-gray-100 rounded bg-white relative flex shrink-0 p-1">
+                        <Image src={p.imageUrl} alt="" fill className="object-contain" unoptimized referrerPolicy="no-referrer" />
                       </div>
-                    ) : <Package className="w-8 h-8 text-gray-300" />}
+                    ) : <Package className="w-8 h-8 text-gray-300 shrink-0" />}
                     <span className="text-gray-900 text-base">{p.name}</span>
                   </td>
                   <td className="p-3 text-gray-600 font-medium text-xs">
