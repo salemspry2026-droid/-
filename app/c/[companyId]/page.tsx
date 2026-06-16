@@ -735,7 +735,15 @@ export default function PublicCompanyPage() {
                     {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
                   </td>
                   <td className="p-3 font-bold text-center">
-                    {/* Empty bonus field as requested */}
+                    {isOffer && p.specialOffer.bonus ? (
+                      <span className="text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded text-xs">{p.specialOffer.bonus}</span>
+                    ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
+                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-2 py-1 rounded text-xs">{p.bonusFixedPercent}% ثابت</span>
+                    ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
+                      <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded text-xs">حسب الشرائح</span>
+                    ) : p.bonus ? (
+                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-2 py-1 rounded text-xs">{p.bonus}</span>
+                    ) : '-'}
                   </td>
                   <td className="p-3 text-center">
                     {p.inStock !== false ? (
