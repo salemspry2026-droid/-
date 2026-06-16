@@ -364,6 +364,16 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                   عرض خاص
                 </div>
               )}
+              {product.isNewProduct && !isOffer && (
+                <div className="absolute top-2 right-2 bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  جديد
+                </div>
+              )}
+              {product.isLowStock && product.inStock !== false && (
+                <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  قارب الانتهاء
+                </div>
+              )}
               {product.inStock === false && (
                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                    <span className="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs">نفدت الكمية</span>

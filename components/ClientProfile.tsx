@@ -15,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, UserRound, Phone, MapPin, Store, Camera, Mail, FileText, Activity, BarChart3, Clock, DollarSign, Filter } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
+import { compressImage } from '@/lib/utils';
+
 export default function ClientProfile() {
   const { profile, user } = useStore();
   const [loading, setLoading] = useState(false);
@@ -229,8 +231,13 @@ export default function ClientProfile() {
 
     setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `clientLogos/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
+      const compressedBase64 = await compressImage(file, 400, 0.7);
+      // It returns base64 directly, no need for firebase storage since it's small! But users may want it in storage.
+      // Wait, we can just use the base64 URL directly instead of Firebase storage! It fits if it's small enough. But since they already use Firebase storage, I'll convert it back to blob.
+      const res = await fetch(compressedBase64);
+      const blob = await res.blob();
+      const storageRef = ref(storage, `clientLogos/${user.uid}/${Date.now()}_logo.jpg`);
+      await uploadBytes(storageRef, blob);
       const url = await getDownloadURL(storageRef);
       setFormData(prev => ({ ...prev, logoUrl: url }));
       toast.success('تم رفع الصورة بنجاح');

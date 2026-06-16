@@ -25,6 +25,7 @@ export default function PublicCompanyPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeBrand, setActiveBrand] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
   useEffect(() => {
@@ -120,14 +121,51 @@ export default function PublicCompanyPage() {
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             brandName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'all' || p.categoryId === activeCategory;
-      return matchesSearch && matchesCategory;
+      const matchesBrand = activeBrand === 'all' || p.brandId === activeBrand;
+      return matchesSearch && matchesCategory && matchesBrand;
     });
-  }, [products, searchQuery, activeCategory, categories, brands]);
+  }, [products, searchQuery, activeCategory, activeBrand, categories, brands]);
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#F0F2F5]">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+      <div className="min-h-[100dvh] bg-[#F0F2F5]" dir="rtl">
+        <div className="bg-gradient-to-br from-[#2E0B5B] to-[#4C1D95] pt-10 pb-20 rounded-b-[40px] shadow-lg relative overflow-hidden">
+          <div className="container mx-auto max-w-7xl px-4 text-center relative z-10">
+             <div className="w-24 h-24 mx-auto bg-white/20 rounded-2xl animate-pulse mb-5 shadow-2xl border-[3px] border-white/10"></div>
+             <div className="h-8 bg-white/20 rounded-md w-48 mx-auto mb-2 animate-pulse"></div>
+             <div className="h-4 bg-white/20 rounded-md w-32 mx-auto animate-pulse"></div>
+          </div>
+        </div>
+
+        <div className="container mx-auto max-w-7xl px-4 -mt-10 relative z-20">
+          <div className="bg-white rounded-2xl shadow-xl p-5 border border-purple-50 flex justify-between gap-4">
+             <div className="flex-1 bg-gray-100 rounded-md animate-pulse h-16"></div>
+             <div className="flex-1 bg-gray-100 rounded-md animate-pulse h-16"></div>
+             <div className="flex-1 bg-gray-100 rounded-md animate-pulse h-16"></div>
+          </div>
+        </div>
+
+        <div className="container mx-auto max-w-7xl px-4 mt-8 space-y-4 relative z-20">
+           <div className="h-14 bg-white rounded-2xl animate-pulse shadow-sm"></div>
+           <div className="flex gap-2 pb-2">
+             <div className="w-20 h-10 bg-gray-200 rounded-full animate-pulse shrink-0"></div>
+             <div className="w-24 h-10 bg-gray-200 rounded-full animate-pulse shrink-0"></div>
+             <div className="w-32 h-10 bg-gray-200 rounded-full animate-pulse shrink-0"></div>
+           </div>
+        </div>
+
+        <div className="container mx-auto max-w-7xl px-4 mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-16 relative z-20">
+           {[...Array(6)].map((_, i) => (
+             <div key={i} className="bg-white rounded-2xl p-4 animate-pulse shadow-sm border border-gray-100 flex gap-4">
+                <div className="w-24 h-24 bg-gray-200 rounded-xl shrink-0"></div>
+                <div className="flex-1 space-y-3 py-2">
+                   <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                   <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                   <div className="h-6 bg-gray-200 rounded w-1/2 mt-4"></div>
+                </div>
+             </div>
+           ))}
+        </div>
       </div>
     );
   }
@@ -391,8 +429,12 @@ export default function PublicCompanyPage() {
         </div>
         
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100">
-           <Button onClick={handleRegisterClick} className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold h-14 rounded-xl text-lg shadow-xl shadow-purple-900/20 transition-transform active:scale-95">
-              سجل الآن للطلب
+           <Button 
+             onClick={handleRegisterClick} 
+             disabled={selectedProduct.inStock === false}
+             className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold h-14 rounded-xl text-lg shadow-xl shadow-purple-900/20 transition-transform active:scale-95 disabled:opacity-50 disabled:bg-gray-400 disabled:shadow-none disabled:active:scale-100 disabled:cursor-not-allowed text-center"
+           >
+              {selectedProduct.inStock !== false ? 'سجل الآن للطلب' : 'غير متوفر حالياً لا يمكن تسجيل الطلب'}
            </Button>
         </div>
       </div>
@@ -493,6 +535,26 @@ export default function PublicCompanyPage() {
                </button>
              ))}
            </div>
+
+           {brands.length > 0 && (
+             <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none snap-x mt-2">
+               <button 
+                  onClick={() => setActiveBrand('all')} 
+                  className={cn("px-5 py-2 rounded-full whitespace-nowrap text-xs font-bold transition-all shadow-sm snap-start", activeBrand === 'all' ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50")}
+               >
+                 كل العلامات
+               </button>
+               {brands.map(brand => (
+                 <button 
+                    key={brand.id} 
+                    onClick={() => setActiveBrand(brand.id)} 
+                    className={cn("px-5 py-2 rounded-full whitespace-nowrap text-xs font-bold transition-all shadow-sm snap-start", activeBrand === brand.id ? "bg-indigo-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50")}
+                 >
+                   {brand.name}
+                 </button>
+               ))}
+             </div>
+           )}
         </div>
 
         {/* Product List */}
@@ -539,7 +601,15 @@ export default function PublicCompanyPage() {
                      {/* Content Right */}
                      <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
                        <h3 className="font-black text-gray-900 text-sm sm:text-base leading-tight mb-1 line-clamp-2 pr-4">{p.name}</h3>
-                       <div className="text-[11px] text-gray-500 font-bold mb-2 bg-gray-100 w-fit px-2 py-0.5 rounded-md">{p.unit || 'حبة'}</div>
+                       <div className="flex flex-wrap items-center gap-1 mb-2">
+                         <div className="text-[11px] text-gray-500 font-bold bg-gray-100 px-2 py-0.5 rounded-md">{p.unit || 'حبة'}</div>
+                         {p.isNewProduct && (
+                            <div className="text-[10px] text-purple-700 bg-purple-50 border border-purple-100 font-bold px-2 py-0.5 rounded-md">جديد</div>
+                         )}
+                         {p.isLowStock && (
+                            <div className="text-[10px] text-orange-700 bg-orange-50 border border-orange-100 font-bold px-2 py-0.5 rounded-md">قارب الانتهاء</div>
+                         )}
+                       </div>
                        
                        {bonusTxt && (
                           <div className="flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded mb-1.5 w-fit border border-red-100/50">
@@ -633,18 +703,19 @@ export default function PublicCompanyPage() {
             <tr className="bg-purple-900 text-white">
               <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl">م</th>
               <th className="p-3 border border-purple-900 font-bold">الصنف</th>
-              <th className="p-3 border border-purple-900 font-bold w-[25%]">الشكل / الماركة</th>
-              <th className="p-3 border border-purple-900 font-bold w-20 text-center">العبوة</th>
-              <th className="p-3 border border-purple-900 font-bold w-28 text-center bg-purple-800">السعر ({company.primaryCurrency || 'YER'})</th>
-              <th className="p-3 border border-purple-900 font-bold w-40 text-center">العرض / البونص</th>
+              <th className="p-3 border border-purple-900 font-bold w-[15%]">العلامة التجارية</th>
+              <th className="p-3 border border-purple-900 font-bold w-[15%]">الفئة</th>
+              <th className="p-3 border border-purple-900 font-bold w-16 text-center">العبوة</th>
+              <th className="p-3 border border-purple-900 font-bold w-24 text-center bg-purple-800">السعر ({company.primaryCurrency || 'YER'})</th>
+              <th className="p-3 border border-purple-900 font-bold w-32 text-center">البونص</th>
               <th className="p-3 border border-purple-900 font-bold w-20 text-center rounded-tl-xl">الحالة</th>
             </tr>
           </thead>
           <tbody>
-            {products.map((p, idx) => {
-              const brand = brands.find(b => b.id === p.brandId)?.name || '';
+            {filteredProducts.map((p, idx) => {
+              const brand = brands.find(b => b.id === p.brandId)?.name || '-';
+              const category = categories.find(c => c.id === p.categoryId)?.name || '-';
               const isOffer = p.specialOffer?.isActive;
-              const bonusText = isOffer && p.specialOffer.bonus ? p.specialOffer.bonus : (p.bonusType === 'fixed' && p.bonusFixedPercent ? `بونص ${p.bonusFixedPercent}%` : (!p.bonusType && p.bonus ? p.bonus : null));
               
               return (
                 <tr key={p.id} className="border-b border-gray-200 even:bg-purple-50/40 print:break-inside-avoid">
@@ -657,22 +728,20 @@ export default function PublicCompanyPage() {
                     ) : <Package className="w-8 h-8 text-gray-300 shrink-0" />}
                     <span className="text-gray-900 text-base">{p.name}</span>
                   </td>
-                  <td className="p-3 text-gray-600 font-medium text-xs">
-                    {brand && <div className="text-gray-900 font-bold">{brand}</div>}
-                    {p.categoryId && <div>{categories.find(c=>c.id===p.categoryId)?.name}</div>}
-                  </td>
+                  <td className="p-3 text-gray-800 font-bold text-xs">{brand}</td>
+                  <td className="p-3 text-gray-600 font-bold text-xs">{category}</td>
                   <td className="p-3 text-center text-gray-600 font-bold">{p.unit || 'حبة'}</td>
                   <td className="p-3 text-center font-black text-lg text-purple-900 bg-purple-50/20">
                     {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
                   </td>
                   <td className="p-3 font-bold text-center">
-                    {bonusText ? <span className="text-red-600 inline-flex items-center justify-center gap-1"><Gift className="w-3 h-3"/>{bonusText}</span> : <span className="text-gray-300">-</span>}
+                    {/* Empty bonus field as requested */}
                   </td>
                   <td className="p-3 text-center">
                     {p.inStock !== false ? (
                       <div className="inline-flex items-center justify-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-md text-[10px] font-black"><CheckCircle className="w-3 h-3"/>متوفر</div>
                     ) : (
-                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-2 py-1 rounded-md text-[10px] font-black">غير متوفر</div>
+                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-2 py-1 rounded-md text-[10px] font-black w-full">غير متوفر</div>
                     )}
                   </td>
                 </tr>
@@ -680,6 +749,11 @@ export default function PublicCompanyPage() {
             })}
           </tbody>
         </table>
+
+        {/* Branding Footer */}
+        <div className="mt-16 pt-8 border-t-2 border-gray-100 flex justify-center items-center text-gray-400">
+           <AppLogoText className="text-xl grayscale opacity-60" />
+        </div>
 
         {/* Footer Details */}
         <div className="flex items-stretch justify-between bg-purple-50 rounded-xl border border-purple-100 overflow-hidden mb-4 print:break-inside-avoid">

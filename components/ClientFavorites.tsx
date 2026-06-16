@@ -270,11 +270,31 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
                   <Heart className="w-5 h-5 fill-red-500" />
                 </button>
 
-                <div className="w-full aspect-square rounded-lg bg-gray-50 flex items-center justify-center mb-3">
+                <div className="w-full aspect-square rounded-lg bg-gray-50 flex items-center justify-center mb-3 relative overflow-hidden">
                   {product.imageUrl ? (
                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
                   ) : (
                     <Package className="w-10 h-10 text-gray-300" />
+                  )}
+                  {product.specialOffer?.isActive && (
+                    <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                      عرض خاص
+                    </div>
+                  )}
+                  {product.isNewProduct && !product.specialOffer?.isActive && (
+                    <div className="absolute top-2 right-2 bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                      جديد
+                    </div>
+                  )}
+                  {product.isLowStock && product.inStock !== false && (
+                    <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                      قارب الانتهاء
+                    </div>
+                  )}
+                  {product.inStock === false && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
+                       <span className="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs">نفدت الكمية</span>
+                    </div>
                   )}
                 </div>
                 

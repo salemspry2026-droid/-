@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc, arrayUnion, getDocs, writeBatch } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Sparkles, X, Gift, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
-import { handleFirestoreError, OperationType } from '@/lib/utils';
+import { handleFirestoreError, OperationType, compressImage } from '@/lib/utils';
 
 export function ProductFormDialog({ 
   children, 
@@ -42,6 +42,8 @@ export function ProductFormDialog({
     setNotes(p.notes || '');
     setExpiryDates(p.expiryDates || []);
     setInStock(p.inStock !== false);
+    setIsNewProduct(p.isNewProduct || false);
+    setIsLowStock(p.isLowStock || false);
     
     if (p.specialOffer?.isActive) {
         setHasSpecialOffer(true);
@@ -88,6 +90,8 @@ export function ProductFormDialog({
   const [expiryDates, setExpiryDates] = useState<string[]>([]);
   const [newExpiryDate, setNewExpiryDate] = useState('');
   const [inStock, setInStock] = useState(true);
+  const [isNewProduct, setIsNewProduct] = useState(false);
+  const [isLowStock, setIsLowStock] = useState(false);
 
   // Special Offer Fields
   const [hasSpecialOffer, setHasSpecialOffer] = useState(false);
@@ -131,7 +135,7 @@ export function ProductFormDialog({
     setInvoiceTypeRestriction('all'); setCurrencyRestrictionType('any'); setSpecificCurrencies([]);
     setBonusType('none'); setBonusFixedPercent(''); setBonusTiers([]);
     setImageUrl(''); setNewBrandName(''); setNewCategoryName(''); setNewUnitName(''); setNotes(''); setExpiryDates([]);
-    setNewExpiryDate(''); setInStock(true); setHasSpecialOffer(false); setOfferPrice('');
+    setNewExpiryDate(''); setInStock(true); setIsNewProduct(false); setIsLowStock(false); setHasSpecialOffer(false); setOfferPrice('');
     setOfferBonus(''); setOfferExpiryDate(''); setOfferQuantity(''); setOfferCondition('quantity'); setOfferEndDate('');
   };
 
@@ -214,6 +218,8 @@ export function ProductFormDialog({
         notes,
         expiryDates,
         inStock,
+        isNewProduct,
+        isLowStock,
         specialOffer: hasSpecialOffer ? {
           isActive: true,
           price: parseFloat(offerPrice) || 0,
@@ -234,7 +240,50 @@ export function ProductFormDialog({
       };
 
       if (productToEdit) {
+        const changes = [];
+        if (productToEdit.inStock === false && inStock === true) changes.push('أصبح متوفراً للطلب');
+        else if (productToEdit.inStock !== false && inStock === false) changes.push('نفدت كميته');
+        if (!productToEdit.isLowStock && isLowStock) changes.push('قاربت كميته على الانتهاء');
+        if (!productToEdit.isNewProduct && isNewProduct) changes.push('سجل كمنتج جديد');
+        if (!productToEdit.specialOffer?.isActive && hasSpecialOffer) changes.push('يحمل عرضاً خاصاً جديداً');
+
         await updateDoc(doc(db, 'products', productToEdit.id), productData);
+
+        if (changes.length > 0) {
+           try {
+             const profilesQ = query(collection(db, 'userProfiles'), 
+                where('companyId', '==', profile.companyId), 
+                where('role', '==', 'client'), 
+                where('favoriteProductIds', 'array-contains', productToEdit.id)
+             );
+             const snap = await getDocs(profilesQ);
+             if (!snap.empty) {
+                const batch = writeBatch(db);
+                snap.docs.forEach(d => {
+                  const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+                  const notifRef = doc(db, 'notifications', notifId);
+                  batch.set(notifRef, {
+                      companyId: profile.companyId,
+                      title: 'تحديث حالة صنف',
+                      message: `الصنف (${productToEdit.name}) الذي تفضله ${changes.join('، و ')}.`,
+                      type: 'product_update',
+                      orderId: productToEdit.id,
+                      clientUid: d.id,
+                      readBy: [],
+                      createdAt: serverTimestamp(),
+                      updatedAt: serverTimestamp(),
+                      createdBy: user.uid,
+                      updatedBy: user.uid,
+                      isDeleted: false
+                  });
+                });
+                await batch.commit();
+             }
+           } catch (notifErr) {
+             console.error("Failed to push notifications", notifErr);
+           }
+        }
+
         toast.success('تم تحديث الصنف بنجاح');
       } else {
         const productId = `prod_${Math.random().toString(36).substring(2, 11)}`;
@@ -308,14 +357,15 @@ export function ProductFormDialog({
                   type="file" 
                   accept="image/*" 
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setImageUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const compressedBase64 = await compressImage(file, 800, 0.7);
+                        setImageUrl(compressedBase64);
+                      } catch (err) {
+                        console.error('Failed to compress image', err);
+                      }
                     }
                   }}
                 />
@@ -409,11 +459,21 @@ export function ProductFormDialog({
 
               {/* In Stock & Expiry Dates */}
               <div className="space-y-4 col-span-2 bg-gray-50 p-4 rounded-xl border border-gray-200 mt-2">
-                <div className="flex items-center justify-between">
-                  <Label className="font-bold">حالة المخزون وتواريخ الصلاحية</Label>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" id="inStock" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                    <Label htmlFor="inStock" className="cursor-pointer">متوفر في المخزون (متاح للطلب)</Label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <Label className="font-bold">حالة المخزون والمؤشرات وتواريخ الصلاحية</Label>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="inStock" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+                      <Label htmlFor="inStock" className="cursor-pointer">متوفر (متاح)</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="isLowStock" checked={isLowStock} onChange={(e) => setIsLowStock(e.target.checked)} className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500" />
+                      <Label htmlFor="isLowStock" className="cursor-pointer text-orange-700">قارب على الانتهاء</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="isNewProduct" checked={isNewProduct} onChange={(e) => setIsNewProduct(e.target.checked)} className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500" />
+                      <Label htmlFor="isNewProduct" className="cursor-pointer text-purple-700">جديد</Label>
+                    </div>
                   </div>
                 </div>
                 

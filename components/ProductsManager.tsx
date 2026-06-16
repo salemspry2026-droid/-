@@ -142,6 +142,16 @@ export function ProductsManager() {
                   <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap", product.inStock !== false ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600")}>
                     {product.inStock !== false ? 'في المخزون' : 'نفدت الكمية'}
                   </span>
+                  {product.isLowStock && (
+                    <span className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">
+                      قارب الانتهاء
+                    </span>
+                  )}
+                  {product.isNewProduct && (
+                    <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">
+                      جديد
+                    </span>
+                  )}
                 </div>
               </div>
               
