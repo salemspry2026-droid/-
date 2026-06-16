@@ -113,15 +113,37 @@ export default function PublicCompanyPage() {
     router.push('/');
   };
 
+  const allCategories = useMemo(() => {
+    const cats = new Map();
+    categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
+    products.forEach(p => {
+      if (p.category && typeof p.category === 'string' && !cats.has(p.category)) {
+        cats.set(p.category, { id: p.category, name: p.category });
+      }
+    });
+    return Array.from(cats.values());
+  }, [categories, products]);
+
+  const allBrands = useMemo(() => {
+    const bMap = new Map();
+    brands.forEach(b => bMap.set(b.id, { id: b.id, name: b.name }));
+    products.forEach(p => {
+      if (p.brand && typeof p.brand === 'string' && !bMap.has(p.brand)) {
+         bMap.set(p.brand, { id: p.brand, name: p.brand });
+      }
+    });
+    return Array.from(bMap.values());
+  }, [brands, products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catName = categories.find(c => c.id === p.categoryId)?.name || '';
-      const brandName = brands.find(b => b.id === p.brandId)?.name || '';
+      const catName = p.category || categories.find(c => c.id === p.categoryId)?.name || '';
+      const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name || '';
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             brandName.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === 'all' || p.categoryId === activeCategory;
-      const matchesBrand = activeBrand === 'all' || p.brandId === activeBrand;
+      const matchesCategory = activeCategory === 'all' || p.categoryId === activeCategory || p.category === activeCategory;
+      const matchesBrand = activeBrand === 'all' || p.brandId === activeBrand || p.brand === activeBrand;
       return matchesSearch && matchesCategory && matchesBrand;
     });
   }, [products, searchQuery, activeCategory, activeBrand, categories, brands]);
@@ -525,7 +547,7 @@ export default function PublicCompanyPage() {
              >
                الكل
              </button>
-             {categories.map(cat => (
+             {allCategories.map((cat: any) => (
                <button 
                   key={cat.id} 
                   onClick={() => setActiveCategory(cat.id)} 
@@ -536,7 +558,7 @@ export default function PublicCompanyPage() {
              ))}
            </div>
 
-           {brands.length > 0 && (
+           {allBrands.length > 0 && (
              <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none snap-x mt-2">
                <button 
                   onClick={() => setActiveBrand('all')} 
@@ -544,7 +566,7 @@ export default function PublicCompanyPage() {
                >
                  كل العلامات
                </button>
-               {brands.map(brand => (
+               {allBrands.map((brand: any) => (
                  <button 
                     key={brand.id} 
                     onClick={() => setActiveBrand(brand.id)} 
@@ -571,8 +593,8 @@ export default function PublicCompanyPage() {
                  const isOffer = p.specialOffer?.isActive;
                  const hasDiscount = isOffer && p.price > p.specialOffer.price;
                  const discountPercent = hasDiscount ? Math.round(((p.price - p.specialOffer.price) / p.price) * 100) : 0;
-                 const brandName = brands.find(b => b.id === p.brandId)?.name;
-                 const categoryName = categories.find(c => c.id === p.categoryId)?.name;
+                 const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name;
+                 const categoryName = p.category || categories.find(c => c.id === p.categoryId)?.name;
 
                  return (
                   <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col gap-3 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
@@ -737,61 +759,61 @@ export default function PublicCompanyPage() {
         <table className="w-full text-right border-collapse mb-10 text-sm">
           <thead>
             <tr className="bg-purple-900 text-white">
-              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl">م</th>
-              <th className="p-3 border border-purple-900 font-bold">الصنف</th>
-              <th className="p-3 border border-purple-900 font-bold w-[15%]">العلامة التجارية</th>
-              <th className="p-3 border border-purple-900 font-bold w-[15%]">الفئة</th>
-              <th className="p-3 border border-purple-900 font-bold w-16 text-center">العبوة</th>
-              <th className="p-3 border border-purple-900 font-bold w-24 text-center bg-purple-800">السعر ({company.primaryCurrency || 'YER'})</th>
-              <th className="p-3 border border-purple-900 font-bold w-32 text-center">البونص</th>
-              <th className="p-3 border border-purple-900 font-bold w-20 text-center rounded-tl-xl">الحالة</th>
+              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-xs">م</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-xs">الصنف</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">العلامة التجارية</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">الفئة</th>
+              <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-xs">العبوة</th>
+              <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-xs">السعر ({company.primaryCurrency || 'YER'})</th>
+              <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-xs">البونص</th>
+              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:text-xs">الحالة</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.map((p, idx) => {
-              const brand = brands.find(b => b.id === p.brandId)?.name || '-';
-              const category = categories.find(c => c.id === p.categoryId)?.name || '-';
+              const brand = p.brand || brands.find(b => b.id === p.brandId)?.name || '-';
+              const category = p.category || categories.find(c => c.id === p.categoryId)?.name || '-';
               const isOffer = p.specialOffer?.isActive;
               
               return (
                 <tr key={p.id} className="border-b border-gray-200 even:bg-purple-50/40 print:break-inside-avoid">
-                  <td className="p-3 text-center text-gray-500 font-bold">{idx + 1}</td>
-                  <td className="p-3 font-bold flex items-center gap-3">
+                  <td className="p-2 print:p-1.5 text-center text-gray-500 font-bold print:text-[11px]">{idx + 1}</td>
+                  <td className="p-2 print:p-1.5 font-bold flex items-center gap-2 print:text-[11px]">
                     {p.imageUrl ? (
-                      <div className="w-10 h-10 border border-gray-100 rounded bg-white relative flex shrink-0 p-1">
+                      <div className="w-8 h-8 print:w-6 print:h-6 min-w-[24px] border border-gray-100 rounded bg-white relative flex shrink-0 p-0.5">
                         <Image src={p.imageUrl} alt="" fill className="object-contain" unoptimized referrerPolicy="no-referrer" />
                       </div>
-                    ) : <Package className="w-8 h-8 text-gray-300 shrink-0" />}
-                    <span className="text-gray-900 text-base">{p.name}</span>
+                    ) : <Package className="w-6 h-6 print:w-5 print:h-5 text-gray-300 shrink-0" />}
+                    <span className="text-gray-900">{p.name}</span>
                   </td>
-                  <td className="p-3 text-gray-800 font-bold text-xs">{brand}</td>
-                  <td className="p-3 text-gray-600 font-bold text-xs">{category}</td>
-                  <td className="p-3 text-center text-gray-600 font-bold">{p.unit || 'حبة'}</td>
-                  <td className="p-3 text-center font-black text-lg text-purple-900 bg-purple-50/20">
+                  <td className="p-2 print:p-1.5 text-gray-800 font-bold text-xs print:text-[11px]">{brand}</td>
+                  <td className="p-2 print:p-1.5 text-gray-600 font-bold text-xs print:text-[11px]">{category}</td>
+                  <td className="p-2 print:p-1.5 text-center text-gray-600 font-bold print:text-[11px]">{p.unit || 'حبة'}</td>
+                  <td className="p-2 print:p-1.5 text-center font-black text-base print:text-sm text-purple-900 bg-purple-50/20">
                     {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
                   </td>
-                  <td className="p-3 font-bold text-center">
+                  <td className="p-2 print:p-1.5 font-bold text-center">
                     {isOffer && p.specialOffer.bonus ? (
-                      <span className="text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded text-xs">{p.specialOffer.bonus}</span>
+                      <span className="text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.specialOffer.bonus}</span>
                     ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
-                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-2 py-1 rounded text-xs">{p.bonusFixedPercent}% ثابت</span>
+                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.bonusFixedPercent}% ثابت</span>
                     ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
-                      <div className="flex flex-col gap-1 items-center justify-center">
+                      <div className="flex flex-col gap-0.5 items-center justify-center">
                          {p.bonusTiers.map((tier: any, i: number) => (
-                           <div key={i} className="text-[10px] text-blue-800 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded whitespace-nowrap min-w-max">
-                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? `(${tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'معلق'})` : ''}: <span className="font-black text-orange-600">+{tier.percent}%</span>
+                           <div key={i} className="text-[10px] print:text-[9px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight whitespace-nowrap min-w-max">
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'}: <span className="font-black text-orange-600">+{tier.percent}%</span>
                            </div>
                          ))}
                       </div>
                     ) : p.bonus ? (
-                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-2 py-1 rounded text-xs">{p.bonus}</span>
+                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.bonus}</span>
                     ) : '-'}
                   </td>
-                  <td className="p-3 text-center">
+                  <td className="p-2 print:p-1.5 text-center">
                     {p.inStock !== false ? (
-                      <div className="inline-flex items-center justify-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-md text-[10px] font-black"><CheckCircle className="w-3 h-3"/>متوفر</div>
+                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 print:bg-transparent px-2 py-1 rounded-md text-[10px] print:text-[10px] font-black min-w-[50px]"><CheckCircle className="w-3 h-3 ml-0.5 print:hidden"/>متوفر</div>
                     ) : (
-                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-2 py-1 rounded-md text-[10px] font-black w-full">غير متوفر</div>
+                      <div className="inline-flex justify-center text-red-500 bg-red-50 print:bg-transparent px-2 py-1 rounded-md text-[10px] print:text-[10px] font-black min-w-[50px]">غير متوفر</div>
                     )}
                   </td>
                 </tr>
