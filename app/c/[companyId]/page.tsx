@@ -569,12 +569,13 @@ export default function PublicCompanyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative pb-28">
                {filteredProducts.map(p => {
                  const isOffer = p.specialOffer?.isActive;
-                 const bonusTxt = p.specialOffer?.isActive && p.specialOffer.bonus ? p.specialOffer.bonus : p.bonus;
                  const hasDiscount = isOffer && p.price > p.specialOffer.price;
                  const discountPercent = hasDiscount ? Math.round(((p.price - p.specialOffer.price) / p.price) * 100) : 0;
+                 const brandName = brands.find(b => b.id === p.brandId)?.name;
+                 const categoryName = categories.find(c => c.id === p.categoryId)?.name;
 
                  return (
-                  <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex gap-4 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
+                  <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col gap-3 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
                      {/* Floating % badge for discount */}
                      {hasDiscount && (
                        <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-bl-lg z-10 shadow-sm">
@@ -582,51 +583,86 @@ export default function PublicCompanyPage() {
                        </div>
                      )}
 
-                     {/* Image Left */}
-                     <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 bg-gray-50/80 rounded-xl overflow-hidden flex items-center justify-center p-2 border border-gray-100 group-hover:bg-purple-50/30 transition-colors">
-                        {p.inStock !== false ? (
-                          <div className="absolute top-1.5 left-1.5 bg-green-50 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-green-100 flex items-center gap-1 z-10 shadow-sm">
-                             متوفر <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                          </div>
-                        ) : (
-                          <div className="absolute top-1.5 left-1.5 bg-red-50 text-red-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-100 z-10 shadow-sm">
-                             غير متوفر
-                          </div>
-                        )}
-                        {p.imageUrl ? (
-                          <Image src={p.imageUrl} alt={p.name} fill className="object-contain p-2 mix-blend-multiply" unoptimized referrerPolicy="no-referrer" />
-                        ) : <Package className="w-8 h-8 text-purple-200" />}
+                     <div className="flex gap-4">
+                       {/* Image Left */}
+                       <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 bg-gray-50/80 rounded-xl overflow-hidden flex items-center justify-center p-2 border border-gray-100 group-hover:bg-purple-50/30 transition-colors">
+                          {p.inStock !== false ? (
+                            <div className="absolute top-1.5 left-1.5 bg-green-50 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-green-100 flex items-center gap-1 z-10 shadow-sm">
+                               متوفر <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                            </div>
+                          ) : (
+                            <div className="absolute top-1.5 left-1.5 bg-red-50 text-red-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-100 z-10 shadow-sm">
+                               غير متوفر
+                            </div>
+                          )}
+                          {p.imageUrl ? (
+                            <Image src={p.imageUrl} alt={p.name} fill className="object-contain p-2 mix-blend-multiply" unoptimized referrerPolicy="no-referrer" />
+                          ) : <Package className="w-8 h-8 text-purple-200" />}
+                       </div>
+
+                       {/* Content Right */}
+                       <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
+                         <h3 className="font-black text-gray-900 text-sm sm:text-base leading-tight mb-1 line-clamp-2 pr-4">{p.name}</h3>
+                         <div className="flex flex-wrap items-center gap-1 mb-2">
+                           <div className="text-[11px] text-gray-500 font-bold bg-gray-100 px-2 py-0.5 rounded-md">{p.unit || 'حبة'}</div>
+                           {categoryName && (
+                              <div className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[80px]">{categoryName}</div>
+                           )}
+                           {brandName && (
+                              <div className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[80px]">{brandName}</div>
+                           )}
+                           {p.isNewProduct && (
+                              <div className="text-[10px] text-purple-700 bg-purple-50 border border-purple-100 font-bold px-2 py-0.5 rounded-md">جديد</div>
+                           )}
+                           {p.isLowStock && (
+                              <div className="text-[10px] text-orange-700 bg-orange-50 border border-orange-100 font-bold px-2 py-0.5 rounded-md">قارب</div>
+                           )}
+                         </div>
+                         
+                         <div className="mt-auto flex items-end gap-2">
+                            <span className="font-black text-purple-700 text-lg sm:text-xl leading-none">
+                              {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] sm:text-xs text-gray-500 font-black mb-0.5">{company.primaryCurrency || 'YER'}</span>
+                            
+                            {hasDiscount && (
+                              <span className="text-[11px] text-gray-400 line-through mb-0.5 font-bold">{p.price}</span>
+                            )}
+                         </div>
+                       </div>
                      </div>
 
-                     {/* Content Right */}
-                     <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
-                       <h3 className="font-black text-gray-900 text-sm sm:text-base leading-tight mb-1 line-clamp-2 pr-4">{p.name}</h3>
-                       <div className="flex flex-wrap items-center gap-1 mb-2">
-                         <div className="text-[11px] text-gray-500 font-bold bg-gray-100 px-2 py-0.5 rounded-md">{p.unit || 'حبة'}</div>
-                         {p.isNewProduct && (
-                            <div className="text-[10px] text-purple-700 bg-purple-50 border border-purple-100 font-bold px-2 py-0.5 rounded-md">جديد</div>
-                         )}
-                         {p.isLowStock && (
-                            <div className="text-[10px] text-orange-700 bg-orange-50 border border-orange-100 font-bold px-2 py-0.5 rounded-md">قارب الانتهاء</div>
-                         )}
-                       </div>
-                       
-                       {bonusTxt && (
-                          <div className="flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded mb-1.5 w-fit border border-red-100/50">
-                            <Gift className="w-3 h-3" /> بونص {typeof bonusTxt === 'string' && bonusTxt.length > 15 ? 'متاح' : bonusTxt}
-                          </div>
-                       )}
-
-                       <div className="mt-auto flex items-end gap-2">
-                          <span className="font-black text-purple-700 text-lg sm:text-xl leading-none">
-                            {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
-                          </span>
-                          <span className="text-[10px] sm:text-xs text-gray-500 font-black mb-0.5">{company.primaryCurrency || 'YER'}</span>
-                          
-                          {hasDiscount && (
-                            <span className="text-[11px] text-gray-400 line-through mb-0.5 font-bold">{p.price}</span>
-                          )}
-                       </div>
+                     {/* Bonus Box */}
+                     <div className="mt-2 bg-gray-50/80 rounded-xl p-2 border border-gray-100/80">
+                        {isOffer && p.specialOffer.bonus ? (
+                           <div className="flex items-center gap-1 text-[11px] font-black text-red-600 bg-red-50/80 px-2 py-1 rounded w-fit border border-red-100/50">
+                             <Gift className="w-3.5 h-3.5" /> بونص العرض: {p.specialOffer.bonus}
+                           </div>
+                        ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
+                           <div className="flex items-center gap-1 text-[11px] font-black text-orange-600 bg-orange-50/80 px-2 py-1 rounded w-fit border border-orange-100/50">
+                             <Gift className="w-3.5 h-3.5" /> بونص ثابت: {p.bonusFixedPercent}%
+                           </div>
+                        ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
+                           <div className="flex flex-col gap-1.5">
+                             <div className="flex items-center gap-1 text-[11px] font-bold text-gray-700">
+                               <Gift className="w-3.5 h-3.5 text-blue-500" /> بونص حسب الكمية:
+                             </div>
+                             <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                                {p.bonusTiers.map((tier: any, i: number) => (
+                                   <div key={i} className="flex flex-col bg-white border border-blue-100 rounded-md py-1 px-2 shrink-0 shadow-sm min-w-[70px] text-center">
+                                      <span className="text-[9px] text-gray-500 font-bold">من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : '+'}</span>
+                                      <span className="text-[11px] font-black text-blue-700">+{tier.percent}%</span>
+                                   </div>
+                                ))}
+                             </div>
+                           </div>
+                        ) : p.bonus ? (
+                           <div className="flex items-center gap-1 text-[11px] font-black text-purple-600 bg-purple-50/80 px-2 py-1 rounded w-fit border border-purple-100/50">
+                             <Gift className="w-3.5 h-3.5" /> بونص {typeof p.bonus === 'string' && p.bonus.length > 25 ? 'متاح' : p.bonus}
+                           </div>
+                        ) : (
+                           <div className="text-[11px] text-gray-400 font-bold italic px-1">بدون بونص</div>
+                        )}
                      </div>
                   </div>
                  )
@@ -740,7 +776,13 @@ export default function PublicCompanyPage() {
                     ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
                       <span className="text-orange-600 bg-orange-50 border border-orange-100 px-2 py-1 rounded text-xs">{p.bonusFixedPercent}% ثابت</span>
                     ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
-                      <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded text-xs">حسب الشرائح</span>
+                      <div className="flex flex-col gap-1 items-center justify-center">
+                         {p.bonusTiers.map((tier: any, i: number) => (
+                           <div key={i} className="text-[10px] text-blue-800 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded whitespace-nowrap min-w-max">
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? `(${tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'معلق'})` : ''}: <span className="font-black text-orange-600">+{tier.percent}%</span>
+                           </div>
+                         ))}
+                      </div>
                     ) : p.bonus ? (
                       <span className="text-purple-600 bg-purple-50 border border-purple-100 px-2 py-1 rounded text-xs">{p.bonus}</span>
                     ) : '-'}
