@@ -117,28 +117,38 @@ export default function PublicCompanyPage() {
     const cats = new Map();
     categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
     products.forEach(p => {
+      if (p.categoryId && typeof p.categoryId === 'string' && !cats.has(p.categoryId)) {
+        cats.set(p.categoryId, { id: p.categoryId, name: p.categoryId });
+      }
       if (p.category && typeof p.category === 'string' && !cats.has(p.category)) {
         cats.set(p.category, { id: p.category, name: p.category });
       }
     });
-    return Array.from(cats.values());
+
+    const usedCatIds = new Set(products.flatMap(p => [p.categoryId, p.category]).filter(Boolean));
+    return Array.from(cats.values()).filter((c: any) => usedCatIds.has(c.id));
   }, [categories, products]);
 
   const allBrands = useMemo(() => {
     const bMap = new Map();
     brands.forEach(b => bMap.set(b.id, { id: b.id, name: b.name }));
     products.forEach(p => {
+      if (p.brandId && typeof p.brandId === 'string' && !bMap.has(p.brandId)) {
+        bMap.set(p.brandId, { id: p.brandId, name: p.brandId });
+      }
       if (p.brand && typeof p.brand === 'string' && !bMap.has(p.brand)) {
          bMap.set(p.brand, { id: p.brand, name: p.brand });
       }
     });
-    return Array.from(bMap.values());
+
+    const usedBrandIds = new Set(products.flatMap(p => [p.brandId, p.brand]).filter(Boolean));
+    return Array.from(bMap.values()).filter((b: any) => usedBrandIds.has(b.id));
   }, [brands, products]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catName = p.category || categories.find(c => c.id === p.categoryId)?.name || '';
-      const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name || '';
+      const catName = p.category || categories.find(c => c.id === p.categoryId)?.name || p.categoryId || '';
+      const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name || p.brandId || '';
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             p.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -781,8 +791,8 @@ export default function PublicCompanyPage() {
           </thead>
           <tbody>
             {filteredProducts.map((p, idx) => {
-              const brand = p.brand || brands.find(b => b.id === p.brandId)?.name || '-';
-              const category = p.category || categories.find(c => c.id === p.categoryId)?.name || '-';
+              const brand = p.brand || brands.find(b => b.id === p.brandId)?.name || p.brandId || '-';
+              const category = p.category || categories.find(c => c.id === p.categoryId)?.name || p.categoryId || '-';
               const isOffer = p.specialOffer?.isActive;
               
               return (

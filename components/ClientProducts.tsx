@@ -222,19 +222,30 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   };
 
   const activeCategoriesList = useMemo(() => {
-    const usedCatIds = new Set(products.map(p => p.categoryId).filter(Boolean));
-    return [{ id: 'all', name: 'الكل' }, ...categories.filter(c => usedCatIds.has(c.id))];
+    const cats = new Map();
+    categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
+    products.forEach(p => {
+      if (p.categoryId && typeof p.categoryId === 'string' && !cats.has(p.categoryId)) {
+        cats.set(p.categoryId, { id: p.categoryId, name: p.categoryId });
+      }
+      if (p.category && typeof p.category === 'string' && !cats.has(p.category)) {
+        cats.set(p.category, { id: p.category, name: p.category });
+      }
+    });
+
+    const usedCatIds = new Set(products.flatMap(p => [p.categoryId, p.category]).filter(Boolean));
+    return [{ id: 'all', name: 'الكل' }, ...Array.from(cats.values()).filter((c: any) => usedCatIds.has(c.id))];
   }, [products, categories]);
 
   const filteredProducts = products.flatMap(product => {
-    const catName = categories.find(c => c.id === product.categoryId)?.name || '';
-    const brandName = brands.find(b => b.id === product.brandId)?.name || '';
+    const catName = product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || '';
+    const brandName = product.brand || brands.find(b => b.id === product.brandId)?.name || product.brandId || '';
 
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           brandName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory;
+    const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory || product.category === activeCategory;
     
     if (!matchesSearch || !matchesCategory) return [];
 
@@ -383,7 +394,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             </div>
             
             <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-1">{categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}</p>
+              <p className="text-xs text-gray-500 mb-1">{product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || 'بدون تصنيف'}</p>
               <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{product.name} {isOffer ? '(عرض)' : ''}</h3>
               {product.scientificName && (
                 <p className="text-[11px] text-gray-500 italic mb-2 truncate">{product.scientificName}</p>

@@ -135,8 +135,8 @@ export function ProductsManager() {
                       <p className="text-[11px] italic text-gray-500 mt-0.5">{product.scientificName}</p>
                   )}
                   <p className="text-sm text-gray-500 mt-1">
-                    {categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}
-                    {product.brandId && ` • ${brands.find(b => b.id === product.brandId)?.name || ''}`}
+                    {product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || 'بدون تصنيف'}
+                    {(product.brandId || product.brand) && ` • ${product.brand || brands.find(b => b.id === product.brandId)?.name || product.brandId || ''}`}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
