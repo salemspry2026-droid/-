@@ -306,6 +306,9 @@ export function ProductDetailsDialog({
               <div className="flex-1 space-y-3">
                  <div>
                     <h3 className="text-xl font-bold text-gray-900">{product.name}</h3>
+                    {product.scientificName && (
+                        <p className="text-sm italic text-gray-600 mb-1">{product.scientificName}</p>
+                    )}
                     <p className="text-gray-500">
                       {categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'} 
                       {product.brandId && ` • ${brands.find(b => b.id === product.brandId)?.name || ''}`}

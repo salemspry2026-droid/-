@@ -231,6 +231,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     const brandName = brands.find(b => b.id === product.brandId)?.name || '';
 
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           brandName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory;
@@ -383,7 +384,10 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             
             <div className="flex-1">
               <p className="text-xs text-gray-500 mb-1">{categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}</p>
-              <h3 className="font-bold text-gray-900 text-sm leading-tight mb-2 line-clamp-2">{product.name} {isOffer ? '(عرض)' : ''}</h3>
+              <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{product.name} {isOffer ? '(عرض)' : ''}</h3>
+              {product.scientificName && (
+                <p className="text-[11px] text-gray-500 italic mb-2 truncate">{product.scientificName}</p>
+              )}
               
               {isOffer && product.specialOffer?.bonus && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded mb-2 w-fit">

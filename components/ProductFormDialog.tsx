@@ -32,6 +32,7 @@ export function ProductFormDialog({
   
   const populateForm = (p: any) => {
     setName(p.name || '');
+    setScientificName(p.scientificName || '');
     setPrice(p.price?.toString() || '');
     setCurrency(p.currency || '');
     setDescription(p.description || '');
@@ -72,8 +73,9 @@ export function ProductFormDialog({
   const [companyCategories, setCompanyCategories] = useState<any[]>([]);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
 
-  // Form Basic Info
+  // Basic Info Fields
   const [name, setName] = useState('');
+  const [scientificName, setScientificName] = useState('');
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('');
   const [description, setDescription] = useState('');
@@ -131,7 +133,7 @@ export function ProductFormDialog({
   }, [open, profile?.companyId]);
 
   const resetForm = () => {
-    setName(''); setPrice(''); setDescription(''); setCategoryId('none'); setUnit('كرتون'); setBrandId('none');
+    setName(''); setScientificName(''); setPrice(''); setDescription(''); setCategoryId('none'); setUnit('كرتون'); setBrandId('none');
     setInvoiceTypeRestriction('all'); setCurrencyRestrictionType('any'); setSpecificCurrencies([]);
     setBonusType('none'); setBonusFixedPercent(''); setBonusTiers([]);
     setImageUrl(''); setNewBrandName(''); setNewCategoryName(''); setNewUnitName(''); setNotes(''); setExpiryDates([]);
@@ -208,6 +210,7 @@ export function ProductFormDialog({
 
       const productData: any = {
         name,
+        scientificName,
         description,
         price: parseFloat(price),
         currency: currency || companyDetails?.primaryCurrency || 'SAR',
@@ -381,6 +384,10 @@ export function ProductFormDialog({
               <div className="space-y-2 col-span-2 md:col-span-1">
                 <Label>اسم الصنف *</Label>
                 <Input value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2 col-span-2 md:col-span-1">
+                <Label>الاسم العلمي (اختياري)</Label>
+                <Input value={scientificName} onChange={e => setScientificName(e.target.value)} placeholder="مثال: Paracetamol 500mg" />
               </div>
               <div className="space-y-2 col-span-2 md:col-span-1">
                 <Label>السعر الافتراضي *</Label>

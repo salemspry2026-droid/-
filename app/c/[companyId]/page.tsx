@@ -140,6 +140,7 @@ export default function PublicCompanyPage() {
       const catName = p.category || categories.find(c => c.id === p.categoryId)?.name || '';
       const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name || '';
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            p.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             brandName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'all' || p.categoryId === activeCategory || p.category === activeCategory;
@@ -625,6 +626,9 @@ export default function PublicCompanyPage() {
                        {/* Content Right */}
                        <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
                          <h3 className="font-black text-gray-900 text-sm sm:text-base leading-tight mb-1 line-clamp-2 pr-4">{p.name}</h3>
+                         {p.scientificName && (
+                           <div className="text-[11px] text-gray-500 italic mb-1.5">{p.scientificName}</div>
+                         )}
                          <div className="flex flex-wrap items-center gap-1 mb-2">
                            <div className="text-[11px] text-gray-500 font-bold bg-gray-100 px-2 py-0.5 rounded-md">{p.unit || 'حبة'}</div>
                            {categoryName && (
@@ -766,6 +770,7 @@ export default function PublicCompanyPage() {
             <tr className="bg-purple-900 text-white">
               <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-xs">م</th>
               <th className="p-3 border border-purple-900 font-bold print:text-xs">الصنف</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-xs">الاسم العلمي</th>
               <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">العلامة التجارية</th>
               <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">الفئة</th>
               <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-xs">العبوة</th>
@@ -791,6 +796,7 @@ export default function PublicCompanyPage() {
                     ) : <Package className="w-6 h-6 print:w-5 print:h-5 text-gray-300 shrink-0" />}
                     <span className="text-gray-900">{p.name}</span>
                   </td>
+                  <td className="p-2 print:p-1.5 text-gray-600 italic text-xs print:text-[11px] font-medium">{p.scientificName || '-'}</td>
                   <td className="p-2 print:p-1.5 text-gray-800 font-bold text-xs print:text-[11px]">{brand}</td>
                   <td className="p-2 print:p-1.5 text-gray-600 font-bold text-xs print:text-[11px]">{category}</td>
                   <td className="p-2 print:p-1.5 text-center text-gray-600 font-bold print:text-[11px]">{p.unit || 'حبة'}</td>

@@ -58,6 +58,7 @@ export function ProductsManager() {
     const brandName = brands.find(b => b.id === product.brandId)?.name || '';
     
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           brandName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategoryId === 'all' || product.categoryId === activeCategoryId;
@@ -130,6 +131,9 @@ export function ProductsManager() {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg leading-tight">{product.name}</h3>
+                  {product.scientificName && (
+                      <p className="text-[11px] italic text-gray-500 mt-0.5">{product.scientificName}</p>
+                  )}
                   <p className="text-sm text-gray-500 mt-1">
                     {categories.find(c => c.id === product.categoryId)?.name || 'بدون تصنيف'}
                     {product.brandId && ` • ${brands.find(b => b.id === product.brandId)?.name || ''}`}
