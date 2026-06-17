@@ -673,6 +673,11 @@ export default function PublicCompanyPage() {
                                 {p.bonusTiers.map((tier: any, i: number) => (
                                    <div key={i} className="flex flex-col bg-white border border-blue-100 rounded-md py-1 px-2 shrink-0 shadow-sm min-w-[70px] text-center">
                                       <span className="text-[9px] text-gray-500 font-bold">من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : '+'}</span>
+                                      {tier.invoiceType && tier.invoiceType !== 'all' && (
+                                         <span className="text-[8px] text-blue-500 font-bold bg-blue-50 rounded px-1 my-0.5 max-w-full truncate">
+                                            {tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي/معلق'}
+                                         </span>
+                                      )}
                                       <span className="text-[11px] font-black text-blue-700">+{tier.percent}%</span>
                                    </div>
                                 ))}
@@ -801,7 +806,7 @@ export default function PublicCompanyPage() {
                       <div className="flex flex-col gap-0.5 items-center justify-center">
                          {p.bonusTiers.map((tier: any, i: number) => (
                            <div key={i} className="text-[10px] print:text-[9px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight whitespace-nowrap min-w-max">
-                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'}: <span className="font-black text-orange-600">+{tier.percent}%</span>
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[8px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600">+{tier.percent}%</span>
                            </div>
                          ))}
                       </div>
