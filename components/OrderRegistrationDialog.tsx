@@ -82,16 +82,16 @@ export function OrderRegistrationDialog({
     if (!open || !profile?.companyId) return;
 
     setLoading(true);
-    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', profile.companyId));
+    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
+    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId));
 
-    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
-    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
-    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(e));
+    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)), e => console.error(e));
+    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(p => !p.isDeleted)), e => console.error(e));
+    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)), e => console.error(e));
     const unsubStages = onSnapshot(qStages, (snap) => {
-        const sortedStages = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index);
+        const sortedStages = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index);
         setOrderStages(sortedStages);
     }, e => console.error(e));
     const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {

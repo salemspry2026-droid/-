@@ -378,11 +378,11 @@ function ProductMetadataManager({ companyId, userId }: { companyId: string, user
   const [newBrand, setNewBrand] = useState('');
 
   useEffect(() => {
-    const qCat = query(collection(db, 'productCategories'), where('companyId', '==', companyId), where('isDeleted', '==', false));
-    const unsubCat = onSnapshot(qCat, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const qCat = query(collection(db, 'productCategories'), where('companyId', '==', companyId));
+    const unsubCat = onSnapshot(qCat, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)));
 
-    const qBrand = query(collection(db, 'productBrands'), where('companyId', '==', companyId), where('isDeleted', '==', false));
-    const unsubBrand = onSnapshot(qBrand, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const qBrand = query(collection(db, 'productBrands'), where('companyId', '==', companyId));
+    const unsubBrand = onSnapshot(qBrand, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)));
 
     return () => { unsubCat(); unsubBrand(); };
   }, [companyId]);
@@ -452,9 +452,9 @@ function OrderStagesManager({ companyId, userId }: { companyId: string, userId: 
   const [allowedRoles, setAllowedRoles] = useState<string[]>(['owner', 'admin']);
 
   useEffect(() => {
-    const q = query(collection(db, 'orderStages'), where('companyId', '==', companyId), where('isDeleted', '==', false));
+    const q = query(collection(db, 'orderStages'), where('companyId', '==', companyId));
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index);
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index);
       setStages(docs);
     });
     return () => unsub();

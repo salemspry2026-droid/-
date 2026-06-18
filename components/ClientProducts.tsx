@@ -76,9 +76,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       where('isActive', '==', true),
       where('isDeleted', '==', false)
     );
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
-    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', clientSelectedCompany.id), where('isDeleted', '==', false));
+    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', clientSelectedCompany.id));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', clientSelectedCompany.id));
+    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', clientSelectedCompany.id));
 
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -86,9 +86,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))), e => console.error(e));
-    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(c => !c.isDeleted)), e => console.error(e));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(b => !b.isDeleted)), e => console.error(e));
+    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); unsubStages(); };
   }, [clientSelectedCompany?.id]);
@@ -238,8 +238,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
   }, [products, categories]);
 
   const filteredProducts = products.flatMap(product => {
-    const catName = product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || '';
-    const brandName = product.brand || brands.find(b => b.id === product.brandId)?.name || product.brandId || '';
+    const catName = categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : '');
+    const brandName = brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '');
 
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -394,7 +394,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             </div>
             
             <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-1">{product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || 'بدون تصنيف'}</p>
+              <p className="text-xs text-gray-500 mb-1">{categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : 'بدون تصنيف')}</p>
               <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{product.name} {isOffer ? '(عرض)' : ''}</h3>
               {product.scientificName && (
                 <p className="text-[11px] text-gray-500 italic mb-2 truncate">{product.scientificName}</p>

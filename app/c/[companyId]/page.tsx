@@ -147,8 +147,8 @@ export default function PublicCompanyPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catName = p.category || categories.find(c => c.id === p.categoryId)?.name || p.categoryId || '';
-      const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name || p.brandId || '';
+      const catName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : '');
+      const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : '');
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             p.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -230,8 +230,8 @@ export default function PublicCompanyPage() {
 
   // --- Render Product Details Sheet (Overlay) ---
   if (selectedProduct) {
-    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name;
-    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name;
+    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name || (selectedProduct.brand && !selectedProduct.brand.startsWith('brand_') && selectedProduct.brand !== 'none' ? selectedProduct.brand : undefined);
+    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name || (selectedProduct.category && !selectedProduct.category.startsWith('cat_') && selectedProduct.category !== 'none' ? selectedProduct.category : undefined);
     const isOffer = selectedProduct.specialOffer?.isActive;
     const finalPrice = isOffer ? selectedProduct.specialOffer.price : selectedProduct.price;
 
@@ -604,8 +604,8 @@ export default function PublicCompanyPage() {
                  const isOffer = p.specialOffer?.isActive;
                  const hasDiscount = isOffer && p.price > p.specialOffer.price;
                  const discountPercent = hasDiscount ? Math.round(((p.price - p.specialOffer.price) / p.price) * 100) : 0;
-                 const brandName = p.brand || brands.find(b => b.id === p.brandId)?.name;
-                 const categoryName = p.category || categories.find(c => c.id === p.categoryId)?.name;
+                 const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : undefined);
+                 const categoryName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : undefined);
 
                  return (
                   <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col gap-3 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
@@ -791,8 +791,8 @@ export default function PublicCompanyPage() {
           </thead>
           <tbody>
             {filteredProducts.map((p, idx) => {
-              const brand = p.brand || brands.find(b => b.id === p.brandId)?.name || p.brandId || '-';
-              const category = p.category || categories.find(c => c.id === p.categoryId)?.name || p.categoryId || '-';
+              const brand = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : '-');
+              const category = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : '-');
               const isOffer = p.specialOffer?.isActive;
               
               return (
@@ -821,8 +821,8 @@ export default function PublicCompanyPage() {
                     ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
                       <div className="flex flex-col gap-0.5 items-center justify-center">
                          {p.bonusTiers.map((tier: any, i: number) => (
-                           <div key={i} className="text-[10px] print:text-[9px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight whitespace-nowrap min-w-max">
-                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[8px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600">+{tier.percent}%</span>
+                           <div key={i} className="text-[10px] print:text-[9px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight whitespace-nowrap min-w-max" dir="rtl">
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[8px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600 mr-1" dir="ltr">+{tier.percent}%</span>
                            </div>
                          ))}
                       </div>

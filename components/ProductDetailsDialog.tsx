@@ -310,8 +310,8 @@ export function ProductDetailsDialog({
                         <p className="text-sm italic text-gray-600 mb-1">{product.scientificName}</p>
                     )}
                     <p className="text-gray-500">
-                      {product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || 'بدون تصنيف'} 
-                      {(product.brandId || product.brand) && ` • ${product.brand || brands.find(b => b.id === product.brandId)?.name || product.brandId || ''}`}
+                      {categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : 'بدون تصنيف')} 
+                      {(product.brandId || product.brand) && ` • ${brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '')}`}
                     </p>
                  </div>
                  <div className="text-2xl font-bold text-blue-600">

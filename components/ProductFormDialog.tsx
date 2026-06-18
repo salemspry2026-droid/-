@@ -117,11 +117,11 @@ export function ProductFormDialog({
   useEffect(() => {
     if (!open || !profile?.companyId) return;
 
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
+    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId));
     
-    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)));
+    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)));
     const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
         if(docSnap.exists()) {
             setCompanyDetails(docSnap.data());

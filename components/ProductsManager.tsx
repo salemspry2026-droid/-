@@ -33,16 +33,16 @@ export function ProductsManager() {
     if (!profile?.companyId) return;
 
     const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
+    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId));
+    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
 
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(c => !c.isDeleted)));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(b => !b.isDeleted)));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); };
   }, [profile?.companyId]);
@@ -54,8 +54,8 @@ export function ProductsManager() {
   }, [products, categories]);
 
   const filteredProducts = products.filter(product => {
-    const catName = categories.find(c => c.id === product.categoryId)?.name || '';
-    const brandName = brands.find(b => b.id === product.brandId)?.name || '';
+    const catName = categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : '');
+    const brandName = brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '');
     
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,8 +135,8 @@ export function ProductsManager() {
                       <p className="text-[11px] italic text-gray-500 mt-0.5">{product.scientificName}</p>
                   )}
                   <p className="text-sm text-gray-500 mt-1">
-                    {product.category || categories.find(c => c.id === product.categoryId)?.name || product.categoryId || 'بدون تصنيف'}
-                    {(product.brandId || product.brand) && ` • ${product.brand || brands.find(b => b.id === product.brandId)?.name || product.brandId || ''}`}
+                    {categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : 'بدون تصنيف')}
+                    {(product.brandId || product.brand) && ` • ${brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '')}`}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
