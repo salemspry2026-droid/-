@@ -425,7 +425,7 @@ export function ProductFormDialog({
                         <SelectItem value="none">بدون علامة تجارية</SelectItem>
                         {companyBrands.map(b => {
                           if (b.isDeleted && b.id !== brandId) return null;
-                          return <SelectItem key={b.id} value={b.id}>{b.name}{b.isDeleted ? ' (محذوف)' : ''}</SelectItem>;
+                          return <SelectItem key={b.id} value={b.id}>{`${b.name}${b.isDeleted ? ' (محذوف)' : ''}`}</SelectItem>;
                         })}
                         <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة علامة تجارية جديدة)</SelectItem>
                     </SelectContent>
@@ -444,7 +444,7 @@ export function ProductFormDialog({
                         <SelectItem value="none">بدون تصنيف</SelectItem>
                         {companyCategories.map(c => {
                           if (c.isDeleted && c.id !== categoryId) return null;
-                          return <SelectItem key={c.id} value={c.id}>{c.name}{c.isDeleted ? ' (محذوف)' : ''}</SelectItem>;
+                          return <SelectItem key={c.id} value={c.id}>{`${c.name}${c.isDeleted ? ' (محذوف)' : ''}`}</SelectItem>;
                         })}
                         <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة تصنيف جديد)</SelectItem>
                     </SelectContent>
