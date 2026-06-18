@@ -420,7 +420,15 @@ export function ProductFormDialog({
                 <Label>العلامة التجارية</Label>
                 <div className="flex flex-col gap-2">
                   <Select value={brandId} onValueChange={(v) => setBrandId(v || '')}>
-                    <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر...">
+                        {brandId && brandId !== 'none' && brandId !== 'other' 
+                          ? (companyBrands.find(b => b.id === brandId)?.name || brandId) 
+                          : brandId === 'none' ? 'بدون علامة تجارية' 
+                          : brandId === 'other' ? 'آخر' 
+                          : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">بدون علامة تجارية</SelectItem>
                         {companyBrands.map(b => {
@@ -439,7 +447,15 @@ export function ProductFormDialog({
                 <Label>التصنيف</Label>
                 <div className="flex flex-col gap-2">
                   <Select value={categoryId} onValueChange={(v) => setCategoryId(v || '')}>
-                    <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر...">
+                        {categoryId && categoryId !== 'none' && categoryId !== 'other' 
+                          ? (companyCategories.find(c => c.id === categoryId)?.name || categoryId) 
+                          : categoryId === 'none' ? 'بدون تصنيف' 
+                          : categoryId === 'other' ? 'آخر' 
+                          : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">بدون تصنيف</SelectItem>
                         {companyCategories.map(c => {
