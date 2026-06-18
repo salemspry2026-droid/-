@@ -74,8 +74,7 @@ export default function PublicCompanyPage() {
         const qCategories = query(categoriesRef, where('companyId', '==', companyId));
         const categoriesSnap = await getDocs(qCategories);
         const categoriesData = categoriesSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() as any }))
-          .filter(c => !c.isDeleted);
+          .map(doc => ({ id: doc.id, ...doc.data() as any }));
         setCategories(categoriesData);
       } catch (err: any) {
          console.warn("Category fetch error", err);
@@ -87,8 +86,7 @@ export default function PublicCompanyPage() {
         const qBrands = query(brandsRef, where('companyId', '==', companyId));
         const brandsSnap = await getDocs(qBrands);
         const brandsData = brandsSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() as any }))
-          .filter(b => !b.isDeleted);
+          .map(doc => ({ id: doc.id, ...doc.data() as any }));
         setBrands(brandsData);
       } catch (err: any) {
         console.warn("Brand fetch error", err);
@@ -117,10 +115,10 @@ export default function PublicCompanyPage() {
     const cats = new Map();
     categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
     products.forEach(p => {
-      if (p.categoryId && typeof p.categoryId === 'string' && !cats.has(p.categoryId)) {
+      if (p.categoryId && typeof p.categoryId === 'string' && !p.categoryId.startsWith('cat_') && !cats.has(p.categoryId)) {
         cats.set(p.categoryId, { id: p.categoryId, name: p.categoryId });
       }
-      if (p.category && typeof p.category === 'string' && !cats.has(p.category)) {
+      if (p.category && typeof p.category === 'string' && !p.category.startsWith('cat_') && p.category !== 'none' && !cats.has(p.category)) {
         cats.set(p.category, { id: p.category, name: p.category });
       }
     });
@@ -133,10 +131,10 @@ export default function PublicCompanyPage() {
     const bMap = new Map();
     brands.forEach(b => bMap.set(b.id, { id: b.id, name: b.name }));
     products.forEach(p => {
-      if (p.brandId && typeof p.brandId === 'string' && !bMap.has(p.brandId)) {
+      if (p.brandId && typeof p.brandId === 'string' && !p.brandId.startsWith('brand_') && !bMap.has(p.brandId)) {
         bMap.set(p.brandId, { id: p.brandId, name: p.brandId });
       }
-      if (p.brand && typeof p.brand === 'string' && !bMap.has(p.brand)) {
+      if (p.brand && typeof p.brand === 'string' && !p.brand.startsWith('brand_') && p.brand !== 'none' && !bMap.has(p.brand)) {
          bMap.set(p.brand, { id: p.brand, name: p.brand });
       }
     });

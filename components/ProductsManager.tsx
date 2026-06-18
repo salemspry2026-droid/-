@@ -41,8 +41,8 @@ export function ProductsManager() {
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(c => !c.isDeleted)));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(b => !b.isDeleted)));
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); };
   }, [profile?.companyId]);

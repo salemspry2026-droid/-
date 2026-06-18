@@ -120,8 +120,8 @@ export function ProductFormDialog({
     const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
     const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId));
     
-    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)));
-    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)));
+    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any }))));
+    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any }))));
     const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
         if(docSnap.exists()) {
             setCompanyDetails(docSnap.data());
@@ -423,7 +423,10 @@ export function ProductFormDialog({
                     <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">بدون علامة تجارية</SelectItem>
-                        {companyBrands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                        {companyBrands.map(b => {
+                          if (b.isDeleted && b.id !== brandId) return null;
+                          return <SelectItem key={b.id} value={b.id}>{b.name}{b.isDeleted ? ' (محذوف)' : ''}</SelectItem>;
+                        })}
                         <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة علامة تجارية جديدة)</SelectItem>
                     </SelectContent>
                   </Select>
@@ -439,7 +442,10 @@ export function ProductFormDialog({
                     <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="none">بدون تصنيف</SelectItem>
-                        {companyCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {companyCategories.map(c => {
+                          if (c.isDeleted && c.id !== categoryId) return null;
+                          return <SelectItem key={c.id} value={c.id}>{c.name}{c.isDeleted ? ' (محذوف)' : ''}</SelectItem>;
+                        })}
                         <SelectItem value="other" className="text-blue-600 font-bold">آخر (إضافة تصنيف جديد)</SelectItem>
                     </SelectContent>
                   </Select>

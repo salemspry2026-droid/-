@@ -86,8 +86,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(c => !c.isDeleted)), e => console.error(e));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(b => !b.isDeleted)), e => console.error(e));
+    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))), e => console.error(e));
+    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))), e => console.error(e));
     const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); unsubStages(); };
@@ -225,10 +225,10 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     const cats = new Map();
     categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
     products.forEach(p => {
-      if (p.categoryId && typeof p.categoryId === 'string' && !cats.has(p.categoryId)) {
+      if (p.categoryId && typeof p.categoryId === 'string' && !p.categoryId.startsWith('cat_') && !cats.has(p.categoryId)) {
         cats.set(p.categoryId, { id: p.categoryId, name: p.categoryId });
       }
-      if (p.category && typeof p.category === 'string' && !cats.has(p.category)) {
+      if (p.category && typeof p.category === 'string' && !p.category.startsWith('cat_') && p.category !== 'none' && !cats.has(p.category)) {
         cats.set(p.category, { id: p.category, name: p.category });
       }
     });
