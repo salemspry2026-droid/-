@@ -135,8 +135,8 @@ export function ProductsManager() {
                       <p className="text-[11px] italic text-gray-500 mt-0.5">{product.scientificName}</p>
                   )}
                   <p className="text-sm text-gray-500 mt-1">
-                    {categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : 'بدون تصنيف')}
-                    {(product.brandId || product.brand) && ` • ${brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '')}`}
+                    {categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category.length !== 20 && product.category !== 'none' ? product.category : (product.categoryId && product.categoryId.length !== 20 && product.categoryId !== 'none' ? product.categoryId : 'بدون تصنيف'))}
+                    {(product.brandId || product.brand) && ` • ${brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand.length !== 20 && product.brand !== 'none' ? product.brand : (product.brandId && product.brandId.length !== 20 && product.brandId !== 'none' ? product.brandId : ''))}`}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">

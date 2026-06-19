@@ -16,6 +16,7 @@ import { Loader2, UserRound, Phone, MapPin, Store, Camera, Mail, FileText, Activ
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 import { compressImage } from '@/lib/utils';
+import Image from 'next/image';
 
 export default function ClientProfile() {
   const { profile, user } = useStore();
@@ -336,9 +337,9 @@ export default function ClientProfile() {
             {!isEditing ? (
               <div className="space-y-8">
                 <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden">
+                  <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden relative">
                     {formData.logoUrl ? (
-                      <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                      <Image src={formData.logoUrl} alt="Logo" fill className="object-cover" unoptimized referrerPolicy="no-referrer" />
                     ) : (
                       <Store className="w-10 h-10 text-gray-400" />
                     )}
@@ -383,9 +384,9 @@ export default function ClientProfile() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col items-center mb-8">
                   <div className="relative group">
-                    <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden">
+                    <div className="w-24 h-24 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden relative">
                       {formData.logoUrl ? (
-                        <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                        <Image src={formData.logoUrl} alt="Logo" fill className="object-cover" unoptimized referrerPolicy="no-referrer" />
                       ) : (
                         <Store className="w-10 h-10 text-gray-400" />
                       )}

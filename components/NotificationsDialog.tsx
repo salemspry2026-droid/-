@@ -90,7 +90,7 @@ export function NotificationsDialog({
       unsubNotifs();
       unsubOrders();
     };
-  }, [open, profile?.companyId, profile?.role, user?.uid]);
+  }, [open, profile?.companyId, profile?.role, user?.uid, profile]);
 
   const markAsRead = async (notification: any) => {
     if (!user?.uid || notification.readBy?.includes(user?.uid) || notification.isStaleAlert) return;

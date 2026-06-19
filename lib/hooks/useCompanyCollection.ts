@@ -14,6 +14,8 @@ export function useCompanyCollection<T>(collectionName: string, companyId?: stri
       return;
     }
 
+    setLoading(true);
+
     const q = query(
       collection(db, collectionName),
       where('companyId', '==', companyId),

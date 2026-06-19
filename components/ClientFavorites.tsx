@@ -9,6 +9,7 @@ import { Loader2, ShoppingCart, Heart, Package, Trash2, Plus, Minus } from 'luci
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import Image from 'next/image';
 
 interface CartItem {
   product: any;
@@ -24,7 +25,6 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
   const [isOrdering, setIsOrdering] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!profile || !profile.favoriteProductIds || profile.favoriteProductIds.length === 0) {
       setFavoriteProducts([]);
@@ -81,7 +81,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
     };
 
     fetchFavorites();
-  }, [profile?.favoriteProductIds]);
+  }, [profile?.favoriteProductIds, profile]);
 
   const handleRemoveFavorite = async (product: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -272,7 +272,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
 
                 <div className="w-full aspect-square rounded-lg bg-gray-50 flex items-center justify-center mb-3 relative overflow-hidden">
                   {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                    <Image src={product.imageUrl} alt={product.name} fill className="object-cover rounded-lg" unoptimized referrerPolicy="no-referrer" />
                   ) : (
                     <Package className="w-10 h-10 text-gray-300" />
                   )}

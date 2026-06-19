@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Sparkles, X, Gift, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, compressImage } from '@/lib/utils';
+import Image from 'next/image';
 
 export function ProductFormDialog({ 
   children, 
@@ -352,7 +353,7 @@ export function ProductFormDialog({
             <div className="flex flex-col items-center gap-2 mb-6">
               <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 relative group cursor-pointer focus-within:ring-2 focus-within:ring-blue-500">
                 {imageUrl ? (
-                  <img src={imageUrl} alt="Product" className="w-full h-full object-contain p-2 pointer-events-none" />
+                  <Image src={imageUrl} alt="Product" fill className="object-contain p-2 pointer-events-none" unoptimized referrerPolicy="no-referrer" />
                 ) : (
                   <span className="text-gray-400 text-xs text-center p-2">اضف صورة (CV)</span>
                 )}
@@ -423,7 +424,7 @@ export function ProductFormDialog({
                     <SelectTrigger>
                       <SelectValue placeholder="اختر...">
                         {brandId && brandId !== 'none' && brandId !== 'other' 
-                          ? (companyBrands.find(b => b.id === brandId)?.name || brandId) 
+                          ? (companyBrands.find(b => b.id === brandId)?.name || (productToEdit?.brand && productToEdit.brand.length !== 20 && !productToEdit.brand.startsWith('brand_') ? productToEdit.brand : brandId.length === 20 ? 'علامة تجارية غير معروفة' : brandId)) 
                           : brandId === 'none' ? 'بدون علامة تجارية' 
                           : brandId === 'other' ? 'آخر' 
                           : undefined}
@@ -450,7 +451,7 @@ export function ProductFormDialog({
                     <SelectTrigger>
                       <SelectValue placeholder="اختر...">
                         {categoryId && categoryId !== 'none' && categoryId !== 'other' 
-                          ? (companyCategories.find(c => c.id === categoryId)?.name || categoryId) 
+                          ? (companyCategories.find(c => c.id === categoryId)?.name || (productToEdit?.category && productToEdit.category.length !== 20 && !productToEdit.category.startsWith('cat_') ? productToEdit.category : categoryId.length === 20 ? 'تصنيف غير معروف' : categoryId)) 
                           : categoryId === 'none' ? 'بدون تصنيف' 
                           : categoryId === 'other' ? 'آخر' 
                           : undefined}

@@ -115,10 +115,11 @@ export default function PublicCompanyPage() {
     const cats = new Map();
     categories.forEach(c => cats.set(c.id, { id: c.id, name: c.name }));
     products.forEach(p => {
-      if (p.categoryId && typeof p.categoryId === 'string' && !p.categoryId.startsWith('cat_') && !cats.has(p.categoryId)) {
+      // If categoryId is a legacy text name (not a Firestore 20-char ID and not cat_), add it
+      if (p.categoryId && typeof p.categoryId === 'string' && !p.categoryId.startsWith('cat_') && p.categoryId.length !== 20 && !cats.has(p.categoryId)) {
         cats.set(p.categoryId, { id: p.categoryId, name: p.categoryId });
       }
-      if (p.category && typeof p.category === 'string' && !p.category.startsWith('cat_') && p.category !== 'none' && !cats.has(p.category)) {
+      if (p.category && typeof p.category === 'string' && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' && !cats.has(p.category)) {
         cats.set(p.category, { id: p.category, name: p.category });
       }
     });
@@ -131,10 +132,11 @@ export default function PublicCompanyPage() {
     const bMap = new Map();
     brands.forEach(b => bMap.set(b.id, { id: b.id, name: b.name }));
     products.forEach(p => {
-      if (p.brandId && typeof p.brandId === 'string' && !p.brandId.startsWith('brand_') && !bMap.has(p.brandId)) {
+      // If brandId is a legacy text name (not a Firestore 20-char ID and not brand_), add it
+      if (p.brandId && typeof p.brandId === 'string' && !p.brandId.startsWith('brand_') && p.brandId.length !== 20 && !bMap.has(p.brandId)) {
         bMap.set(p.brandId, { id: p.brandId, name: p.brandId });
       }
-      if (p.brand && typeof p.brand === 'string' && !p.brand.startsWith('brand_') && p.brand !== 'none' && !bMap.has(p.brand)) {
+      if (p.brand && typeof p.brand === 'string' && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' && !bMap.has(p.brand)) {
          bMap.set(p.brand, { id: p.brand, name: p.brand });
       }
     });
@@ -145,8 +147,8 @@ export default function PublicCompanyPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : '');
-      const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : '');
+      const catName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : ''));
+      const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : ''));
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             p.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -228,8 +230,8 @@ export default function PublicCompanyPage() {
 
   // --- Render Product Details Sheet (Overlay) ---
   if (selectedProduct) {
-    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name || (selectedProduct.brand && !selectedProduct.brand.startsWith('brand_') && selectedProduct.brand !== 'none' ? selectedProduct.brand : undefined);
-    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name || (selectedProduct.category && !selectedProduct.category.startsWith('cat_') && selectedProduct.category !== 'none' ? selectedProduct.category : undefined);
+    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name || (selectedProduct.brand && !selectedProduct.brand.startsWith('brand_') && selectedProduct.brand.length !== 20 && selectedProduct.brand !== 'none' ? selectedProduct.brand : (selectedProduct.brandId && selectedProduct.brandId.length !== 20 && selectedProduct.brandId !== 'none' ? selectedProduct.brandId : undefined));
+    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name || (selectedProduct.category && !selectedProduct.category.startsWith('cat_') && selectedProduct.category.length !== 20 && selectedProduct.category !== 'none' ? selectedProduct.category : (selectedProduct.categoryId && selectedProduct.categoryId.length !== 20 && selectedProduct.categoryId !== 'none' ? selectedProduct.categoryId : undefined));
     const isOffer = selectedProduct.specialOffer?.isActive;
     const finalPrice = isOffer ? selectedProduct.specialOffer.price : selectedProduct.price;
 
@@ -602,8 +604,8 @@ export default function PublicCompanyPage() {
                  const isOffer = p.specialOffer?.isActive;
                  const hasDiscount = isOffer && p.price > p.specialOffer.price;
                  const discountPercent = hasDiscount ? Math.round(((p.price - p.specialOffer.price) / p.price) * 100) : 0;
-                 const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : undefined);
-                 const categoryName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : undefined);
+                 const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : undefined));
+                 const categoryName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : undefined));
 
                  return (
                   <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col gap-3 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
@@ -789,8 +791,8 @@ export default function PublicCompanyPage() {
           </thead>
           <tbody>
             {filteredProducts.map((p, idx) => {
-              const brand = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand !== 'none' ? p.brand : '-');
-              const category = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category !== 'none' ? p.category : '-');
+              const brand = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : '-'));
+              const category = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : '-'));
               const isOffer = p.specialOffer?.isActive;
               
               return (

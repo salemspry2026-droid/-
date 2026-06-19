@@ -136,7 +136,7 @@ export function GlobalNotificationListener() {
       unsubNotifs();
       unsubOrders();
     };
-  }, [profile?.companyId, profile?.role, user?.uid, setUnreadNotifications]);
+  }, [profile?.companyId, profile?.role, user?.uid, setUnreadNotifications, profile]);
 
   return null;
 }
