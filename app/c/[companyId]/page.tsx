@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useStore } from '@/lib/store';
 import { Loader2, ArrowRight, UserPlus, Package, MapPin, Phone, Mail, BuildingIcon, X, Search, FileText, CheckCircle, Share2, ShieldCheck, Truck, Percent, Headphones, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,73 +29,70 @@ export default function PublicCompanyPage() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
   useEffect(() => {
-    const fetchCompanyData = async () => {
-      if (!companyId || typeof companyId !== 'string') return;
+    if (!companyId || typeof companyId !== 'string') return;
       
-      try {
-        const companyRef = doc(db, 'companies', companyId);
-        const companySnap = await getDoc(companyRef);
-        
-        if (!companySnap.exists()) {
-          setError('لم يتم العثور على الشركة المطلوبة.');
-          setLoading(false);
-          return;
-        }
+    setLoading(true);
 
-        const companyData: any = { id: companySnap.id, ...companySnap.data() };
-        if (companyData.isDeleted) {
-           setError('تم حذف هذه الشركة.');
-           setLoading(false);
-           return;
-        }
-        
-        setCompany(companyData);
-      } catch (err: any) {
-        console.error("Error fetching company info:", err);
-        setError('حدث خطأ أثناء تحميل بيانات الشركة: ' + err.message);
+    const companyRef = doc(db, 'companies', companyId);
+    const unsubCompany = onSnapshot(companyRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        setError('لم يتم العثور على الشركة المطلوبة.');
         setLoading(false);
         return;
       }
-
-      try {
-        const productsRef = collection(db, 'products');
-        const qProducts = query(productsRef, where('companyId', '==', companyId));
-        const productsSnap = await getDocs(qProducts);
-        const productsData = productsSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() as any }))
-          .filter(p => !p.isDeleted && p.isActive !== false);
-        setProducts(productsData);
-      } catch (err: any) {
-        console.warn("Product fetch error", err);
+      const companyData: any = { id: docSnap.id, ...docSnap.data() };
+      if (companyData.isDeleted) {
+         setError('تم حذف هذه الشركة.');
+         setLoading(false);
+         return;
       }
-
-      try {
-        const categoriesRef = collection(db, 'productCategories');
-        const qCategories = query(categoriesRef, where('companyId', '==', companyId));
-        const categoriesSnap = await getDocs(qCategories);
-        const categoriesData = categoriesSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() as any }));
-        setCategories(categoriesData);
-      } catch (err: any) {
-         console.warn("Category fetch error", err);
-      }
-
-      try {
-        // Fetch brands
-        const brandsRef = collection(db, 'productBrands');
-        const qBrands = query(brandsRef, where('companyId', '==', companyId));
-        const brandsSnap = await getDocs(qBrands);
-        const brandsData = brandsSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() as any }));
-        setBrands(brandsData);
-      } catch (err: any) {
-        console.warn("Brand fetch error", err);
-      }
-
+      setCompany(companyData);
       setLoading(false);
-    };
+    }, (err) => {
+      console.error("Error fetching company info:", err);
+      setError('حدث خطأ أثناء تحميل بيانات الشركة: ' + err.message);
+      setLoading(false);
+    });
 
-    fetchCompanyData();
+    const productsRef = collection(db, 'products');
+    const qProducts = query(productsRef, where('companyId', '==', companyId));
+    const unsubProducts = onSnapshot(qProducts, (snap) => {
+      const productsData = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(p => !p.isDeleted && p.isActive !== false);
+      setProducts(productsData);
+    }, (err) => {
+      console.warn("Product fetch error", err);
+    });
+
+    const categoriesRef = collection(db, 'productCategories');
+    const qCategories = query(categoriesRef, where('companyId', '==', companyId));
+    const unsubCategories = onSnapshot(qCategories, (snap) => {
+      const categoriesData = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(c => !c.isDeleted);
+      setCategories(categoriesData);
+    }, (err) => {
+       console.warn("Category fetch error", err);
+    });
+
+    const brandsRef = collection(db, 'productBrands');
+    const qBrands = query(brandsRef, where('companyId', '==', companyId));
+    const unsubBrands = onSnapshot(qBrands, (snap) => {
+      const brandsData = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(b => !b.isDeleted);
+      setBrands(brandsData);
+    }, (err) => {
+      console.warn("Brand fetch error", err);
+    });
+
+    return () => {
+      unsubCompany();
+      unsubProducts();
+      unsubCategories();
+      unsubBrands();
+    };
   }, [companyId]);
 
   useEffect(() => {
@@ -778,15 +775,15 @@ export default function PublicCompanyPage() {
         <table className="w-full text-right border-collapse mb-10 text-sm print:table-fixed">
           <thead>
             <tr className="bg-purple-900 text-white">
-              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-[10px] print:p-1.5 print:w-[4%]">م</th>
-              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[18%]">الصنف</th>
-              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[15%]">الاسم العلمي</th>
-              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[10%]">العلامة التجارية</th>
-              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[10%]">الفئة</th>
+              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-[10px] print:p-1.5 print:w-[3%] print:rounded-none">م</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[22%]">الصنف</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[17%]">الاسم العلمي</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[12%]">العلامة التجارية</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[12%]">الفئة</th>
               <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-[10px] print:p-1.5 print:w-[7%]">العبوة</th>
-              <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-[10px] print:p-1.5 print:w-[12%]">السعر ({company.primaryCurrency || 'YER'})</th>
-              <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-[10px] print:p-1.5 print:w-[16%]">البونص</th>
-              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:text-[10px] print:p-1.5 print:w-[8%]">الحالة</th>
+              <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-[10px] print:p-1.5 print:w-[12%] text-nowrap">السعر ({company.primaryCurrency || 'YER'})</th>
+              <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-[10px] print:p-1.5 print:w-[15%]">البونص</th>
+              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:hidden">الحالة</th>
             </tr>
           </thead>
           <tbody>
@@ -796,45 +793,47 @@ export default function PublicCompanyPage() {
               const isOffer = p.specialOffer?.isActive;
               
               return (
-                <tr key={p.id} className="border-b border-gray-200 even:bg-purple-50/40 print:break-inside-avoid">
-                  <td className="p-2 print:p-1 text-center text-gray-500 font-bold print:text-[9px]">{idx + 1}</td>
-                  <td className="p-2 print:p-1 font-bold flex items-center gap-2 print:text-[10px] overflow-hidden break-words">
-                    {p.imageUrl ? (
-                      <div className="w-8 h-8 print:w-5 print:h-5 min-w-[20px] border border-gray-100 rounded bg-white relative flex shrink-0 p-0.5">
-                        <Image src={p.imageUrl} alt="" fill className="object-contain" unoptimized referrerPolicy="no-referrer" />
-                      </div>
-                    ) : <Package className="w-6 h-6 print:w-4 print:h-4 text-gray-300 shrink-0" />}
-                    <span className="text-gray-900 print:line-clamp-2">{p.name}</span>
+                <tr key={p.id} className="border-b border-gray-200 print:border-purple-200 even:bg-purple-50/40 print:even:bg-purple-50/20 print:break-inside-avoid">
+                  <td className="p-2 print:p-1.5 text-center text-gray-500 font-bold print:text-[10px] print:border print:border-purple-100">{idx + 1}</td>
+                  <td className="p-2 print:p-1.5 font-bold print:border print:border-purple-100">
+                    <div className="flex items-start gap-2">
+                       {p.imageUrl ? (
+                         <div className="w-8 h-8 print:w-5 print:h-5 min-w-[20px] border border-gray-100 rounded bg-white relative flex shrink-0 p-0.5 mt-0.5">
+                           <Image src={p.imageUrl} alt="" fill className="object-contain" unoptimized referrerPolicy="no-referrer" />
+                         </div>
+                       ) : <Package className="w-6 h-6 print:w-4 print:h-4 text-gray-300 shrink-0 mt-0.5" />}
+                       <span className="text-gray-900 print:text-[10px] leading-snug break-words">{p.name}</span>
+                    </div>
                   </td>
-                  <td className="p-2 print:p-1 text-gray-600 italic text-xs print:text-[9px] font-medium break-words">{p.scientificName || '-'}</td>
-                  <td className="p-2 print:p-1 text-gray-800 font-bold text-xs print:text-[9px] break-words">{brand}</td>
-                  <td className="p-2 print:p-1 text-gray-600 font-bold text-xs print:text-[9px] break-words">{category}</td>
-                  <td className="p-2 print:p-1 text-center text-gray-600 font-bold print:text-[9px]">{p.unit || 'حبة'}</td>
-                  <td className="p-2 print:p-1 text-center font-black text-base print:text-[11px] text-purple-900 bg-purple-50/20 break-words">
+                  <td className="p-2 print:p-1.5 text-gray-600 italic text-xs print:text-[9.5px] font-medium break-words leading-tight print:border print:border-purple-100">{p.scientificName || '-'}</td>
+                  <td className="p-2 print:p-1.5 text-gray-800 font-bold text-xs print:text-[9px] break-words print:border print:border-purple-100">{brand}</td>
+                  <td className="p-2 print:p-1.5 text-gray-600 font-bold text-xs print:text-[9px] break-words print:border print:border-purple-100">{category}</td>
+                  <td className="p-2 print:p-1.5 text-center text-gray-600 font-bold print:text-[9px] print:border print:border-purple-100">{p.unit || 'حبة'}</td>
+                  <td className="p-2 print:p-1.5 text-center font-black text-base print:text-[11px] text-purple-900 bg-purple-50/20 print:bg-purple-50/40 print:border print:border-purple-100">
                     {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
                   </td>
-                  <td className="p-2 print:p-1 font-bold text-center">
+                  <td className="p-2 print:p-1.5 font-bold text-center print:border print:border-purple-100">
                     {isOffer && p.specialOffer.bonus ? (
-                      <span className="text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.specialOffer.bonus}</span>
+                      <span className="text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-xs print:text-[9px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words leading-snug">{p.specialOffer.bonus}</span>
                     ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
-                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.bonusFixedPercent}% ثابت</span>
+                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded text-xs print:text-[9px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.bonusFixedPercent}% ثابت</span>
                     ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
                       <div className="flex flex-col gap-0.5 items-center justify-center">
                          {p.bonusTiers.map((tier: any, i: number) => (
-                           <div key={i} className="text-[10px] print:text-[8px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight print:whitespace-normal whitespace-nowrap break-words" dir="rtl">
-                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[7px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600 mr-1" dir="ltr">+{tier.percent}%</span>
+                           <div key={i} className="text-[10px] print:text-[8.5px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight print:whitespace-normal whitespace-nowrap break-words text-center" dir="rtl">
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[7.5px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600 mr-1" dir="ltr">+{tier.percent}%</span>
                            </div>
                          ))}
                       </div>
                     ) : p.bonus ? (
-                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.bonus}</span>
+                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[9px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words leading-snug">{p.bonus}</span>
                     ) : '-'}
                   </td>
-                  <td className="p-2 print:p-1 text-center">
+                  <td className="p-2 print:p-1.5 text-center print:hidden">
                     {p.inStock !== false ? (
-                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 print:bg-transparent px-1.5 py-1 rounded-md text-[10px] print:text-[8px] font-black break-words"><CheckCircle className="w-3 h-3 ml-0.5 print:hidden"/>متوفر</div>
+                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 px-1.5 py-1 rounded-md text-[10px] font-black break-words"><CheckCircle className="w-3 h-3 ml-0.5"/>متوفر</div>
                     ) : (
-                      <div className="inline-flex justify-center text-red-500 bg-red-50 print:bg-transparent px-1.5 py-1 rounded-md text-[10px] print:text-[8px] font-black break-words">غير متوفر</div>
+                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-1.5 py-1 rounded-md text-[10px] font-black break-words">غير متوفر</div>
                     )}
                   </td>
                 </tr>
