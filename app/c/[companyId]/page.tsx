@@ -775,18 +775,18 @@ export default function PublicCompanyPage() {
         </div>
 
         {/* Table */}
-        <table className="w-full text-right border-collapse mb-10 text-sm">
+        <table className="w-full text-right border-collapse mb-10 text-sm print:table-fixed">
           <thead>
             <tr className="bg-purple-900 text-white">
-              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-xs">م</th>
-              <th className="p-3 border border-purple-900 font-bold print:text-xs">الصنف</th>
-              <th className="p-3 border border-purple-900 font-bold print:text-xs">الاسم العلمي</th>
-              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">العلامة التجارية</th>
-              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-xs">الفئة</th>
-              <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-xs">العبوة</th>
-              <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-xs">السعر ({company.primaryCurrency || 'YER'})</th>
-              <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-xs">البونص</th>
-              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:text-xs">الحالة</th>
+              <th className="p-3 border border-purple-900 font-bold w-12 text-center rounded-tr-xl print:text-[10px] print:p-1.5 print:w-[4%]">م</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[18%]">الصنف</th>
+              <th className="p-3 border border-purple-900 font-bold print:text-[10px] print:p-1.5 print:w-[15%]">الاسم العلمي</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[10%]">العلامة التجارية</th>
+              <th className="p-3 border border-purple-900 font-bold w-[12%] print:text-[10px] print:p-1.5 print:w-[10%]">الفئة</th>
+              <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-[10px] print:p-1.5 print:w-[7%]">العبوة</th>
+              <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-[10px] print:p-1.5 print:w-[12%]">السعر ({company.primaryCurrency || 'YER'})</th>
+              <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-[10px] print:p-1.5 print:w-[16%]">البونص</th>
+              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:text-[10px] print:p-1.5 print:w-[8%]">الحالة</th>
             </tr>
           </thead>
           <tbody>
@@ -797,44 +797,44 @@ export default function PublicCompanyPage() {
               
               return (
                 <tr key={p.id} className="border-b border-gray-200 even:bg-purple-50/40 print:break-inside-avoid">
-                  <td className="p-2 print:p-1.5 text-center text-gray-500 font-bold print:text-[11px]">{idx + 1}</td>
-                  <td className="p-2 print:p-1.5 font-bold flex items-center gap-2 print:text-[11px]">
+                  <td className="p-2 print:p-1 text-center text-gray-500 font-bold print:text-[9px]">{idx + 1}</td>
+                  <td className="p-2 print:p-1 font-bold flex items-center gap-2 print:text-[10px] overflow-hidden break-words">
                     {p.imageUrl ? (
-                      <div className="w-8 h-8 print:w-6 print:h-6 min-w-[24px] border border-gray-100 rounded bg-white relative flex shrink-0 p-0.5">
+                      <div className="w-8 h-8 print:w-5 print:h-5 min-w-[20px] border border-gray-100 rounded bg-white relative flex shrink-0 p-0.5">
                         <Image src={p.imageUrl} alt="" fill className="object-contain" unoptimized referrerPolicy="no-referrer" />
                       </div>
-                    ) : <Package className="w-6 h-6 print:w-5 print:h-5 text-gray-300 shrink-0" />}
-                    <span className="text-gray-900">{p.name}</span>
+                    ) : <Package className="w-6 h-6 print:w-4 print:h-4 text-gray-300 shrink-0" />}
+                    <span className="text-gray-900 print:line-clamp-2">{p.name}</span>
                   </td>
-                  <td className="p-2 print:p-1.5 text-gray-600 italic text-xs print:text-[11px] font-medium">{p.scientificName || '-'}</td>
-                  <td className="p-2 print:p-1.5 text-gray-800 font-bold text-xs print:text-[11px]">{brand}</td>
-                  <td className="p-2 print:p-1.5 text-gray-600 font-bold text-xs print:text-[11px]">{category}</td>
-                  <td className="p-2 print:p-1.5 text-center text-gray-600 font-bold print:text-[11px]">{p.unit || 'حبة'}</td>
-                  <td className="p-2 print:p-1.5 text-center font-black text-base print:text-sm text-purple-900 bg-purple-50/20">
+                  <td className="p-2 print:p-1 text-gray-600 italic text-xs print:text-[9px] font-medium break-words">{p.scientificName || '-'}</td>
+                  <td className="p-2 print:p-1 text-gray-800 font-bold text-xs print:text-[9px] break-words">{brand}</td>
+                  <td className="p-2 print:p-1 text-gray-600 font-bold text-xs print:text-[9px] break-words">{category}</td>
+                  <td className="p-2 print:p-1 text-center text-gray-600 font-bold print:text-[9px]">{p.unit || 'حبة'}</td>
+                  <td className="p-2 print:p-1 text-center font-black text-base print:text-[11px] text-purple-900 bg-purple-50/20 break-words">
                     {isOffer ? p.specialOffer.price.toLocaleString() : p.price.toLocaleString()}
                   </td>
-                  <td className="p-2 print:p-1.5 font-bold text-center">
+                  <td className="p-2 print:p-1 font-bold text-center">
                     {isOffer && p.specialOffer.bonus ? (
-                      <span className="text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.specialOffer.bonus}</span>
+                      <span className="text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.specialOffer.bonus}</span>
                     ) : p.bonusType === 'fixed' && p.bonusFixedPercent ? (
-                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.bonusFixedPercent}% ثابت</span>
+                      <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.bonusFixedPercent}% ثابت</span>
                     ) : p.bonusType === 'tiered' && p.bonusTiers && p.bonusTiers.length > 0 ? (
                       <div className="flex flex-col gap-0.5 items-center justify-center">
                          {p.bonusTiers.map((tier: any, i: number) => (
-                           <div key={i} className="text-[10px] print:text-[9px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight whitespace-nowrap min-w-max" dir="rtl">
-                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[8px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600 mr-1" dir="ltr">+{tier.percent}%</span>
+                           <div key={i} className="text-[10px] print:text-[8px] text-blue-800 bg-blue-50 border border-blue-100 print:bg-transparent print:border-none px-1 py-0.5 rounded leading-tight print:whitespace-normal whitespace-nowrap break-words" dir="rtl">
+                             من {tier.minQty} {tier.maxQty ? `إلى ${tier.maxQty}` : 'فأكثر'} {tier.invoiceType && tier.invoiceType !== 'all' ? <span className="text-gray-500 print:text-[7px] font-medium mx-1">({tier.invoiceType === 'cash' ? 'نقدي' : tier.invoiceType === 'credit' ? 'آجل' : 'نقدي معلق'})</span> : ''}: <span className="font-black text-orange-600 mr-1" dir="ltr">+{tier.percent}%</span>
                            </div>
                          ))}
                       </div>
                     ) : p.bonus ? (
-                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[10px] print:border-none print:bg-transparent inline-block whitespace-nowrap">{p.bonus}</span>
+                      <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[8px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words">{p.bonus}</span>
                     ) : '-'}
                   </td>
-                  <td className="p-2 print:p-1.5 text-center">
+                  <td className="p-2 print:p-1 text-center">
                     {p.inStock !== false ? (
-                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 print:bg-transparent px-2 py-1 rounded-md text-[10px] print:text-[10px] font-black min-w-[50px]"><CheckCircle className="w-3 h-3 ml-0.5 print:hidden"/>متوفر</div>
+                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 print:bg-transparent px-1.5 py-1 rounded-md text-[10px] print:text-[8px] font-black break-words"><CheckCircle className="w-3 h-3 ml-0.5 print:hidden"/>متوفر</div>
                     ) : (
-                      <div className="inline-flex justify-center text-red-500 bg-red-50 print:bg-transparent px-2 py-1 rounded-md text-[10px] print:text-[10px] font-black min-w-[50px]">غير متوفر</div>
+                      <div className="inline-flex justify-center text-red-500 bg-red-50 print:bg-transparent px-1.5 py-1 rounded-md text-[10px] print:text-[8px] font-black break-words">غير متوفر</div>
                     )}
                   </td>
                 </tr>
