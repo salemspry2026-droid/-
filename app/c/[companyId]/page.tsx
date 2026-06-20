@@ -144,8 +144,8 @@ export default function PublicCompanyPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const catName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : ''));
-      const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : ''));
+      const catName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && !p.categoryId.startsWith('cat_') && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : ''));
+      const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && !p.brandId.startsWith('brand_') && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : ''));
       const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             p.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -227,8 +227,8 @@ export default function PublicCompanyPage() {
 
   // --- Render Product Details Sheet (Overlay) ---
   if (selectedProduct) {
-    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name || (selectedProduct.brand && !selectedProduct.brand.startsWith('brand_') && selectedProduct.brand.length !== 20 && selectedProduct.brand !== 'none' ? selectedProduct.brand : (selectedProduct.brandId && selectedProduct.brandId.length !== 20 && selectedProduct.brandId !== 'none' ? selectedProduct.brandId : undefined));
-    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name || (selectedProduct.category && !selectedProduct.category.startsWith('cat_') && selectedProduct.category.length !== 20 && selectedProduct.category !== 'none' ? selectedProduct.category : (selectedProduct.categoryId && selectedProduct.categoryId.length !== 20 && selectedProduct.categoryId !== 'none' ? selectedProduct.categoryId : undefined));
+    const brandName = brands.find(b => b.id === selectedProduct.brandId)?.name || (selectedProduct.brand && !selectedProduct.brand.startsWith('brand_') && selectedProduct.brand.length !== 20 && selectedProduct.brand !== 'none' ? selectedProduct.brand : (selectedProduct.brandId && !selectedProduct.brandId.startsWith('brand_') && selectedProduct.brandId.length !== 20 && selectedProduct.brandId !== 'none' ? selectedProduct.brandId : undefined));
+    const categoryName = categories.find(c => c.id === selectedProduct.categoryId)?.name || (selectedProduct.category && !selectedProduct.category.startsWith('cat_') && selectedProduct.category.length !== 20 && selectedProduct.category !== 'none' ? selectedProduct.category : (selectedProduct.categoryId && !selectedProduct.categoryId.startsWith('cat_') && selectedProduct.categoryId.length !== 20 && selectedProduct.categoryId !== 'none' ? selectedProduct.categoryId : undefined));
     const isOffer = selectedProduct.specialOffer?.isActive;
     const finalPrice = isOffer ? selectedProduct.specialOffer.price : selectedProduct.price;
 
@@ -601,8 +601,8 @@ export default function PublicCompanyPage() {
                  const isOffer = p.specialOffer?.isActive;
                  const hasDiscount = isOffer && p.price > p.specialOffer.price;
                  const discountPercent = hasDiscount ? Math.round(((p.price - p.specialOffer.price) / p.price) * 100) : 0;
-                 const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : undefined));
-                 const categoryName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : undefined));
+                 const brandName = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && !p.brandId.startsWith('brand_') && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : undefined));
+                 const categoryName = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && !p.categoryId.startsWith('cat_') && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : undefined));
 
                  return (
                   <div key={p.id} className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col gap-3 border border-gray-100 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group relative overflow-hidden" onClick={() => setSelectedProduct(p)}>
@@ -783,13 +783,13 @@ export default function PublicCompanyPage() {
               <th className="p-3 border border-purple-900 font-bold w-12 text-center print:text-[10px] print:p-1.5 print:w-[7%]">العبوة</th>
               <th className="p-3 border border-purple-900 font-bold w-20 text-center bg-purple-800 print:text-[10px] print:p-1.5 print:w-[12%] text-nowrap">السعر ({company.primaryCurrency || 'YER'})</th>
               <th className="p-3 border border-purple-900 font-bold w-40 text-center print:text-[10px] print:p-1.5 print:w-[15%]">البونص</th>
-              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:hidden">الحالة</th>
+              <th className="p-3 border border-purple-900 font-bold w-16 text-center rounded-tl-xl print:text-[10px] print:p-1.5 print:w-[8%] print:rounded-none">الحالة</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.map((p, idx) => {
-              const brand = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : '-'));
-              const category = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : '-'));
+              const brand = brands.find(b => b.id === p.brandId)?.name || (p.brand && !p.brand.startsWith('brand_') && p.brand.length !== 20 && p.brand !== 'none' ? p.brand : (p.brandId && !p.brandId.startsWith('brand_') && p.brandId.length !== 20 && p.brandId !== 'none' ? p.brandId : '-'));
+              const category = categories.find(c => c.id === p.categoryId)?.name || (p.category && !p.category.startsWith('cat_') && p.category.length !== 20 && p.category !== 'none' ? p.category : (p.categoryId && !p.categoryId.startsWith('cat_') && p.categoryId.length !== 20 && p.categoryId !== 'none' ? p.categoryId : '-'));
               const isOffer = p.specialOffer?.isActive;
               
               return (
@@ -829,11 +829,11 @@ export default function PublicCompanyPage() {
                       <span className="text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded text-xs print:text-[9px] print:border-none print:bg-transparent inline-block print:whitespace-normal whitespace-nowrap break-words leading-snug">{p.bonus}</span>
                     ) : '-'}
                   </td>
-                  <td className="p-2 print:p-1.5 text-center print:hidden">
+                  <td className="p-2 print:p-1.5 text-center print:border print:border-purple-100">
                     {p.inStock !== false ? (
-                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 px-1.5 py-1 rounded-md text-[10px] font-black break-words"><CheckCircle className="w-3 h-3 ml-0.5"/>متوفر</div>
+                      <div className="inline-flex items-center justify-center text-green-600 bg-green-50 px-1.5 py-1 rounded-md text-[10px] print:text-[8px] print:bg-transparent print:p-0 font-black break-words"><CheckCircle className="w-3 h-3 ml-0.5 print:hidden"/>متوفر</div>
                     ) : (
-                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-1.5 py-1 rounded-md text-[10px] font-black break-words">غير متوفر</div>
+                      <div className="inline-flex justify-center text-red-500 bg-red-50 px-1.5 py-1 rounded-md text-[10px] print:text-[8px] print:bg-transparent print:p-0 font-black break-words">غير متوفر</div>
                     )}
                   </td>
                 </tr>
