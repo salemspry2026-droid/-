@@ -3,8 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,6 +14,7 @@ import { GoogleGenAI } from '@google/genai';
 import { ProductFormDialog } from './ProductFormDialog';
 
 import { ProductDetailsDialog } from './ProductDetailsDialog';
+import { productService } from '@/lib/services/productService';
 
 export function ProductsManager() {
   const { profile, user } = useStore();
@@ -32,17 +31,13 @@ export function ProductsManager() {
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
-
-    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubProducts = productService.subscribeToProducts(profile.companyId, (data) => {
+      setProducts(data);
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))));
+    const unsubCats = productService.subscribeToCategories(profile.companyId, setCategories);
+    const unsubBrands = productService.subscribeToBrands(profile.companyId, setBrands);
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); };
   }, [profile?.companyId]);
@@ -57,10 +52,10 @@ export function ProductsManager() {
     const catName = categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : '');
     const brandName = brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '');
     
-    const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          brandName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (product.scientificName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (catName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (brandName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategoryId === 'all' || product.categoryId === activeCategoryId;
     return matchesSearch && matchesCategory;
   });

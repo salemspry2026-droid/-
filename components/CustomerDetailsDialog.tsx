@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { UserCircle, Search, Edit, Trash2, MapPin, Phone, Mail, Building, ShoppingBag, Banknote, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, orderBy, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useStore } from '@/lib/store';
 import { hasPermission } from '@/lib/utils';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
+import { customerService } from '@/lib/services/customerService';
+import { orderService } from '@/lib/services/orderService';
 
 export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { customer: any, isOpen: boolean, onClose: () => void, onEdit?: (customer: any) => void }) {
   const { profile, user } = useStore();
@@ -31,18 +31,10 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
       setLoading(true);
       try {
         // Fetch order stages setup
-        const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-        const stagesSnapshot = await getDocs(qStages);
-        const fetchedStages = stagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index);
+        const fetchedStages = await orderService.getOrderStages(profile.companyId as string);
         setOrderStages(fetchedStages);
 
-        const q = query(
-          collection(db, 'orders'),
-          where('companyId', '==', profile.companyId),
-          where('customerId', '==', customer.id),
-          where('isDeleted', '==', false)
-        );
-        const snapshot = await getDocs(q);
+        const fetchedOrdersList = await orderService.getOrdersByCustomerId(profile.companyId as string, customer.id);
         
         let totalOrders = 0;
         let totalSpent = 0;
@@ -50,8 +42,7 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
         let customerOrders = 0;
         const fetchedOrders: any[] = [];
         
-        snapshot.docs.forEach(doc => {
-          const order = { id: doc.id, ...doc.data() } as any;
+        fetchedOrdersList.forEach(order => {
           fetchedOrders.push(order);
           totalOrders += 1;
           
@@ -91,11 +82,8 @@ export function CustomerDetailsDialog({ customer, isOpen, onClose, onEdit }: { c
 
   const handleDelete = async () => {
     try {
-      await updateDoc(doc(db, 'customers', customer.id), {
-        isDeleted: true,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid
-      });
+      if (!user || !profile?.companyId) return;
+      await customerService.softDeleteCustomer(customer.id, user.uid, profile.companyId);
       toast.success('تم حذف العميل بنجاح');
       setDeleteConfirm(false);
       onClose();

@@ -6,9 +6,9 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { handleFirestoreError, OperationType } from '@/lib/utils';
+import { customerService } from '@/lib/services/customerService';
+import { orderService } from '@/lib/services/orderService';
+import { notificationService } from '@/lib/services/notificationService';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -49,14 +49,7 @@ export function OrderDetailsDialog({
     const checkMatch = async () => {
       setMatchStatus('checking');
       try {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, 'customers'),
-          where('companyId', '==', order.companyId),
-          where('isDeleted', '==', false)
-        );
-        const snapshot = await getDocs(q);
-        const customers = snapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        const customers = await customerService.getCustomersByCompanyId(order.companyId);
 
         const matches = customers.filter(c => 
           (order.customerPhone && c.phone === order.customerPhone) ||
@@ -80,20 +73,16 @@ export function OrderDetailsDialog({
     setMerging(true);
     try {
       if (order.source === 'customer') {
-        await updateDoc(doc(db, 'customers', crmCustomerId), {
+        await customerService.updateCustomer(crmCustomerId, {
           appUserId: order.createdBy,
-          updatedAt: serverTimestamp(),
-          updatedBy: user?.uid || 'system'
-        });
+        }, user?.uid || 'system');
       }
-      await updateDoc(doc(db, 'orders', order.id), {
+      await orderService.updateOrder(order.id, {
         customerId: crmCustomerId,
         linkedCrmCustomerId: crmCustomerId,
         clientUid: order.source === 'customer' ? order.createdBy : null,
         customerName: crmCustomerName,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid || 'system'
-      });
+      }, user?.uid || 'system');
       toast.success('تمت عملية الدمج بنجاح وتم تحديث الطلب');
       onOpenChange(false);
     } catch (e) {
@@ -106,29 +95,20 @@ export function OrderDetailsDialog({
   const handleApproveNewCustomer = async () => {
     setMerging(true);
     try {
-      const { setDoc } = await import('firebase/firestore');
       const newCustId = `cust_${crypto.randomUUID()}`;
-      await setDoc(doc(db, 'customers', newCustId), {
-        companyId: order.companyId,
+      await customerService.createCustomer(newCustId, order.companyId, {
         name: order.customerName,
         phone: order.customerPhone || '',
         address: order.customerAddress || '',
         contactNumbers: order.customerPhone ? [order.customerPhone] : [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user?.uid,
-        updatedBy: user?.uid,
         ...(order.source === 'customer' && { appUserId: order.createdBy }),
-        isDeleted: false
-      });
+      }, user?.uid || 'system');
 
-      await updateDoc(doc(db, 'orders', order.id), {
+      await orderService.updateOrder(order.id, {
         customerId: newCustId,
         linkedCrmCustomerId: newCustId,
         clientUid: order.source === 'customer' ? order.createdBy : null,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid || 'system'
-      });
+      }, user?.uid || 'system');
       toast.success('تمت إضافة العميل لقاعدة البيانات والموافقة بنجاح');
       onOpenChange(false);
     } catch (e) {
@@ -154,62 +134,46 @@ export function OrderDetailsDialog({
     try {
       let finalCustomerId = order.customerId;
       let finalLinkedCrmId = order.linkedCrmCustomerId;
-      const { setDoc } = await import('firebase/firestore');
 
       if (order.source === 'customer' && !order.linkedCrmCustomerId && activeIndex === -1 && matchStatus === 'no_match') {
         // Automatically add new customer
         const newCustId = `cust_${crypto.randomUUID()}`;
-        await setDoc(doc(db, 'customers', newCustId), {
-          companyId: order.companyId,
+        await customerService.createCustomer(newCustId, order.companyId, {
           name: order.customerName,
           phone: order.customerPhone || '',
           address: order.customerAddress || '',
           contactNumbers: order.customerPhone ? [order.customerPhone] : [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user?.uid,
-          updatedBy: user?.uid,
           ...(order.source === 'customer' && { appUserId: order.createdBy }),
-          isDeleted: false
-        });
+        }, user?.uid || 'system');
         finalCustomerId = newCustId;
         finalLinkedCrmId = newCustId;
       }
 
-      await updateDoc(doc(db, 'orders', order.id), {
+      await orderService.updateOrder(order.id, {
         status: nextStage.name,
         ...(finalCustomerId !== order.customerId && {
           customerId: finalCustomerId,
           linkedCrmCustomerId: finalLinkedCrmId
         }),
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid || 'system'
-      });
+      }, user?.uid || 'system');
+
       toast.success('تم انتقال الطلب للمرحلة التالية بنجاح');
       onOpenChange(false);
 
       const isFinalStage = stages.length > 0 && nextStage.name === stages[stages.length - 1].name;
       if (!isFinalStage) {
-        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-        const { setDoc } = await import('firebase/firestore');
         const cUid = order.clientUid || (order.source === 'customer' ? order.createdBy : null);
-        await setDoc(doc(db, 'notifications', notifId), {
+        await notificationService.createNotification({
           companyId: order.companyId,
           ...(cUid && { clientUid: cUid }),
           title: 'تحديث حالة الطلب',
           message: `تم تحديث حالة الطلب للعميل ${order?.customerName || ''} إلى: ${nextStage.name}`,
           type: 'status_update',
           orderId: order.id,
-          readBy: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user?.uid,
-          updatedBy: user?.uid,
-          isDeleted: false
-        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+        }, user?.uid || 'system').catch((err: any) => console.error(err));
       }
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.UPDATE, `orders/${order.id}`);
+      console.error(error);
       toast.error('حدث خطأ أثناء نقل الطلب');
     } finally {
       setSaving(false);
@@ -251,52 +215,39 @@ export function OrderDetailsDialog({
       });
 
       // Update current order
-      await updateDoc(doc(db, 'orders', order.id), {
+      await orderService.updateOrder(order.id, {
         items: remainingItems,
         totalAmountByCurrency: remainingTotals,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid || 'system'
-      });
+      }, user?.uid || 'system');
 
       // Create new order
       const newOrderId = `ord_${crypto.randomUUID()}`;
       // first stage name
       const initialStageName = stages.length > 0 ? stages[0].name : 'pending';
       const excludeTotalQty = excludedItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
-      const { setDoc, Timestamp } = await import('firebase/firestore');
 
-      await setDoc(doc(db, 'orders', newOrderId), {
+      await orderService.createOrder({
         ...order,
         id: newOrderId,
         items: excludedItems,
         totalAmountByCurrency: excludedTotals,
         totalQuantity: excludeTotalQty,
         status: initialStageName, // New order resets to first stage
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user?.uid || 'system',
-        createdByName: user?.displayName || 'System',
-      });
+      }, user?.uid || 'system');
 
       // Create reminder notification
-      const notifId = `notif_${crypto.randomUUID()}`;
       const hours = parseInt(reminderHours) || 24;
       const remindAtTime = Date.now() + hours * 3600 * 1000;
+      const { Timestamp } = await import('firebase/firestore');
       
-      await setDoc(doc(db, 'notifications', notifId), {
+      await notificationService.createNotification({
         companyId: order.companyId,
         title: 'تذكير باستكمال صنف مستثنى',
         message: `طلب مجدول: العميل ${order.customerName} يحتاج لتوفير أصناف نفذت.`,
         type: 'reminder',
         orderId: newOrderId,
-        readBy: [],
         remindAt: Timestamp.fromMillis(remindAtTime),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user?.uid,
-        updatedBy: user?.uid,
-        isDeleted: false
-      }).catch(err => console.error(err));
+      }, user?.uid || 'system').catch(err => console.error(err));
 
       toast.success('تم استثناء الأصناف وإنشاء طلب جديد لها بنجاح.');
       setShowExcludeDialog(false);

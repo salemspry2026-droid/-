@@ -14,6 +14,7 @@ import { CompanySettingsDialog } from './CompanySettings';
 
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { AdministrationDialog } from './AdministrationDialog';
+import { orderService } from '@/lib/services/orderService';
 
 export function HomeTab() {
   const { profile, setIsNotificationsOpen, setIsCallRecordingsOpen, setActiveTab, unreadNotifications } = useStore();
@@ -23,6 +24,15 @@ export function HomeTab() {
   const [isCompanySettingsOpen, setIsCompanySettingsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any>(null);
+  
+  const [dashboardStats, setDashboardStats] = useState({
+    todayCount: 0,
+    delegateCount: 0,
+    customerCount: 0,
+    totalSalesToday: 0,
+    avgSalesToday: 0,
+    stageCounts: {} as Record<string, number>
+  });
   
   useEffect(() => {
     // Data Migration: Disabled to prevent permission loops
@@ -43,31 +53,25 @@ export function HomeTab() {
       where('isDeleted', '==', false)
     );
     const unsubStages = onSnapshot(qStages, (snapshot) => {
-      setOrderStages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index));
+      const stages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index);
+      setOrderStages(stages);
+      
+      // Fetch dashboard stats after stages are loaded
+      orderService.getDashboardStats(profile.companyId, companyCurrency, stages).then(stats => {
+        if (stats) setDashboardStats(stats);
+      }).catch(err => console.error("Error fetching stats:", err));
     });
 
-    const qOrders = query(
-      collection(db, 'orders'), 
-      where('companyId', '==', profile.companyId), 
-      where('isDeleted', '==', false)
-    );
-
-    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetched.sort((a: any, b: any) => {
-        const da = a.createdAt?.toMillis?.() || 0;
-        const dbTime = b.createdAt?.toMillis?.() || 0;
-        return dbTime - da;
-      });
+    const unsubOrders = orderService.subscribeToRecentOrders(profile.companyId, 5, (fetched) => {
       setOrders(fetched);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
+    });
 
     return () => {
       unsubCompany();
       unsubStages();
       unsubOrders();
     };
-  }, [profile?.companyId]);
+  }, [profile?.companyId, companyCurrency]);
 
   const handleLogout = async () => {
     try {
@@ -77,33 +81,7 @@ export function HomeTab() {
     }
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const todaysOrders = orders.filter(o => {
-    if (!o.createdAt) return false;
-    const orderDate = o.createdAt.toDate();
-    return orderDate >= today;
-  });
-
-  const totalSalesToday = todaysOrders.reduce((sum, order) => {
-    let amount = 0;
-    if (order.totalAmountByCurrency) {
-      // Sum the amounts that match the primary currency
-      amount = order.totalAmountByCurrency[companyCurrency] || 0;
-      // If the order has only one currency and it differs, should we include it? 
-      // Safest is to explicitly sum the chosen primary currency.
-    }
-    return sum + amount;
-  }, 0);
-
-  const ordersWithPrimaryCurrencyCount = todaysOrders.filter(o => o.totalAmountByCurrency && o.totalAmountByCurrency[companyCurrency] !== undefined).length;
-  const avgSalesToday = ordersWithPrimaryCurrencyCount > 0 ? totalSalesToday / ordersWithPrimaryCurrencyCount : 0;
-
-  const newOrdersCount = orders.filter(o => o.status === 'pending').length;
-  const reviewOrdersCount = orders.filter(o => o.status === 'processing').length;
-  const confirmedOrdersCount = orders.filter(o => o.status === 'completed').length;
-  const deliveredOrdersCount = orders.filter(o => o.status === 'delivered').length; // Assuming delivered status exists
+  const { totalSalesToday, todayCount, delegateCount, customerCount, avgSalesToday, stageCounts } = dashboardStats;
 
   const fallbackStages = [
     { id: 'pending', name: 'جديد', color: 'bg-blue-50 text-blue-900 border-blue-200', iconBg: 'bg-blue-600 text-white', iconContent: 'NEW' },
@@ -186,13 +164,13 @@ export function HomeTab() {
         <div className="flex items-center gap-4 text-sm text-blue-100 border-t border-blue-400/30 pt-4">
           <div className="flex items-center gap-1">
             <Package className="w-4 h-4" />
-            <span>{todaysOrders.length} طلب</span>
+            <span>{todayCount} طلب</span>
           </div>
           <div className="flex items-center gap-1 opacity-75">
             <span>(</span>
-            <span className="text-blue-200">{todaysOrders.filter(o => o.source !== 'customer').length} مندوب</span>
+            <span className="text-blue-200">{delegateCount} مندوب</span>
             <span>-</span>
-            <span className="text-purple-200">{todaysOrders.filter(o => o.source === 'customer').length} عميل</span>
+            <span className="text-purple-200">{customerCount} عميل</span>
             <span>)</span>
           </div>
           <div className="flex items-center gap-1 mr-auto">
@@ -205,7 +183,7 @@ export function HomeTab() {
       {/* Dynamic Status Cards */}
       <div className={`pb-2 hide-scrollbar flex w-full ${stagesToDisplay.length > 5 ? 'gap-3 overflow-x-auto' : 'gap-2 md:gap-3 justify-between'}`}>
         {stagesToDisplay.map((stage) => {
-          const count = orders.filter(o => o.status === stage.id).length;
+          const count = stageCounts[stage.id || stage.name] || 0;
           const isScrollable = stagesToDisplay.length > 5;
           return (
             <div key={stage.id} className={`${stage.color} ${isScrollable ? 'shrink-0 w-28' : 'flex-1 min-w-0'} rounded-xl p-2 md:p-3 flex flex-col items-center justify-center text-center gap-1`}>

@@ -12,6 +12,8 @@ import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { productService } from '@/lib/services/productService';
+import { orderService } from '@/lib/services/orderService';
 
 interface CartItem {
   product: any;
@@ -70,25 +72,23 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     // Reset cart when company changes
     setCart([]);
 
-    const qProducts = query(
-      collection(db, 'products'), 
-      where('companyId', '==', clientSelectedCompany.id),
-      where('isActive', '==', true),
-      where('isDeleted', '==', false)
-    );
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', clientSelectedCompany.id));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', clientSelectedCompany.id));
-    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', clientSelectedCompany.id));
-
-    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProducts(prods);
+    const unsubProducts = productService.subscribeToProducts(clientSelectedCompany.id, (prods) => {
+      // Filter active products locally or we can filter here
+      setProducts(prods.filter((p: any) => p.isActive));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubCats = onSnapshot(qCats, (snap) => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))), e => console.error(e));
-    const unsubBrands = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }))), e => console.error(e));
-    const unsubStages = onSnapshot(qStages, (snap) => setOrderStages(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index)), e => console.error(e));
+    const unsubCats = productService.subscribeToCategories(clientSelectedCompany.id, (cats) => {
+      setCategories(cats);
+    });
+
+    const unsubBrands = productService.subscribeToBrands(clientSelectedCompany.id, (brs) => {
+      setBrands(brs);
+    });
+
+    const unsubStages = orderService.subscribeToOrderStages(clientSelectedCompany.id, (stages) => {
+      setOrderStages(stages);
+    }, e => console.error(e));
 
     return () => { unsubProducts(); unsubCats(); unsubBrands(); unsubStages(); };
   }, [clientSelectedCompany?.id]);
@@ -105,7 +105,9 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         productName: item.product.name,
         quantity: item.quantity,
         price: item.product.specialOffer?.isActive ? item.product.specialOffer.price : item.product.price,
-        currency: item.product.currency
+        currency: item.product.currency,
+        bonusQuantity: calculateBonus(item),
+        isManualBonus: false
       }));
 
       const totalAmountByCurrency: Record<string, number> = {};
@@ -116,63 +118,16 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         totalAmountByCurrency[item.currency] += item.price * item.quantity;
       });
 
-      // Find if this user already has a linked CRM customer ID for this company
-      let existingLinkedCrmCustomerId = null;
-      let existingCustomerId = user.uid;
-      try {
-        const { getDocs } = await import('firebase/firestore');
-        const qOrders = query(
-          collection(db, 'orders'),
-          where('createdBy', '==', user.uid)
-        );
-        const prevOrdersSnap = await getDocs(qOrders);
-        const linkedOrder = prevOrdersSnap.docs.find(d => {
-          const data = d.data();
-          return data.companyId === clientSelectedCompany.id && !data.isDeleted && data.linkedCrmCustomerId;
-        });
-        if (linkedOrder) {
-          existingLinkedCrmCustomerId = linkedOrder.data().linkedCrmCustomerId;
-          existingCustomerId = existingLinkedCrmCustomerId;
-        }
-      } catch (err) {
-        console.error('Error fetching past orders for linking:', err);
-      }
-
-      await setDoc(doc(db, 'orders', orderId), {
-        companyId: clientSelectedCompany.id,
-        customerId: existingCustomerId, // Use linked CRM ID if known
-        ...(existingLinkedCrmCustomerId && { linkedCrmCustomerId: existingLinkedCrmCustomerId }),
-        clientUid: user.uid,
-        customerName: profile?.storeName || profile?.displayName || 'عميل',
-        customerPhone: profile?.phone || '',
-        customerAddress: profile?.address || 'طلب عبر التطبيق',
-        source: 'customer',
-        items: items,
-        totalAmountByCurrency: totalAmountByCurrency,
-        status: orderStages.length > 0 ? orderStages[0].name : 'pending', // Usually the first stage
-        invoiceType: invoiceType,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        createdByName: profile?.displayName || user.displayName || 'عميل',
-        updatedBy: user.uid,
-        isDeleted: false
-      });
-
-      const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-      await setDoc(doc(db, 'notifications', notifId), {
-        companyId: clientSelectedCompany.id,
-        title: 'طلب جديد من عميل',
-        message: `تم تسجيل طلب جديد رقم #${orderId.substring(0, 6)} من قِبل العميل المباشر ${profile?.displayName || 'مجهول'}`,
-        type: 'client_order',
-        orderId: orderId,
-        readBy: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => console.error("Failed to create notification", err));
+      const initialStatus = orderStages.length > 0 ? orderStages[0].name : 'pending';
+      await orderService.placeClientOrder(
+        user.uid,
+        profile,
+        clientSelectedCompany.id,
+        items,
+        invoiceType,
+        totalAmountByCurrency,
+        initialStatus
+      );
 
       toast.success('تم إرسال الطلب بنجاح وهو في انتظار التأكيد!');
       setCart([]);
@@ -184,6 +139,28 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     } finally {
       setIsOrdering(false);
     }
+  };
+
+  const calculateBonus = (item: CartItem) => {
+    const p = item.product;
+    if (!p.bonusType || p.bonusType === 'none') return 0;
+    
+    if (p.bonusType === 'fixed') {
+      const pct = p.bonusFixedPercent || 0;
+      return Math.floor(item.quantity * (pct / 100));
+    }
+    
+    if (p.bonusType === 'tiered' && p.bonusTiers) {
+      const tier = p.bonusTiers.find((t: any) => {
+         const mInvoice = !t.invoiceType || t.invoiceType === 'all' || t.invoiceType === invoiceType;
+         const mQty = item.quantity >= t.minQty && (!t.maxQty || item.quantity <= t.maxQty);
+         return mInvoice && mQty;
+      });
+      if (tier) {
+         return Math.floor(item.quantity * (tier.percent / 100));
+      }
+    }
+    return 0;
   };
 
   const getCartQuantity = (displayId: string) => {
@@ -241,10 +218,10 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     const catName = categories.find(c => c.id === product.categoryId)?.name || (product.category && !product.category.startsWith('cat_') && product.category !== 'none' ? product.category : '');
     const brandName = brands.find(b => b.id === product.brandId)?.name || (product.brand && !product.brand.startsWith('brand_') && product.brand !== 'none' ? product.brand : '');
 
-    const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.scientificName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          catName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          brandName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (product.scientificName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (catName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (brandName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'all' || product.categoryId === activeCategory || product.category === activeCategory;
     
     if (!matchesSearch || !matchesCategory) return [];
@@ -510,6 +487,11 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                       <span key={curr} className="ml-2">{total} {curr}</span>
                     ))}
                   </p>
+                  {cart.some(i => calculateBonus(i) > 0) && (
+                    <p className="text-[10px] text-yellow-300 font-bold mt-0.5">
+                      + {cart.reduce((s, i) => s + calculateBonus(i), 0)} وحدة بونص مجاني
+                    </p>
+                  )}
                </div>
              </div>
              
@@ -550,6 +532,11 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-sm text-gray-900 truncate">{item.product.name}</h4>
                       <p className="text-xs text-gray-500 mb-2">{price} {item.product.currency}</p>
+                      {calculateBonus(item) > 0 && (
+                        <p className="text-xs font-bold text-purple-600 mb-2 bg-purple-50 inline-block px-2 py-0.5 rounded">
+                          بونص مجاني: {calculateBonus(item)}
+                        </p>
+                      )}
                       
                       <div className="flex items-center gap-3 bg-white w-fit rounded-lg border border-gray-200">
                         <button 
@@ -613,6 +600,12 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
              <div className="h-px bg-green-200 my-3"></div>
              <h4 className="font-bold text-gray-900 mb-2">الإجمالي</h4>
              <div className="space-y-1">
+               {cart.filter(i => calculateBonus(i) > 0).length > 0 && (
+                 <div className="flex justify-between items-center font-bold text-purple-700 text-sm mb-2 pb-2 border-b border-purple-100">
+                   <span>إجمالي البونص المجاني</span>
+                   <span>{cart.reduce((sum, item) => sum + calculateBonus(item), 0)} وحدة</span>
+                 </div>
+               )}
                {Object.entries(cartTotalsByCurrency).map(([curr, total]) => (
                 <div key={curr} className="flex justify-between items-center font-bold text-green-800 text-lg">
                   <span>{curr}</span>

@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { companyService } from '@/lib/services/companyService';
+import { settingsService } from '@/lib/services/settingsService';
+import { doc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -151,9 +153,8 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
 
   useEffect(() => {
     if (!profile?.companyId) return;
-    const locQ = query(collection(db, 'locations'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const unsub = onSnapshot(locQ, (snap) => {
-      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = settingsService.subscribeToCollection(profile.companyId, 'locations', (data) => {
+      setLocations(data);
     });
     return () => unsub();
   }, [profile?.companyId]);
@@ -167,10 +168,9 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
     const fetchCompany = async () => {
       setLoading(true);
       try {
-        const docSnap = await getDoc(doc(db, 'companies', profile.companyId as string)).catch(err => handleFirestoreError(err, OperationType.GET, `companies/${profile.companyId}`));
-        if (docSnap && docSnap.exists()) {
-          const data = docSnap.data();
-          setCompany({ id: docSnap.id, ...data });
+        const data: any = await companyService.getCompanyById(profile.companyId as string);
+        if (data) {
+          setCompany(data);
           setName(data.name || '');
           setCompanyType(data.companyType || '');
           setCompanyTypeOther(data.companyTypeOther || '');
@@ -187,7 +187,7 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
           setIsVisibleToClients(data.isVisibleToClients || false);
         }
       } catch (error) {
-        console.error(error);
+        handleFirestoreError(error, OperationType.GET, `companies/${profile.companyId}`);
       } finally {
         setLoading(false);
       }
@@ -216,11 +216,9 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
       const base64Image = await compressImageToBase64(file);
       
       // Update Firestore directly with the Base64 string (bypasses Firebase Storage entirely)
-      await updateDoc(doc(db, 'companies', profile.companyId), {
-        logoUrl: base64Image,
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid
-      });
+      await companyService.updateCompanySettings(profile.companyId, {
+        logoUrl: base64Image
+      }, user.uid);
 
       setLogoUrl(base64Image);
       setCompany((prev: any) => ({ ...prev, logoUrl: base64Image }));
@@ -258,8 +256,6 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
         notes,
         primaryCurrency,
         isVisibleToClients,
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid
       };
       
       // Generate clientJoinCode if it doesn't exist
@@ -267,12 +263,11 @@ export function CompanySettingsDialog({ open, onOpenChange }: { open: boolean, o
         updates.clientJoinCode = 'CLI-' + Math.random().toString(36).substring(2, 8).toUpperCase();
       }
 
-      await updateDoc(doc(db, 'companies', profile.companyId), updates).catch(err => handleFirestoreError(err, OperationType.UPDATE, `companies/${profile.companyId}`));
+      await companyService.updateCompanySettings(profile.companyId, updates, user.uid);
       
       setCompany((prev: any) => ({
         ...prev,
-        ...updates,
-        updatedAt: undefined // remove serverTimestamp for local state
+        ...updates
       }));
       
       toast.success('تم حفظ معلومات الشركة بنجاح');

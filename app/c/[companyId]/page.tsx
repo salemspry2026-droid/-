@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { AppLogoText } from '@/components/AppLogo';
 import { cn } from '@/lib/utils';
+import { companyService } from '@/lib/services/companyService';
+import { productService } from '@/lib/services/productService';
 
 export default function PublicCompanyPage() {
   const { companyId } = useParams();
@@ -31,16 +33,12 @@ export default function PublicCompanyPage() {
   useEffect(() => {
     if (!companyId || typeof companyId !== 'string') return;
       
-    setLoading(true);
-
-    const companyRef = doc(db, 'companies', companyId);
-    const unsubCompany = onSnapshot(companyRef, (docSnap) => {
-      if (!docSnap.exists()) {
+    const unsubCompany = companyService.subscribeToCompany(companyId, (companyData) => {
+      if (!companyData) {
         setError('لم يتم العثور على الشركة المطلوبة.');
         setLoading(false);
         return;
       }
-      const companyData: any = { id: docSnap.id, ...docSnap.data() };
       if (companyData.isDeleted) {
          setError('تم حذف هذه الشركة.');
          setLoading(false);
@@ -54,37 +52,18 @@ export default function PublicCompanyPage() {
       setLoading(false);
     });
 
-    const productsRef = collection(db, 'products');
-    const qProducts = query(productsRef, where('companyId', '==', companyId));
-    const unsubProducts = onSnapshot(qProducts, (snap) => {
-      const productsData = snap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(p => !p.isDeleted && p.isActive !== false);
-      setProducts(productsData);
+    const unsubProducts = productService.subscribeToProducts(companyId, (prods) => {
+      setProducts(prods.filter(p => p.isActive !== false));
     }, (err) => {
       console.warn("Product fetch error", err);
     });
 
-    const categoriesRef = collection(db, 'productCategories');
-    const qCategories = query(categoriesRef, where('companyId', '==', companyId));
-    const unsubCategories = onSnapshot(qCategories, (snap) => {
-      const categoriesData = snap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(c => !c.isDeleted);
-      setCategories(categoriesData);
-    }, (err) => {
-       console.warn("Category fetch error", err);
+    const unsubCategories = productService.subscribeToCategories(companyId, (cats) => {
+      setCategories(cats.filter((c: any) => !c.isDeleted));
     });
 
-    const brandsRef = collection(db, 'productBrands');
-    const qBrands = query(brandsRef, where('companyId', '==', companyId));
-    const unsubBrands = onSnapshot(qBrands, (snap) => {
-      const brandsData = snap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(b => !b.isDeleted);
-      setBrands(brandsData);
-    }, (err) => {
-      console.warn("Brand fetch error", err);
+    const unsubBrands = productService.subscribeToBrands(companyId, (brs) => {
+      setBrands(brs.filter((b: any) => !b.isDeleted));
     });
 
     return () => {

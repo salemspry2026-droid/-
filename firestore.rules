@@ -284,7 +284,10 @@ service cloud.firestore {
                     isValidCustomer(request.resource.data) && 
                     isUpdatedByCurrentUser() && 
                     areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) &&
-                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId));
+                    (
+                      isCompanyAdmin(resource.data.companyId) || 
+                      (isCompanySales(resource.data.companyId) && areImmutableFieldsUnchanged(['isDeleted']))
+                    );
     }
 
     match /orders/{orderId} {
@@ -300,7 +303,11 @@ service cloud.firestore {
                     isUnchangedOrBackfilled('createdAt') &&
                     isUnchangedOrBackfilled('createdBy') &&
                     isUnchangedOrBackfilled('companyId') &&
-                    (isCompanyAdmin(resource.data.companyId) || isCompanySales(resource.data.companyId) || (resource.data.createdBy == request.auth.uid && areImmutableFieldsUnchanged(['status', 'totalAmountByCurrency', 'items', 'companyId', 'customerId', 'linkedCrmCustomerId'])));
+                    (
+                      isCompanyAdmin(resource.data.companyId) || 
+                      (isCompanySales(resource.data.companyId) && areImmutableFieldsUnchanged(['isDeleted'])) || 
+                      (resource.data.createdBy == request.auth.uid && areImmutableFieldsUnchanged(['status', 'totalAmountByCurrency', 'items', 'companyId', 'customerId', 'linkedCrmCustomerId', 'isDeleted']))
+                    );
     }
 
     match /productCategories/{categoryId} {
@@ -331,6 +338,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidOrderStage(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidOrderStage(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAuthenticated() && isCompanyAdmin(resource.data.companyId);
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['companyId', 'action', 'details', 'createdAt', 'createdBy']) &&
+                    isCreatedByCurrentUser() &&
+                    isCompanyMember(request.resource.data.companyId);
+      allow update, delete: if false; // Audit logs are immutable
     }
   }
 }

@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from './ui/label';
 import { Shield, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { companyService } from '@/lib/services/companyService';
 
 export function StaffManager() {
   const { profile, user } = useStore();
@@ -20,19 +19,7 @@ export function StaffManager() {
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const q = query(
-      collection(db, 'userProfiles'),
-      where('companyId', '==', profile.companyId)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const users: any[] = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.role !== 'client') {
-          users.push({ id: doc.id, ...data });
-        }
-      });
+    const unsubscribe = companyService.subscribeToCompanyStaff(profile.companyId, (users) => {
       setStaff(users);
       setLoading(false);
     });
@@ -43,16 +30,11 @@ export function StaffManager() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
 
   const handleUpdateEmployee = async (empId: string, field: string, value: string) => {
-    if (!isAdmin) return;
+    if (!isAdmin || !user?.uid) return;
     try {
-      await updateDoc(doc(db, 'userProfiles', empId), {
-        [field]: value,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid
-      });
+      await companyService.updateEmployee(empId, { [field]: value }, user.uid, profile.companyId);
       toast.success('تم التحديث بنجاح');
     } catch (error) {
-      console.error("Error updating employee", error);
       toast.error('حدث خطأ أثناء التحديث');
     }
   };

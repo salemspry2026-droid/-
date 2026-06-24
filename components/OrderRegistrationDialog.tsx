@@ -457,7 +457,7 @@ export function OrderRegistrationDialog({
   };
 
   let expandedFilteredProducts = products.flatMap(p => {
-    const matchesSearch = p.name?.toLowerCase().includes(productSearch.toLowerCase());
+    const matchesSearch = (p.name || '').toLowerCase().includes(productSearch.toLowerCase());
     
     let matchesCategory = false;
     if (activeCategory === 'all') matchesCategory = true;

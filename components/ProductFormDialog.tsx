@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Plus, Sparkles, X, Gift, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, compressImage } from '@/lib/utils';
+import { productService } from '@/lib/services/productService';
 import Image from 'next/image';
 
 export function ProductFormDialog({ 
@@ -244,14 +245,14 @@ export function ProductFormDialog({
       };
 
       if (productToEdit) {
-        const changes = [];
+        const changes: string[] = [];
         if (productToEdit.inStock === false && inStock === true) changes.push('أصبح متوفراً للطلب');
         else if (productToEdit.inStock !== false && inStock === false) changes.push('نفدت كميته');
         if (!productToEdit.isLowStock && isLowStock) changes.push('قاربت كميته على الانتهاء');
         if (!productToEdit.isNewProduct && isNewProduct) changes.push('سجل كمنتج جديد');
         if (!productToEdit.specialOffer?.isActive && hasSpecialOffer) changes.push('يحمل عرضاً خاصاً جديداً');
 
-        await updateDoc(doc(db, 'products', productToEdit.id), productData);
+        await productService.updateProduct(productToEdit.id, productData, user.uid, profile.companyId);
 
         if (changes.length > 0) {
            try {
@@ -292,11 +293,8 @@ export function ProductFormDialog({
       } else {
         const productId = `prod_${Math.random().toString(36).substring(2, 11)}`;
         productData.companyId = profile.companyId;
-        productData.createdAt = serverTimestamp();
-        productData.createdBy = user.uid;
-        productData.isDeleted = false;
         productData.isActive = true;
-        await setDoc(doc(db, 'products', productId), productData);
+        await productService.createProduct(productId, productData, user.uid, profile.companyId);
         toast.success('تم إضافة الصنف بنجاح');
       }
 

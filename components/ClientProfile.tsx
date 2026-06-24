@@ -18,6 +18,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { compressImage } from '@/lib/utils';
 import Image from 'next/image';
 
+import { orderService } from '@/lib/services/orderService';
+import { companyService } from '@/lib/services/companyService';
+
 export default function ClientProfile() {
   const { profile, user } = useStore();
   const [loading, setLoading] = useState(false);
@@ -71,32 +74,17 @@ export default function ClientProfile() {
 
   useEffect(() => {
     if (!user) return;
-    import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
-      let myOrders: any[] = [];
-      let mappedOrders: any[] = [];
-      const updateCombined = () => {
-        const combined = [...myOrders, ...mappedOrders];
-        const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-        setClientOrders(unique);
-        setLoadingOrders(false);
-      };
-      const qSelf = query(collection(db, 'orders'), where('createdBy', '==', user.uid));
-      const qClientUid = query(collection(db, 'orders'), where('clientUid', '==', user.uid));
-      const qCompanies = query(collection(db, 'companies'), where('isDeleted', '==', false));
-      
-      const unsubSelf = onSnapshot(qSelf, (snap) => {
-        myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !(d as any).isDeleted);
-        updateCombined();
-      });
-      const unsubClientUid = onSnapshot(qClientUid, (snap) => {
-        mappedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !(d as any).isDeleted);
-        updateCombined();
-      });
-      const unsubCompanies = onSnapshot(qCompanies, (snap) => {
-        setCompanies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-      return () => { unsubSelf(); unsubClientUid(); unsubCompanies(); };
-    });
+    
+    const unsubOrders = orderService.subscribeToClientOrders(user.uid, (data) => {
+      setClientOrders(data);
+      setLoadingOrders(false);
+    }, (e) => console.error(e));
+
+    const unsubCompanies = companyService.subscribeToAllCompanies((data) => {
+      setCompanies(data);
+    }, (e) => console.error(e));
+
+    return () => { unsubOrders(); unsubCompanies(); };
   }, [user]);
 
   const filteredOrders = useMemo(() => {

@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -12,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Loader2, Plus, Phone, MapPin, Mail, Building, Trash2, Contact } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn, hasPermission } from '@/lib/utils';
+import { customerService } from '@/lib/services/customerService';
+import { locationService } from '@/lib/services/locationService';
 
 import { AddressSelector } from './AddressSelector';
 import { CustomerDetailsDialog } from './CustomerDetailsDialog';
@@ -36,6 +36,7 @@ export function CustomersManager() {
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
+  const [pageSize, setPageSize] = useState(20);
 
   // Form state
   const [name, setName] = useState('');
@@ -77,30 +78,28 @@ export function CustomersManager() {
 
   useEffect(() => {
     if (!profile?.companyId) return;
-    const locQ = query(collection(db, 'locations'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const unsub = onSnapshot(locQ, (snap) => {
-      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = locationService.subscribeToLocations(
+      profile.companyId,
+      (data) => setLocations(data)
+    );
     return () => unsub();
   }, [profile?.companyId]);
 
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const q = query(
-      collection(db, 'customers'), 
-      where('companyId', '==', profile.companyId),
-      where('isDeleted', '==', false)
+    const unsub = customerService.subscribeToPaginatedCustomers(
+      profile.companyId,
+      pageSize,
+      (custs) => {
+        setCustomers(custs);
+        setLoading(false);
+      },
+      (error: any) => handleFirestoreError(error, OperationType.LIST, 'customers')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const custs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCustomers(custs);
-      setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
-
-    return () => unsubscribe();
-  }, [profile?.companyId]);
+    return () => unsub();
+  }, [profile?.companyId, pageSize]);
 
   const handleImportContact = async () => {
     if (typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
@@ -141,27 +140,21 @@ export function CustomersManager() {
         customerType,
         customerTypeOther: customerType === 'other' ? customerTypeOther : '',
         isActive,
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
       };
 
       if (editingCustomer) {
-        await updateDoc(doc(db, 'customers', editingCustomer.id), customerData).catch(err => handleFirestoreError(err, OperationType.UPDATE, `customers/${editingCustomer.id}`));
+        await customerService.updateCustomer(editingCustomer.id, customerData, user.uid, profile.companyId);
         toast.success('تم تحديث العميل بنجاح');
       } else {
         const customerId = `cust_${crypto.randomUUID()}`;
-        customerData.companyId = profile.companyId;
-        customerData.createdAt = serverTimestamp();
-        customerData.createdBy = user.uid;
-        customerData.isDeleted = false;
-        
-        await setDoc(doc(db, 'customers', customerId), customerData).catch(err => handleFirestoreError(err, OperationType.CREATE, `customers/${customerId}`));
+        await customerService.createCustomer(customerId, profile.companyId, customerData, user.uid);
         toast.success('تم إضافة العميل بنجاح');
       }
 
       setIsDialogOpen(false);
       resetForm();
     } catch (error: any) {
+      handleFirestoreError(error, editingCustomer ? OperationType.UPDATE : OperationType.CREATE, 'customers');
       toast.error(error.message || (editingCustomer ? 'فشل تحديث العميل' : 'فشل إضافة العميل'));
     }
   };
@@ -196,9 +189,9 @@ export function CustomersManager() {
   };
 
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          customer.phone?.includes(searchQuery) ||
-                          customer.id?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (customer.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (customer.phone || '').includes(searchQuery) ||
+                          (customer.id || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = activeStatusFilter === 'all' || 
                           (activeStatusFilter === 'active' && customer.isActive !== false) ||
                           (activeStatusFilter === 'inactive' && customer.isActive === false);
@@ -451,6 +444,14 @@ export function CustomersManager() {
           </div>
         )}
       </div>
+      
+      {filteredCustomers.length >= pageSize && (
+        <div className="flex justify-center mt-6">
+          <Button variant="outline" onClick={() => setPageSize(prev => prev + 20)} className="rounded-full px-8">
+            عرض المزيد
+          </Button>
+        </div>
+      )}
 
       <CustomerDetailsDialog 
         customer={selectedCustomer} 

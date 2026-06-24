@@ -7,7 +7,9 @@ import { collection, query, where, getDocs, doc, setDoc, serverTimestamp, update
 import { Button } from '@/components/ui/button';
 import { Loader2, ShoppingCart, Heart, Package, Trash2, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner';
-import { handleFirestoreError, OperationType } from '@/lib/utils';
+import { productService } from '@/lib/services/productService';
+import { companyService } from '@/lib/services/companyService';
+import { orderService } from '@/lib/services/orderService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
 
@@ -36,41 +38,12 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
       try {
         const productIds = profile.favoriteProductIds as string[];
         
-        // Fetch products in chunks of 30 due to Firestore 'in' limits
-        const chunks = [];
-        for (let i = 0; i < productIds.length; i += 30) {
-          chunks.push(productIds.slice(i, i + 30));
-        }
-
-        const allProducts = [];
-        for (const chunk of chunks) {
-          const q = query(
-            collection(db, 'products'),
-            where('__name__', 'in', chunk),
-            where('isDeleted', '==', false)
-          );
-          const snap = await getDocs(q);
-          allProducts.push(...snap.docs.map(d => ({ id: d.id, displayId: d.id, ...d.data() })));
-        }
-
+        const allProducts = await productService.getProductsByIds(productIds);
         setFavoriteProducts(allProducts);
 
         // Fetch company info for these products
-        const companyIdsArr = Array.from(new Set(allProducts.map((p: any) => p.companyId).filter(Boolean)));
-        const compChunks = [];
-        for (let i = 0; i < companyIdsArr.length; i += 30) {
-          compChunks.push(companyIdsArr.slice(i, i + 30));
-        }
-        
-        const allComps = [];
-        for (const chunk of compChunks) {
-          const qc = query(
-            collection(db, 'companies'),
-            where('__name__', 'in', chunk)
-          );
-          const snapC = await getDocs(qc);
-          allComps.push(...snapC.docs.map(d => ({ id: d.id, ...d.data() })));
-        }
+        const companyIdsArr = Array.from(new Set(allProducts.map((p: any) => p.companyId).filter(Boolean))) as string[];
+        const allComps = await companyService.getCompaniesByIds(companyIdsArr);
         setCompanies(allComps);
 
       } catch (err) {
@@ -147,25 +120,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
     });
 
     try {
-      const { getDocs } = await import('firebase/firestore');
-      const qOrders = query(
-        collection(db, 'orders'),
-        where('createdBy', '==', user.uid)
-      );
-      const prevOrdersSnap = await getDocs(qOrders);
-      const pastOrders = prevOrdersSnap.docs.map(d => d.data());
-
       for (const [companyId, itemsGroup] of Object.entries(groups)) {
-        const orderId = `ord_${Math.random().toString(36).substring(2, 11)}`;
-        
-        let existingLinkedCrmCustomerId = null;
-        let existingCustomerId = user.uid;
-        const linkedOrder = pastOrders.find(o => o.companyId === companyId && !o.isDeleted && o.linkedCrmCustomerId);
-        if (linkedOrder) {
-          existingLinkedCrmCustomerId = linkedOrder.linkedCrmCustomerId;
-          existingCustomerId = existingLinkedCrmCustomerId;
-        }
-
         const orderItems = itemsGroup.map(item => ({
           productId: item.product.id,
           productName: item.product.name,
@@ -190,41 +145,15 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
           if (hasCashOrPending) finalInvoiceType = 'pending_cash'; // or something safe. Actually 'cash' is always safe.
         }
 
-        await setDoc(doc(db, 'orders', orderId), {
-          companyId: companyId,
-          customerId: existingCustomerId,
-          ...(existingLinkedCrmCustomerId && { linkedCrmCustomerId: existingLinkedCrmCustomerId }),
-          clientUid: user.uid,
-          customerName: profile?.storeName || profile?.displayName || 'عميل',
-          customerPhone: profile?.phone || '',
-          customerAddress: profile?.address || 'طلب عبر التطبيق',
-          source: 'customer',
-          items: orderItems,
-          totalAmountByCurrency: totalAmountByCurrency,
-          status: 'pending', 
-          invoiceType: finalInvoiceType,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          createdByName: profile?.displayName || user.displayName || 'عميل',
-          updatedBy: user.uid,
-          isDeleted: false
-        });
-
-        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-        await setDoc(doc(db, 'notifications', notifId), {
-          companyId: companyId,
-          title: 'طلب جديد من عميل',
-          message: `تم تسجيل طلب جديد رقم #${orderId.substring(0, 6)} من قِبل العميل المباشر`,
-          type: 'client_order',
-          orderId: orderId,
-          readBy: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedBy: user.uid,
-          isDeleted: false
-        }).catch(() => {});
+        await orderService.placeClientOrder(
+          user.uid,
+          profile,
+          companyId,
+          orderItems,
+          finalInvoiceType,
+          totalAmountByCurrency,
+          'pending'
+        );
       }
 
       toast.success(`تم إرسال ${Object.keys(groups).length} طلبات بنجاح للمصادر!`);

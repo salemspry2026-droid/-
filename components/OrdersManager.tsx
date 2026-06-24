@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -16,6 +14,9 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
+import { orderService } from '@/lib/services/orderService';
+import { customerService } from '@/lib/services/customerService';
+import { productService } from '@/lib/services/productService';
 
 export function OrdersManager() {
   const { profile, user } = useStore();
@@ -30,6 +31,7 @@ export function OrdersManager() {
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any>(null);
   const [activeDateFilter, setActiveDateFilter] = useState<'all' | 'today' | 'pending_debts'>('all');
+  const [pageSize, setPageSize] = useState(20);
 
   const { selectedOrderId, setSelectedOrderId } = useStore();
 
@@ -53,27 +55,13 @@ export function OrdersManager() {
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qOrders = query(collection(db, 'orders'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId), where('isDeleted', '==', false));
-
-    const unsubStages = onSnapshot(qStages, (snapshot) => {
-      setOrderStages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orderStages'));
-
-    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubStages = orderService.subscribeToOrderStages(profile.companyId, setOrderStages, (error: any) => handleFirestoreError(error, OperationType.LIST, 'orderStages'));
+    const unsubOrders = orderService.subscribeToOrders(profile.companyId, pageSize, (data) => {
+      setOrders(data);
       setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
-
-    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
-
-    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+    }, (error: any) => handleFirestoreError(error, OperationType.LIST, 'orders'));
+    const unsubCustomers = customerService.subscribeToCustomers(profile.companyId, setCustomers, (error: any) => handleFirestoreError(error, OperationType.LIST, 'customers'));
+    const unsubProducts = productService.subscribeToProducts(profile.companyId, setProducts, (error: any) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
     return () => {
       unsubStages();
@@ -81,36 +69,28 @@ export function OrdersManager() {
       unsubCustomers();
       unsubProducts();
     };
-  }, [profile?.companyId]);
+  }, [profile?.companyId, pageSize]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid
-      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `orders/${orderId}`));
+      if (!user?.uid || !profile?.companyId) return;
+      await orderService.updateOrderStatus(orderId, newStatus, user.uid, profile.companyId);
       toast.success('تم تحديث الحالة');
 
       const isFinalStage = orderStages.length > 0 && newStatus === orderStages[orderStages.length - 1].name;
       const tOrder = orders.find(o => o.id === orderId);
       if (!isFinalStage) {
-        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
         const cUid = (tOrder?.clientUid) || (tOrder?.source === 'customer' ? tOrder?.createdBy : null);
-        await setDoc(doc(db, 'notifications', notifId), {
-          companyId: profile?.companyId,
+        await orderService.createNotification(profile.companyId, {
           ...(cUid && { clientUid: cUid }),
           title: 'تحديث حالة الطلب',
           message: `تم تحديث حالة الطلب للعميل ${tOrder?.customerName || ''} إلى: ${newStatus}`,
           type: 'status_update',
           orderId: orderId,
           readBy: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
           createdBy: user?.uid,
           updatedBy: user?.uid,
-          isDeleted: false
-        }).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+        });
       }
     } catch (error: any) {
       toast.error(error.message || 'فشل تحديث الحالة');
@@ -130,7 +110,7 @@ export function OrdersManager() {
     : fallbackStages;
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || order.id.includes(searchQuery);
+    const matchesSearch = (order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) || order.id.includes(searchQuery);
     
     // Status Filter
     let stageFilterMatch = false;
@@ -373,6 +353,14 @@ export function OrdersManager() {
           </div>
         )}
       </div>
+      
+      {filteredOrders.length >= pageSize && (
+        <div className="flex justify-center mt-6">
+          <Button variant="outline" onClick={() => setPageSize(prev => prev + 20)} className="rounded-full px-8">
+            عرض المزيد
+          </Button>
+        </div>
+      )}
       
       <OrderDetailsDialog
         open={!!selectedOrderDetails}

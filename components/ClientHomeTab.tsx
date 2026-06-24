@@ -11,6 +11,9 @@ import { handleFirestoreError, OperationType } from '@/lib/utils';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 
+import { companyService } from '@/lib/services/companyService';
+import { productService } from '@/lib/services/productService';
+
 export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { setClientSelectedCompany, profile, user, setIsNotificationsOpen, unreadNotifications } = useStore();
   const [companies, setCompanies] = useState<any[]>([]);
@@ -21,26 +24,12 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Fetch all active companies
-    const qCompanies = query(
-      collection(db, 'companies'), 
-      where('isDeleted', '==', false)
-    );
+    const unsubCompanies = companyService.subscribeToAllCompanies((data) => {
+      setCompanies(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'companies'));
 
-    const unsubCompanies = onSnapshot(qCompanies, (snapshot) => {
-      setCompanies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'companies');
-    });
-
-    // Fetch all active products for stock logic & product search
-    const qProducts = query(
-      collection(db, 'products'),
-      where('isDeleted', '==', false)
-    );
-
-    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubProducts = productService.subscribeToAllProducts((data) => {
+      setProducts(data);
       setLoading(false);
     });
 

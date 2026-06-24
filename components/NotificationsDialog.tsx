@@ -6,6 +6,8 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, updateDoc, doc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { Loader2, Bell, Clock, PackageCheck, AlertCircle } from 'lucide-react';
+import { notificationService } from '@/lib/services/notificationService';
+import { orderService } from '@/lib/services/orderService';
 
 export function NotificationsDialog({ 
   open, 
@@ -23,60 +25,34 @@ export function NotificationsDialog({
   const [dbNotifications, setDbNotifications] = useState<any[]>([]);
   const [staleOrders, setStaleOrders] = useState<any[]>([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!open || !profile || !user?.uid) return;
+    if (!open || !profile || !user?.uid || !profile.role || !profile.companyId) return;
 
-    if (profile.role === 'client') {
-      const qNotifs = query(
-        collection(db, 'notifications'), 
-        where('clientUid', '==', user.uid),
-        where('isDeleted', '==', false)
-      );
-      const unsubNotifs = onSnapshot(qNotifs, (snap) => {
-        setDbNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    // 1. Listen to database notifications
+    const unsubNotifs = notificationService.subscribeToNotifications(
+      profile.companyId,
+      profile.role,
+      user.uid,
+      (data) => {
+        setDbNotifications(data);
         setLoading(false);
-      }, (error) => {
+      },
+      (error) => {
         if ((error as any).code !== 'permission-denied') {
           handleFirestoreError(error, OperationType.LIST, 'notifications');
         }
         setLoading(false);
-      });
-      return () => unsubNotifs();
-    }
-
-    if (!profile.companyId) return;
-
-    // 1. Listen to database notifications
-    const qNotifs = query(
-      collection(db, 'notifications'), 
-      where('companyId', '==', profile.companyId),
-      where('isDeleted', '==', false)
+      }
     );
 
-    const unsubNotifs = onSnapshot(qNotifs, (snap) => {
-      setDbNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'notifications');
-      setLoading(false);
-    });
-
     // 2. Fetch Stale Orders (unconfirmed for more than 4 hours)
-    // Client-side mapping
     let unsubOrders = () => {};
-    if (profile.role && ['admin', 'owner', 'sales'].includes(profile.role) && profile.companyId) {
+    if (['admin', 'owner', 'sales'].includes(profile.role)) {
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-      const qOrders = query(
-        collection(db, 'orders'),
-        where('companyId', '==', profile.companyId as string),
-        where('isDeleted', '==', false),
-        where('status', 'in', ['pending', 'processing']) // Unconfirmed
-      );
-
-      unsubOrders = onSnapshot(qOrders, (snap) => {
-        const allPending = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const stales = allPending.filter((o: any) => {
+      
+      unsubOrders = orderService.subscribeToOrders(profile.companyId, (data) => {
+        const pending = data.filter(o => o.status === 'pending' || o.status === 'processing');
+        const stales = pending.filter((o: any) => {
           const createdAt = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
           return createdAt < fourHoursAgo;
         });
@@ -95,11 +71,7 @@ export function NotificationsDialog({
   const markAsRead = async (notification: any) => {
     if (!user?.uid || notification.readBy?.includes(user?.uid) || notification.isStaleAlert) return;
     try {
-      await updateDoc(doc(db, 'notifications', notification.id), {
-        readBy: [...(notification.readBy || []), user.uid],
-        updatedBy: user.uid,
-        updatedAt: serverTimestamp()
-      });
+      await notificationService.markAsRead(notification.id, notification.readBy || [], user.uid);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `notifications/${notification.id}`);
     }
@@ -116,7 +88,7 @@ export function NotificationsDialog({
   };
 
   // Combine and sort notifications
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const visibleDbNotifications = dbNotifications.filter(n => {
     if (n.remindAt && n.remindAt?.toDate) {

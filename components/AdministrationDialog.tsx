@@ -13,6 +13,7 @@ import { Loader2, Settings, Plus, Trash2, Edit2, Save, X, MapPin, Tags, ListOrde
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { settingsService } from '@/lib/services/settingsService';
 
 export function AdministrationDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { profile, user } = useStore();
@@ -100,9 +101,8 @@ function CurrenciesManager({ companyId, userId }: { companyId: string, userId: s
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'companies', companyId), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+    const unsub = settingsService.subscribeToCompanySettings(companyId, (data) => {
+      if (data) {
         setPrimaryCurrency(data.primaryCurrency || 'SAR');
         setSecondaryCurrencies(data.secondaryCurrencies || []);
         setExchangeRates(data.exchangeRates || {});
@@ -114,13 +114,13 @@ function CurrenciesManager({ companyId, userId }: { companyId: string, userId: s
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'companies', companyId), {
+      await settingsService.updateCompanyCurrencies(
+        companyId,
         primaryCurrency,
         secondaryCurrencies,
         exchangeRates,
-        updatedAt: serverTimestamp(),
-        updatedBy: userId
-      });
+        userId
+      );
       toast.success('تم حفظ إعدادات العملات بنجاح');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `companies/${companyId}`);
@@ -245,9 +245,8 @@ function LocationsManager({ companyId, userId }: { companyId: string, userId: st
   const [parentId, setParentId] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'locations'), where('companyId', '==', companyId), where('isDeleted', '==', false));
-    const unsub = onSnapshot(q, (snap) => {
-      setLocations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = settingsService.subscribeToCollection(companyId, 'locations', (data) => {
+      setLocations(data);
       setLoading(false);
     });
     return () => unsub();
@@ -256,17 +255,11 @@ function LocationsManager({ companyId, userId }: { companyId: string, userId: st
   const handleAdd = async () => {
     if (!name) return;
     try {
-      await addDoc(collection(db, 'locations'), {
-        companyId,
+      await settingsService.addDocument(companyId, 'locations', {
         name,
         type,
-        parentId: parentId || null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: userId,
-        updatedBy: userId,
-        isDeleted: false
-      });
+        parentId: parentId || null
+      }, userId);
       setName('');
       toast.success('تمت الإضافة بنجاح');
     } catch (error) {
@@ -276,7 +269,7 @@ function LocationsManager({ companyId, userId }: { companyId: string, userId: st
 
   const handleDelete = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'locations', id), { isDeleted: true, updatedBy: userId, updatedAt: serverTimestamp() });
+      await settingsService.softDeleteDocument('locations', id, userId);
       toast.success('تم الحذف بنجاح');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `locations/${id}`);
@@ -378,21 +371,15 @@ function ProductMetadataManager({ companyId, userId }: { companyId: string, user
   const [newBrand, setNewBrand] = useState('');
 
   useEffect(() => {
-    const qCat = query(collection(db, 'productCategories'), where('companyId', '==', companyId));
-    const unsubCat = onSnapshot(qCat, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)));
-
-    const qBrand = query(collection(db, 'productBrands'), where('companyId', '==', companyId));
-    const unsubBrand = onSnapshot(qBrand, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)));
-
+    const unsubCat = settingsService.subscribeToCollection(companyId, 'productCategories', (data) => setCategories(data));
+    const unsubBrand = settingsService.subscribeToCollection(companyId, 'productBrands', (data) => setBrands(data));
     return () => { unsubCat(); unsubBrand(); };
   }, [companyId]);
 
   const handleAdd = async (collectionName: string, name: string, setName: (v: string) => void) => {
     if (!name) return;
     try {
-      await addDoc(collection(db, collectionName), {
-        companyId, name, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: userId, updatedBy: userId, isDeleted: false
-      });
+      await settingsService.addDocument(companyId, collectionName, { name }, userId);
       setName('');
       toast.success('تمت الإضافة بنجاح');
     } catch (error) {
@@ -402,7 +389,7 @@ function ProductMetadataManager({ companyId, userId }: { companyId: string, user
 
   const handleDelete = async (collectionName: string, id: string) => {
     try {
-      await updateDoc(doc(db, collectionName, id), { isDeleted: true, updatedBy: userId, updatedAt: serverTimestamp() });
+      await settingsService.softDeleteDocument(collectionName, id, userId);
       toast.success('تم الحذف بنجاح');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
@@ -452,10 +439,8 @@ function OrderStagesManager({ companyId, userId }: { companyId: string, userId: 
   const [allowedRoles, setAllowedRoles] = useState<string[]>(['owner', 'admin']);
 
   useEffect(() => {
-    const q = query(collection(db, 'orderStages'), where('companyId', '==', companyId));
-    const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index);
-      setStages(docs);
+    const unsub = settingsService.subscribeToCollection(companyId, 'orderStages', (data) => {
+      setStages(data.sort((a: any, b: any) => a.index - b.index));
     });
     return () => unsub();
   }, [companyId]);
@@ -463,17 +448,11 @@ function OrderStagesManager({ companyId, userId }: { companyId: string, userId: 
   const handleAdd = async () => {
     if (!name) return;
     try {
-      await addDoc(collection(db, 'orderStages'), {
-        companyId,
+      await settingsService.addDocument(companyId, 'orderStages', {
         name,
         index: stages.length,
         allowedRoles,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: userId,
-        updatedBy: userId,
-        isDeleted: false
-      });
+      }, userId);
       setName('');
       toast.success('تمت إضافة المرحلة بنجاح');
     } catch (error) {
@@ -483,7 +462,7 @@ function OrderStagesManager({ companyId, userId }: { companyId: string, userId: 
 
   const handleDelete = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'orderStages', id), { isDeleted: true, updatedBy: userId, updatedAt: serverTimestamp() });
+      await settingsService.softDeleteDocument('orderStages', id, userId);
       toast.success('تم الحذف بنجاح');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `orderStages/${id}`);

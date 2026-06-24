@@ -9,6 +9,7 @@ import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
+import { orderService } from '@/lib/services/orderService';
 
 export function ClientOrders() {
   const { profile, user, clientSelectedCompany } = useStore();
@@ -21,63 +22,28 @@ export function ClientOrders() {
 
   useEffect(() => {
     let timeout: any;
-    if (selectedOrderId) {
+    if (selectedOrderId && orders.length > 0) {
       timeout = setTimeout(() => {
+        const orderToOpen = orders.find(o => o.id === selectedOrderId);
+        if (orderToOpen) {
+          setSelectedOrder(orderToOpen);
+        }
         setActiveStatusFilter('all');
         setSelectedOrderId(null);
-      }, 0);
+      }, 100);
     }
     return () => clearTimeout(timeout);
-  }, [selectedOrderId, setSelectedOrderId]);
+  }, [selectedOrderId, setSelectedOrderId, orders]);
 
   useEffect(() => {
     if (!user) return;
 
-    let myOrders: any[] = [];
-    let mappedOrders: any[] = [];
-
-    const updateCombined = () => {
-      const combined = [...myOrders, ...mappedOrders];
-      // Deduplicate by id
-      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-      // Sort by date desc
-      unique.sort((a, b) => {
-        const da = a.createdAt?.toMillis?.() || 0;
-        const db = b.createdAt?.toMillis?.() || 0;
-        return db - da;
-      });
-      setOrders(unique);
+    const unsub = orderService.subscribeToClientOrders(user.uid, (data) => {
+      setOrders(data);
       setLoading(false);
-    };
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
-    const qSelf = query(
-      collection(db, 'orders'), 
-      where('createdBy', '==', user.uid)
-    );
-    const qClientUid = query(
-      collection(db, 'orders'), 
-      where('clientUid', '==', user.uid)
-    );
-
-    const unsubSelf = onSnapshot(qSelf, (snapshot) => {
-      myOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted);
-      updateCombined();
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders (self)'));
-
-    const unsubClientUid = onSnapshot(qClientUid, (snapshot) => {
-      mappedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(d => !(d as any).isDeleted);
-      updateCombined();
-    }, (error) => {
-      // It's possible clientUid query fails if no index but usually it uses single field index.
-      if ((error as any)?.code !== 'permission-denied') {
-         console.warn("Client UID order fetch error:", error);
-      }
-    });
-
-    return () => {
-      unsubSelf();
-      unsubClientUid();
-    };
+    return () => unsub();
   }, [user?.uid, user]);
 
   const filteredOrders = orders.filter(order => {
