@@ -28,7 +28,8 @@ export const notificationService = {
   markAsRead: async (notifId: string, readers: string[], newReaderId: string) => {
     await updateDoc(doc(db, 'notifications', notifId), {
       readBy: [...readers, newReaderId],
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      updatedBy: newReaderId
     });
   },
 
@@ -36,7 +37,8 @@ export const notificationService = {
      if (!readBy.includes(userUid)) {
        await updateDoc(doc(db, 'notifications', notifId), {
          readBy: [...readBy, userUid],
-         updatedAt: serverTimestamp()
+         updatedAt: serverTimestamp(),
+         updatedBy: userUid
        });
      }
   },

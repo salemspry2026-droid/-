@@ -36,10 +36,17 @@ export function OrdersManager() {
   const { selectedOrderId, setSelectedOrderId } = useStore();
 
   useEffect(() => {
-    let timeout: any;
     if (selectedOrderId && orders.length > 0) {
-      timeout = setTimeout(() => {
-        const orderToOpen = orders.find(o => o.id === selectedOrderId);
+      const openOrder = async () => {
+        let orderToOpen = orders.find(o => o.id === selectedOrderId);
+        if (!orderToOpen) {
+          try {
+            orderToOpen = await orderService.getOrderById(selectedOrderId);
+          } catch (error) {
+            console.error("Failed to fetch order:", error);
+          }
+        }
+        
         if (orderToOpen) {
           setSelectedOrderDetails(orderToOpen);
         } else {
@@ -47,9 +54,10 @@ export function OrdersManager() {
         }
         setActiveStatusFilter('all');
         setSelectedOrderId(null);
-      }, 100);
+      };
+      
+      openOrder();
     }
-    return () => clearTimeout(timeout);
   }, [selectedOrderId, setSelectedOrderId, orders]);
 
   useEffect(() => {

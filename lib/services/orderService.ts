@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, setDoc, onSnapshot, getCountFromServer, getAggregateFromServer, sum, average, limit, orderBy, startAfter, QueryConstraint, DocumentSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, setDoc, onSnapshot, getCountFromServer, getAggregateFromServer, sum, average, limit, orderBy, startAfter, QueryConstraint, DocumentSnapshot } from 'firebase/firestore';
 
 export interface ProductStats {
   timesOrdered: number;
@@ -344,6 +344,20 @@ export const orderService = {
       isDeleted: false,
       ...customProps
     });
+  },
+
+  getOrderById: async (orderId: string) => {
+    if (!orderId) return null;
+    try {
+      const snap = await getDoc(doc(db, 'orders', orderId));
+      if (snap.exists() && snap.data().isDeleted !== true) {
+        return { id: snap.id, ...snap.data() as any };
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching order by ID:", error);
+      throw error;
+    }
   },
 
   getOrdersByCustomerId: async (companyId: string, customerId: string) => {
