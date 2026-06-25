@@ -14,6 +14,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
+import { OrderRegistrationDialog } from './OrderRegistrationDialog';
 import { orderService } from '@/lib/services/orderService';
 import { customerService } from '@/lib/services/customerService';
 import { productService } from '@/lib/services/productService';
@@ -27,6 +28,7 @@ export function OrdersManager() {
   const [orderStages, setOrderStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editOrderData, setEditOrderData] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState('all');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any>(null);
@@ -375,7 +377,19 @@ export function OrdersManager() {
         onOpenChange={(open) => !open && setSelectedOrderDetails(null)}
         order={selectedOrderDetails}
         stages={orderStages}
+        onEditOrder={(order) => {
+          setSelectedOrderDetails(null);
+          setEditOrderData(order);
+        }}
       />
+      
+      {editOrderData && (
+        <OrderRegistrationDialog
+          open={!!editOrderData}
+          onOpenChange={(open) => !open && setEditOrderData(null)}
+          editOrder={editOrderData}
+        />
+      )}
     </div>
   );
 }

@@ -20,12 +20,14 @@ export function OrderDetailsDialog({
   open,
   onOpenChange,
   order,
-  stages
+  stages,
+  onEditOrder
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: any;
   stages: any[];
+  onEditOrder?: (order: any) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const { user, profile } = useStore();
@@ -407,6 +409,14 @@ export function OrderDetailsDialog({
                   <span className="text-gray-400 text-xs mb-1">الموظف</span>
                   <span className="font-bold text-gray-900 text-sm truncate max-w-full" dir="rtl">{order.createdByName || order.createdBy}</span>
                 </div>
+                {order.companyModifiedAt && (
+                  <div className="flex flex-col items-end text-right">
+                    <span className="text-gray-400 text-xs mb-1">تعديل الشركة</span>
+                    <span className="font-bold text-yellow-700 text-[11px] bg-yellow-50 px-2 py-1 rounded">
+                      تم إجراء تعديلات على الطلب من قبل الشركة
+                    </span>
+                  </div>
+                )}
                 <div className="flex flex-col items-end text-right">
                   <span className="text-gray-400 text-xs mb-1">ملاحظات</span>
                   <span className="font-bold text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded">
@@ -516,24 +526,35 @@ export function OrderDetailsDialog({
 
         {/* Bottom Action */}
         {profile?.role !== 'client' && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-            {nextStage ? (
-              <Button 
-                onClick={handleMoveToNextStage}
-                disabled={saving}
-                className="w-full h-14 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-base flex justify-center items-center gap-2"
-              >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                  <>
-                    <ArrowLeft className="w-5 h-5" /> إرسال لـ {nextStage.name}
-                  </>
-                )}
-              </Button>
-            ) : (
-              <div className="w-full h-14 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 font-bold text-base flex justify-center items-center">
-                الطلب في المرحلة النهائية
-              </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] flex gap-3">
+            {onEditOrder && (activeIndex <= 1) && (
+               <Button 
+                 onClick={() => onEditOrder(order)}
+                 variant="outline"
+                 className="h-14 px-6 rounded-xl font-bold text-gray-700 border-gray-200"
+               >
+                 تعديل الطلب
+               </Button>
             )}
+            <div className="flex-1">
+              {nextStage ? (
+                <Button 
+                  onClick={handleMoveToNextStage}
+                  disabled={saving}
+                  className="w-full h-14 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-base flex justify-center items-center gap-2"
+                >
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <>
+                      <ArrowLeft className="w-5 h-5" /> إرسال لـ {nextStage.name}
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <div className="w-full h-14 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 font-bold text-base flex justify-center items-center">
+                  الطلب في المرحلة النهائية
+                </div>
+              )}
+            </div>
           </div>
         )}
       </DialogContent>

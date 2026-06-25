@@ -148,6 +148,11 @@ export function ClientOrders() {
                       تم التسجيل بواسطة الشركة
                     </span>
                   )}
+                  {order.companyModifiedAt && (
+                    <span className="inline-block mt-1 bg-yellow-50 text-yellow-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      مُعدّل من الشركة
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-left flex flex-col items-end gap-1">

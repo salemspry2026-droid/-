@@ -18,14 +18,17 @@ import { ProductDetailsDialog } from './ProductDetailsDialog';
 
 export function OrderRegistrationDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  editOrder
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editOrder?: any;
 }) {
   const { profile, user } = useStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const isEditing = !!editOrder;
   
   // Data
   const [customers, setCustomers] = useState<any[]>([]);
@@ -63,20 +66,34 @@ export function OrderRegistrationDialog({
 
   useEffect(() => {
     if (open) {
-      setInvoiceType('cash');
-      setDueDate('');
-      setStep(1);
-      setCart([]);
-      setSelectedCustomerId('');
-      setDiscountValue(0);
-      setSkipReview(false);
+      if (editOrder) {
+        setInvoiceType(editOrder.invoiceType || 'cash');
+        setDueDate(editOrder.dueDate || '');
+        setStep(1);
+        setCart(editOrder.items ? editOrder.items.map((i: any) => ({
+          ...i,
+          productObj: { id: i.productId, name: i.productName, price: i.price, currency: i.currency, bonusType: i.bonusType || 'none' }
+        })) : []);
+        setSelectedCustomerId(editOrder.customerId || '');
+        setDiscountType(editOrder.discount?.type || 'percentage');
+        setDiscountValue(editOrder.discount?.value || 0);
+        setSkipReview(false);
+      } else {
+        setInvoiceType('cash');
+        setDueDate('');
+        setStep(1);
+        setCart([]);
+        setSelectedCustomerId('');
+        setDiscountValue(0);
+        setSkipReview(false);
+      }
       setProductSearch('');
       setActiveCategory('all');
       setIsCreatingCustomer(false);
       setNewCustomerName('');
       setNewCustomerPhone('');
     }
-  }, [open]);
+  }, [open, editOrder]);
 
   useEffect(() => {
     if (!open || !profile?.companyId) return;
@@ -339,6 +356,85 @@ export function OrderRegistrationDialog({
     setSaving(true);
     try {
       const customer = customers.find(c => c.id === selectedCustomerId);
+      
+      if (isEditing) {
+        const { updateDoc } = await import('firebase/firestore');
+        const orderId = editOrder.id;
+        const items = cart.map(i => ({
+          productId: i.productObj.id,
+          productName: i.productObj.name,
+          quantity: i.quantity,
+          note: i.note || '',
+          bonusQuantity: i.isManualBonus ? (i.bonusQuantity || 0) : calculateBonus(i),
+          isManualBonus: !!i.isManualBonus,
+          price: i.productObj.price,
+          currency: i.productObj.currency,
+          total: calculateItemTotal(i)
+        }));
+        
+        const totalsByCurrency = items.reduce((acc, item) => {
+          const curr = item.currency || companyDetails?.primaryCurrency || 'SAR';
+          if (!acc[curr]) acc[curr] = 0;
+          acc[curr] += item.total;
+          return acc;
+        }, {} as Record<string, number>);
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          customerId: customer.id,
+          customerName: customer.name,
+          customerPhone: customer.phone || '',
+          customerAddress: customer.address || 'غير محدد',
+          invoiceType,
+          dueDate: invoiceType !== 'cash' ? dueDate : null,
+          items,
+          discount: { type: discountType, value: discountValue },
+          totalAmountByCurrency: totalsByCurrency,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+          companyModifiedAt: serverTimestamp(),
+          companyModifiedBy: user.uid
+        });
+
+        // Notify client if it was their order
+        if (editOrder.clientUid) {
+          const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+          await setDoc(doc(db, 'notifications', notifId), {
+            companyId: profile.companyId,
+            clientUid: editOrder.clientUid,
+            title: 'تعديل على الطلب',
+            message: `تم إجراء تعديلات على طلبك من قبل الشركة`,
+            type: 'order_updated',
+            orderId: orderId,
+            readBy: [],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: user.uid,
+            updatedBy: user.uid,
+            isDeleted: false
+          }).catch(err => console.error(err));
+        }
+        
+        // Notify company users
+        const companyNotifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
+        await setDoc(doc(db, 'notifications', companyNotifId), {
+          companyId: profile.companyId,
+          title: 'تعديل طلب',
+          message: `تم تعديل الطلب للعميل ${customer.name} بواسطة ${profile.displayName || user.displayName || 'موظف'}`,
+          type: 'order_updated_company',
+          orderId: orderId,
+          readBy: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: user.uid,
+          updatedBy: user.uid,
+          isDeleted: false
+        }).catch(err => console.error(err));
+
+        toast.success('تم تحديث الطلب بنجاح');
+        onOpenChange(false);
+        setSaving(false);
+        return;
+      }
       
       // Group items by brand (for the UI mostly, but we can save group tags)
       // The requirement says: split orders by brand. We can save them as multiple orders!
@@ -970,10 +1066,10 @@ export function OrderRegistrationDialog({
             {/* Bottom Final Action Bar */}
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 flex gap-3 z-10 shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
               <Button onClick={() => setStep(1)} variant="outline" className="flex-1 h-14 rounded-xl font-bold text-blue-600 border-blue-200 hover:bg-blue-50">
-                تعديل
+                العودة
               </Button>
               <Button onClick={handleSubmit} disabled={saving} className="flex-[2] h-14 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-lg gap-2 shadow-sm">
-                {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Check className="w-6 h-6" /> تأكيد الطلب</>}
+                {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Check className="w-6 h-6" /> {isEditing ? 'تحديث الطلب' : 'تأكيد الطلب'}</>}
               </Button>
             </div>
           </>
