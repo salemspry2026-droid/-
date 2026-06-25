@@ -68,7 +68,7 @@ export function OrdersManager() {
       setOrders(data);
       setLoading(false);
     }, (error: any) => handleFirestoreError(error, OperationType.LIST, 'orders'));
-    const unsubCustomers = customerService.subscribeToCustomers(profile.companyId, setCustomers, (error: any) => handleFirestoreError(error, OperationType.LIST, 'customers'));
+    const unsubCustomers = customerService.subscribeToPaginatedCustomers(profile.companyId, 500, setCustomers, (error: any) => handleFirestoreError(error, OperationType.LIST, 'customers'));
     const unsubProducts = productService.subscribeToProducts(profile.companyId, setProducts, (error: any) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
     return () => {
