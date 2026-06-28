@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { useStore } from '@/lib/store';
+import { companyService } from '@/lib/services/companyService';
+import { notificationService } from '@/lib/services/notificationService';
 
 export function JoinRequestDialog({
   notif,
@@ -28,35 +27,28 @@ export function JoinRequestDialog({
     try {
       if (action === 'approve') {
         // Update user profile to become an active employee
-        await updateDoc(doc(db, 'userProfiles', notif.userId), {
+        await companyService.updateEmployee(notif.userId, {
           companyId: notif.companyId,
           pendingCompanyId: null,
           role: 'sales', // Default to sales
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid
-        });
+        }, user.uid);
         toast.success(`تم إضافة ${notif.userName || 'المستخدم'} للشركة بنجاح`);
       } else {
         // Reject - clear pending state
-        await updateDoc(doc(db, 'userProfiles', notif.userId), {
+        await companyService.updateEmployee(notif.userId, {
           pendingCompanyId: null,
           companyId: null,
           role: 'client', // Revert to generic role or keep null
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid
-        });
+        }, user.uid);
         toast.success('تم رفض طلب الانضمام');
       }
 
       // Mark notification as fully processed/read by everyone (or deleted)
-      await updateDoc(doc(db, 'notifications', notif.id), {
-        isDeleted: true
-      });
+      await notificationService.deleteNotification(notif.id, user.uid);
 
       onOpenChange(false);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, 'userProfiles');
-      toast.error('حدث خطأ أثناء معالجة الطلب');
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ أثناء معالجة الطلب');
     } finally {
       setLoading(false);
     }

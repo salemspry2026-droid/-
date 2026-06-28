@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useStore, UserProfile } from '@/lib/store';
+import { authService } from '@/lib/services/authService';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setProfile, setIsAuthReady, clearAuth } = useStore();
@@ -17,10 +17,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(user);
         
         // Listen to user profile
-        const profileRef = doc(db, 'userProfiles', user.uid);
-        unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+        unsubscribeProfile = authService.subscribeToUserProfile(user.uid, (profileData) => {
+          if (profileData) {
+            setProfile(profileData as UserProfile);
           } else {
             // Profile doesn't exist yet, we might need to create it or wait for onboarding
             setProfile(null);

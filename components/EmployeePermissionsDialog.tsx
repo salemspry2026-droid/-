@@ -5,9 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Settings2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { AppPermissions } from "@/lib/store";
+import { companyService } from "@/lib/services/companyService";
+import { AppPermissions, useStore } from "@/lib/store";
 
 const defaultPermissions: AppPermissions = {
   customers: { view: false, create: false, edit: false, delete: false },
@@ -18,6 +17,7 @@ const defaultPermissions: AppPermissions = {
 };
 
 export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin: boolean }) {
+  const { user, profile } = useStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -59,12 +59,10 @@ export function EmployeePermissionsDialog({ emp, isAdmin }: { emp: any, isAdmin:
   };
 
   const handleSave = async () => {
+    if (!user || !profile?.companyId) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'userProfiles', emp.id), {
-        permissions,
-        updatedAt: serverTimestamp()
-      });
+      await companyService.updateEmployee(emp.id, { permissions }, user.uid, profile.companyId);
       toast.success('تم حفظ الصلاحيات بنجاح');
       setOpen(false);
     } catch (e: any) {

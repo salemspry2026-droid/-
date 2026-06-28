@@ -8,11 +8,12 @@ import { useStore } from '@/lib/store';
 import { PhoneCall, Settings, Mic, Play, Trash2, StopCircle, UserPlus, FileAudio, Users, AlertCircle, PhoneIncoming, Box } from 'lucide-react';
 import localforage from 'localforage';
 import { toast } from 'sonner';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { customerService } from '@/lib/services/customerService';
+import { productService } from '@/lib/services/productService';
+import { orderService } from '@/lib/services/orderService';
 
 export function CallRecordingsManager() {
   const { profile, user, isCallRecordingsOpen, setIsCallRecordingsOpen, setIncomingCall } = useStore();
@@ -51,13 +52,13 @@ export function CallRecordingsManager() {
       };
 
       const loadFirestoreData = async () => {
-        const qCust = query(collection(db, 'customers'), where('companyId', '==', profile.companyId));
-        const qProd = query(collection(db, 'products'), where('companyId', '==', profile.companyId));
-        
         try {
-          const [snapCust, snapProd] = await Promise.all([getDocs(qCust), getDocs(qProd)]);
-          setCustomers(snapCust.docs.map(d => ({id: d.id, ...d.data()})));
-          setProducts(snapProd.docs.map(d => ({id: d.id, ...d.data()})));
+          const [customersData, productsData] = await Promise.all([
+            customerService.getCustomersByCompanyId(profile.companyId!),
+            productService.getProductsByCompanyId(profile.companyId!)
+          ]);
+          setCustomers(customersData);
+          setProducts(productsData);
         } catch (e) {
           console.error(e);
         }
@@ -153,7 +154,8 @@ export function CallRecordingsManager() {
       const qty = parseInt(quantity);
       const total = product.price * qty;
 
-      await setDoc(doc(db, 'orders', orderId), {
+      await orderService.createOrder({
+        id: orderId,
         companyId: profile.companyId,
         customerId: customer.id,
         ...(customer.appUserId && { clientUid: customer.appUserId }),
@@ -169,12 +171,7 @@ export function CallRecordingsManager() {
         }],
         totalAmountByCurrency: { [product.currency]: total },
         status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `orders/${orderId}`));
+      }, user.uid);
 
       toast.success('تم تسجيل الطلب من المكالمة بنجاح');
       audioRef.current?.pause();

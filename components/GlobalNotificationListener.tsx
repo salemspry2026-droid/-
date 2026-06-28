@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
 import { notificationService } from '@/lib/services/notificationService';
 import { orderService } from '@/lib/services/orderService';
 import { toast } from 'sonner';

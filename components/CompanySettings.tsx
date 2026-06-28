@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db, storage } from '@/lib/firebase';
 import { companyService } from '@/lib/services/companyService';
 import { settingsService } from '@/lib/services/settingsService';
-import { doc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -719,16 +716,10 @@ function EmployeesManager({ companyId, isAdmin, currentUserId }: { companyId: st
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'userProfiles'), 
-      where('companyId', '==', companyId),
-      where('isDeleted', '==', false)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribe = companyService.subscribeToCompanyStaff(companyId, (staff) => {
+      setEmployees(staff.filter((s: any) => !s.isDeleted));
       setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'userProfiles'));
+    });
 
     return () => unsubscribe();
   }, [companyId]);
@@ -736,11 +727,9 @@ function EmployeesManager({ companyId, isAdmin, currentUserId }: { companyId: st
   const handleUpdateEmployee = async (employeeId: string, field: string, value: string) => {
     if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'userProfiles', employeeId), {
+      await companyService.updateEmployee(employeeId, {
         [field]: value,
-        updatedAt: serverTimestamp(),
-        updatedBy: currentUserId
-      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `userProfiles/${employeeId}`));
+      }, currentUserId, companyId);
       toast.success('تم التحديث بنجاح');
     } catch (error: any) {
       toast.error(error.message || 'فشل التحديث');
@@ -750,12 +739,10 @@ function EmployeesManager({ companyId, isAdmin, currentUserId }: { companyId: st
   const handleRemoveEmployee = async (employeeId: string) => {
     if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'userProfiles', employeeId), {
+      await companyService.updateEmployee(employeeId, {
         companyId: null,
         role: null,
-        updatedAt: serverTimestamp(),
-        updatedBy: currentUserId
-      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `userProfiles/${employeeId}`));
+      }, currentUserId);
       toast.success('تم إزالة الموظف بنجاح');
     } catch (error: any) {
       toast.error(error.message || 'فشل إزالة الموظف');

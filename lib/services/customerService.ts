@@ -2,6 +2,19 @@ import { db } from '@/lib/firebase';
 import { collection, doc, query, where, getDocs, getDoc, updateDoc, setDoc, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
 
 export const customerService = {
+  subscribeToAllCustomers: (companyId: string, onData: (data: any[]) => void, onError?: (err: any) => void) => {
+    if (!companyId) return () => {};
+    const q = query(
+      collection(db, 'customers'),
+      where('companyId', '==', companyId),
+      where('isDeleted', '==', false),
+      orderBy('createdAt', 'desc')
+    );
+    return onSnapshot(q, (snap) => {
+      onData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+    }, onError);
+  },
+
   subscribeToPaginatedCustomers: (
     companyId: string,
     limitCount: number,

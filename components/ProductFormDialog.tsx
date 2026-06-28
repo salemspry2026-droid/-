@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, onSnapshot, updateDoc, arrayUnion, getDocs, writeBatch } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +12,8 @@ import { Loader2, Plus, Sparkles, X, Gift, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, compressImage } from '@/lib/utils';
 import { productService } from '@/lib/services/productService';
+import { settingsService } from '@/lib/services/settingsService';
+import { notificationService } from '@/lib/services/notificationService';
 import Image from 'next/image';
 
 export function ProductFormDialog({ 
@@ -119,15 +119,12 @@ export function ProductFormDialog({
   useEffect(() => {
     if (!open || !profile?.companyId) return;
 
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
-    const qCats = query(collection(db, 'productCategories'), where('companyId', '==', profile.companyId));
-    
-    const unsubB = onSnapshot(qBrands, (snap) => setCompanyBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any }))));
-    const unsubC = onSnapshot(qCats, (snap) => setCompanyCategories(snap.docs.map(d => ({ id: d.id, ...d.data() as any }))));
-    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
-        if(docSnap.exists()) {
-            setCompanyDetails(docSnap.data());
-            setCurrency(prev => prev || docSnap.data().primaryCurrency || 'SAR');
+    const unsubB = settingsService.subscribeToCollection(profile.companyId, 'productBrands', setCompanyBrands);
+    const unsubC = settingsService.subscribeToCollection(profile.companyId, 'productCategories', setCompanyCategories);
+    const unsubComp = settingsService.subscribeToCompanySettings(profile.companyId, (data) => {
+        if(data) {
+            setCompanyDetails(data);
+            setCurrency(prev => prev || data.primaryCurrency || 'SAR');
         }
     });
 
@@ -173,41 +170,32 @@ export function ProductFormDialog({
     try {
       let finalBrandId = brandId === 'none' ? null : brandId;
       if (brandId === 'other' && newBrandName.trim()) {
-        const newBId = `brand_${Math.random().toString(36).substring(2, 11)}`;
-        await setDoc(doc(db, 'productBrands', newBId), {
-          companyId: profile.companyId,
-          name: newBrandName.trim(),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedBy: user.uid,
-          isDeleted: false
-        });
-        finalBrandId = newBId;
+        const docRef = await settingsService.addDocument(profile.companyId, 'productBrands', {
+          name: newBrandName.trim()
+        }, user.uid);
+        finalBrandId = docRef.id;
       }
 
       let finalCategoryId = categoryId === 'none' ? null : categoryId;
       if (categoryId === 'other' && newCategoryName.trim()) {
-        const newCId = `cat_${Math.random().toString(36).substring(2, 11)}`;
-        await setDoc(doc(db, 'productCategories', newCId), {
-          companyId: profile.companyId,
-          name: newCategoryName.trim(),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedBy: user.uid,
-          isDeleted: false
-        });
-        finalCategoryId = newCId;
+        const docRef = await settingsService.addDocument(profile.companyId, 'productCategories', {
+          name: newCategoryName.trim()
+        }, user.uid);
+        finalCategoryId = docRef.id;
       }
 
       let finalUnit = unit;
       if (unit === 'other' && newUnitName.trim()) {
         finalUnit = newUnitName.trim();
-        // Add to company details
-        await updateDoc(doc(db, 'companies', profile.companyId), {
-          productUnits: arrayUnion(finalUnit)
-        }).catch(e => console.error("Could not save new unit", e));
+        try {
+          const { arrayUnion, doc, updateDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase');
+          await updateDoc(doc(db, 'companies', profile.companyId), {
+            productUnits: arrayUnion(finalUnit)
+          });
+        } catch (e) {
+          console.error("Could not save new unit", e);
+        }
       }
 
       const productData: any = {
@@ -256,6 +244,8 @@ export function ProductFormDialog({
 
         if (changes.length > 0) {
            try {
+             const { query, collection, where, getDocs } = await import('firebase/firestore');
+             const { db } = await import('@/lib/firebase');
              const profilesQ = query(collection(db, 'userProfiles'), 
                 where('companyId', '==', profile.companyId), 
                 where('role', '==', 'client'), 
@@ -263,26 +253,17 @@ export function ProductFormDialog({
              );
              const snap = await getDocs(profilesQ);
              if (!snap.empty) {
-                const batch = writeBatch(db);
-                snap.docs.forEach(d => {
-                  const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-                  const notifRef = doc(db, 'notifications', notifId);
-                  batch.set(notifRef, {
+                const promises = snap.docs.map(d => {
+                  return notificationService.createNotification({
                       companyId: profile.companyId,
                       title: 'تحديث حالة صنف',
                       message: `الصنف (${productToEdit.name}) الذي تفضله ${changes.join('، و ')}.`,
                       type: 'product_update',
                       orderId: productToEdit.id,
                       clientUid: d.id,
-                      readBy: [],
-                      createdAt: serverTimestamp(),
-                      updatedAt: serverTimestamp(),
-                      createdBy: user.uid,
-                      updatedBy: user.uid,
-                      isDeleted: false
-                  });
+                  }, user.uid);
                 });
-                await batch.commit();
+                await Promise.all(promises);
              }
            } catch (notifErr) {
              console.error("Failed to push notifications", notifErr);

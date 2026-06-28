@@ -1,6 +1,7 @@
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { signOut, sendPasswordResetEmail } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export const authService = {
   logout: async () => {
@@ -30,5 +31,36 @@ export const authService = {
       console.error("Error fetching user profile:", error);
       throw error;
     }
+  },
+
+  updateUserProfile: async (uid: string, data: any) => {
+    try {
+      await updateDoc(doc(db, 'userProfiles', uid), data);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      throw error;
+    }
+  },
+  
+  uploadProfileImage: async (uid: string, file: Blob) => {
+    try {
+      const storageRef = ref(storage, `clientLogos/${uid}/${Date.now()}_logo.jpg`);
+      await uploadBytes(storageRef, file);
+      return await getDownloadURL(storageRef);
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      throw error;
+    }
+  },
+
+  subscribeToUserProfile: (uid: string, onData: (data: any | null) => void, onError: (error: any) => void) => {
+    const profileRef = doc(db, 'userProfiles', uid);
+    return onSnapshot(profileRef, (docSnap: any) => {
+      if (docSnap.exists()) {
+        onData({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        onData(null);
+      }
+    }, onError);
   }
 };

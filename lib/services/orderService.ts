@@ -249,6 +249,24 @@ export const orderService = {
     }
   },
 
+  updateClientOrdersWithCustomerInfo: async (orders: any[], storeName: string, phone: string, fullAddress: string) => {
+    try {
+      const promises = orders.map(async (order) => {
+        if (order.status === 'pending' || order.status === 'processing') {
+          await updateDoc(doc(db, 'orders', order.id), {
+            customerName: storeName,
+            customerPhone: phone,
+            customerAddress: fullAddress
+          });
+        }
+      });
+      await Promise.all(promises);
+    } catch (error) {
+      console.error("Error updating client orders with customer info:", error);
+      throw error;
+    }
+  },
+
   createOrder: async (orderData: any, userId: string) => {
     const orderId = orderData.id || `ord_${crypto.randomUUID()}`;
     const orderRef = doc(db, 'orders', orderId);

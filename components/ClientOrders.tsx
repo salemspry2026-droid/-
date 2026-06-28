@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Loader2, ShoppingBag, Calendar, ChevronLeft } from 'lucide-react';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';

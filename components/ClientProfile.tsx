@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +15,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { compressImage } from '@/lib/utils';
 import Image from 'next/image';
 
+import { authService } from '@/lib/services/authService';
 import { orderService } from '@/lib/services/orderService';
 import { companyService } from '@/lib/services/companyService';
 
@@ -221,13 +219,9 @@ export default function ClientProfile() {
     setUploadingImage(true);
     try {
       const compressedBase64 = await compressImage(file, 400, 0.7);
-      // It returns base64 directly, no need for firebase storage since it's small! But users may want it in storage.
-      // Wait, we can just use the base64 URL directly instead of Firebase storage! It fits if it's small enough. But since they already use Firebase storage, I'll convert it back to blob.
       const res = await fetch(compressedBase64);
       const blob = await res.blob();
-      const storageRef = ref(storage, `clientLogos/${user.uid}/${Date.now()}_logo.jpg`);
-      await uploadBytes(storageRef, blob);
-      const url = await getDownloadURL(storageRef);
+      const url = await authService.uploadProfileImage(user.uid, blob);
       setFormData(prev => ({ ...prev, logoUrl: url }));
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
@@ -251,7 +245,7 @@ export default function ClientProfile() {
     try {
       const fullAddress = [formData.addressCountry, formData.addressGov, formData.addressCity, formData.addressNeighborhood].filter(Boolean).join(' - ') || formData.address.trim();
       
-      await updateDoc(doc(db, 'userProfiles', user.uid), {
+      await authService.updateUserProfile(user.uid, {
         storeName: formData.storeName.trim(),
         phone: formData.phone.trim(),
         address: fullAddress,
@@ -267,17 +261,7 @@ export default function ClientProfile() {
       });
       
       // Update pending/recent orders as they act as a link to companies
-      clientOrders.forEach(async (order) => {
-        if (order.status === 'pending' || order.status === 'processing') {
-           try {
-             await updateDoc(doc(db, 'orders', order.id), {
-                 customerName: formData.storeName.trim(),
-                 customerPhone: formData.phone.trim(),
-                 customerAddress: fullAddress
-             });
-           } catch (err) {}
-        }
-      });
+      await orderService.updateClientOrdersWithCustomerInfo(clientOrders, formData.storeName.trim(), formData.phone.trim(), fullAddress);
       
       setIsEditing(false);
       toast.success('تم تحديث البيانات المزامنة بنجاح');

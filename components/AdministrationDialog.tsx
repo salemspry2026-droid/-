@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

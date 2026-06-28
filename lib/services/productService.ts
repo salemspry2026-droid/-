@@ -14,6 +14,22 @@ export const productService = {
     }, onError);
   },
 
+  getProductsByCompanyId: async (companyId: string) => {
+    if (!companyId) return [];
+    try {
+      const q = query(
+        collection(db, 'products'),
+        where('companyId', '==', companyId),
+        where('isDeleted', '==', false)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  },
+
   subscribeToAllProducts: (onData: (data: any[]) => void, onError?: (err: any) => void) => {
     const q = query(
       collection(db, 'products'),

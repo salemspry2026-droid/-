@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +13,11 @@ import { toast } from 'sonner';
 import { handleFirestoreError, OperationType, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProductDetailsDialog } from './ProductDetailsDialog';
+import { customerService } from '@/lib/services/customerService';
+import { productService } from '@/lib/services/productService';
+import { orderService } from '@/lib/services/orderService';
+import { companyService } from '@/lib/services/companyService';
+import { notificationService } from '@/lib/services/notificationService';
 
 export function OrderRegistrationDialog({
   open,
@@ -99,21 +102,12 @@ export function OrderRegistrationDialog({
     if (!open || !profile?.companyId) return;
 
     setLoading(true);
-    const qCustomers = query(collection(db, 'customers'), where('companyId', '==', profile.companyId));
-    const qProducts = query(collection(db, 'products'), where('companyId', '==', profile.companyId));
-    const qBrands = query(collection(db, 'productBrands'), where('companyId', '==', profile.companyId));
-    const qStages = query(collection(db, 'orderStages'), where('companyId', '==', profile.companyId));
-
-    const unsubC = onSnapshot(qCustomers, (snap) => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(c => !c.isDeleted)), e => console.error(e));
-    const unsubP = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(p => !p.isDeleted)), e => console.error(e));
-    const unsubB = onSnapshot(qBrands, (snap) => setBrands(snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(b => !b.isDeleted)), e => console.error(e));
-    const unsubStages = onSnapshot(qStages, (snap) => {
-        const sortedStages = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(s => !s.isDeleted).sort((a: any, b: any) => a.index - b.index);
-        setOrderStages(sortedStages);
-    }, e => console.error(e));
-    const unsubComp = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
-      if (docSnap.exists()) setCompanyDetails(docSnap.data());
-    }, e => console.error(e));
+    
+    const unsubC = customerService.subscribeToAllCustomers(profile.companyId, setCustomers, e => console.error(e));
+    const unsubP = productService.subscribeToProducts(profile.companyId, setProducts, e => console.error(e));
+    const unsubB = productService.subscribeToBrands(profile.companyId, setBrands);
+    const unsubStages = orderService.subscribeToOrderStages(profile.companyId, setOrderStages, e => console.error(e));
+    const unsubComp = companyService.subscribeToCompany(profile.companyId, setCompanyDetails, e => console.error(e));
 
     setLoading(false);
 
@@ -125,20 +119,8 @@ export function OrderRegistrationDialog({
       setCustomerOrders([]);
       return;
     }
-    const qOrders = query(
-      collection(db, 'orders'),
-      where('companyId', '==', profile.companyId),
-      where('customerId', '==', selectedCustomerId),
-      where('isDeleted', '==', false)
-    );
-    const unsub = onSnapshot(qOrders, (snap) => {
-      const ordersInfo = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-      ordersInfo.sort((a, b) => {
-        const da = a.createdAt?.toMillis?.() || 0;
-        const dbTime = b.createdAt?.toMillis?.() || 0;
-        return dbTime - da;
-      });
-      setCustomerOrders(ordersInfo);
+    const unsub = orderService.subscribeToOrders(profile.companyId, (ordersInfo) => {
+      setCustomerOrders(ordersInfo.filter((o: any) => o.customerId === selectedCustomerId));
     }, e => console.error(e));
     return () => unsub();
   }, [selectedCustomerId, profile?.companyId]);
@@ -275,18 +257,11 @@ export function OrderRegistrationDialog({
     setSaving(true);
     try {
       const customerId = `cust_${Math.random().toString(36).substring(2, 11)}`;
-      const { setDoc, doc, serverTimestamp } = await import('firebase/firestore');
-      await setDoc(doc(db, 'customers', customerId), {
+      await customerService.createCustomer(customerId, profile.companyId, {
         name: newCustomerName,
         phone: newCustomerPhone,
-        companyId: profile.companyId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
         isActive: true,
-        isDeleted: false
-      });
+      }, user.uid);
       toast.success('تمت إضافة العميل بنجاح');
       setSelectedCustomerId(customerId);
       setIsCreatingCustomer(false);
@@ -379,7 +354,7 @@ export function OrderRegistrationDialog({
           return acc;
         }, {} as Record<string, number>);
 
-        await updateDoc(doc(db, 'orders', orderId), {
+        await orderService.updateOrder(orderId, {
           customerId: customer.id,
           customerName: customer.name,
           customerPhone: customer.phone || '',
@@ -389,46 +364,29 @@ export function OrderRegistrationDialog({
           items,
           discount: { type: discountType, value: discountValue },
           totalAmountByCurrency: totalsByCurrency,
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
-          companyModifiedAt: serverTimestamp(),
           companyModifiedBy: user.uid
-        });
+        }, user.uid, profile.companyId);
 
         // Notify client if it was their order
         if (editOrder.clientUid) {
-          const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-          await setDoc(doc(db, 'notifications', notifId), {
+          await notificationService.createNotification({
             companyId: profile.companyId,
             clientUid: editOrder.clientUid,
             title: 'تعديل على الطلب',
             message: `تم إجراء تعديلات على طلبك من قبل الشركة`,
             type: 'order_updated',
             orderId: orderId,
-            readBy: [],
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            createdBy: user.uid,
-            updatedBy: user.uid,
-            isDeleted: false
-          }).catch(err => console.error(err));
+          }, user.uid).catch(err => console.error(err));
         }
         
         // Notify company users
-        const companyNotifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-        await setDoc(doc(db, 'notifications', companyNotifId), {
+        await notificationService.createNotification({
           companyId: profile.companyId,
           title: 'تعديل طلب',
           message: `تم تعديل الطلب للعميل ${customer.name} بواسطة ${profile.displayName || user.displayName || 'موظف'}`,
           type: 'order_updated_company',
           orderId: orderId,
-          readBy: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedBy: user.uid,
-          isDeleted: false
-        }).catch(err => console.error(err));
+        }, user.uid).catch(err => console.error(err));
 
         toast.success('تم تحديث الطلب بنجاح');
         onOpenChange(false);
@@ -464,24 +422,21 @@ export function OrderRegistrationDialog({
 
         if (!finalClientUid && customer.phone) {
           try {
-            const { getDocs, query: fq, collection: fcol, where: fwh } = await import('firebase/firestore');
+            const { getDocs, query: fq, collection: fcol, where: fwh, updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase');
             const qUsers = fq(fcol(db, 'userProfiles'), fwh('phone', '==', customer.phone), fwh('role', '==', 'client'));
             const userSnap = await getDocs(qUsers);
             if (!userSnap.empty) {
               finalClientUid = userSnap.docs[0].id;
-              const { updateDoc } = await import('firebase/firestore');
-              await updateDoc(doc(db, 'customers', customer.id), { 
-                appUserId: finalClientUid,
-                updatedAt: serverTimestamp(),
-                updatedBy: user.uid 
-              });
+              await customerService.updateCustomer(customer.id, { appUserId: finalClientUid }, user.uid);
             }
           } catch (err) {
             console.error("Error looking up app user by phone:", err);
           }
         }
 
-        await setDoc(doc(db, 'orders', orderId), {
+        await orderService.createOrder({
+          id: orderId,
           companyId: profile.companyId,
           customerId: customer.id,
           ...(finalClientUid && { clientUid: finalClientUid }),
@@ -507,34 +462,22 @@ export function OrderRegistrationDialog({
           skipReviewPhase: skipReview,
           totalAmountByCurrency: brandTotalsByCurrency,
           status: skipReview ? (orderStages.length > 1 ? orderStages[1].name : defaultInitialStatus) : defaultInitialStatus,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
           createdByName: profile.displayName || user.displayName || 'غير محدد',
-          updatedBy: user.uid,
-          isDeleted: false
-        });
+        }, user.uid);
 
-        const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
         const notifData: any = {
           companyId: profile.companyId,
           title: 'طلب جديد',
           message: `تم إنشاء طلب جديد للعميل ${customer.name}`,
           type: 'new_order',
           orderId: orderId,
-          readBy: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedBy: user.uid,
-          isDeleted: false
         };
 
         if (finalClientUid) {
           notifData.clientUid = finalClientUid;
         }
 
-        await setDoc(doc(db, 'notifications', notifId), notifData).catch(err => handleFirestoreError(err, OperationType.CREATE, 'notifications'));
+        await notificationService.createNotification(notifData, user.uid).catch(err => console.error(err));
       }
 
       toast.success('تم تسجيل الطلب بنجاح');

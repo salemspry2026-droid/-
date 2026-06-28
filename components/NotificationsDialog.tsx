@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { useStore } from '@/lib/store';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, updateDoc, doc, getDocs, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { Loader2, Bell, Clock, PackageCheck, AlertCircle } from 'lucide-react';
 import { notificationService } from '@/lib/services/notificationService';
