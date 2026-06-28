@@ -422,12 +422,10 @@ export function OrderRegistrationDialog({
 
         if (!finalClientUid && customer.phone) {
           try {
-            const { getDocs, query: fq, collection: fcol, where: fwh, updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
-            const { db } = await import('@/lib/firebase');
-            const qUsers = fq(fcol(db, 'userProfiles'), fwh('phone', '==', customer.phone), fwh('role', '==', 'client'));
-            const userSnap = await getDocs(qUsers);
-            if (!userSnap.empty) {
-              finalClientUid = userSnap.docs[0].id;
+            const { authService } = await import('@/lib/services/authService');
+            const client = await authService.findClientByPhone(customer.phone);
+            if (client) {
+              finalClientUid = client.id;
               await customerService.updateCustomer(customer.id, { appUserId: finalClientUid }, user.uid);
             }
           } catch (err) {

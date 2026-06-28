@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { settingsService } from '@/lib/services/settingsService';
 
 export function useCompanyCollection<T>(collectionName: string, companyId?: string | null) {
   const [data, setData] = useState<T[]>([]);
@@ -17,20 +16,11 @@ export function useCompanyCollection<T>(collectionName: string, companyId?: stri
 
     setLoading(true);
 
-    const q = query(
-      collection(db, collectionName),
-      where('companyId', '==', companyId),
-      // Future: add where('isDeleted', '==', false) globally once migration allows it
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const results = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as T[];
-        setData(results);
+    const unsubscribe = settingsService.subscribeToCollection(
+      companyId,
+      collectionName,
+      (results) => {
+        setData(results as T[]);
         setLoading(false);
         setError(null);
       },

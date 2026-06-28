@@ -188,11 +188,7 @@ export function ProductFormDialog({
       if (unit === 'other' && newUnitName.trim()) {
         finalUnit = newUnitName.trim();
         try {
-          const { arrayUnion, doc, updateDoc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase');
-          await updateDoc(doc(db, 'companies', profile.companyId), {
-            productUnits: arrayUnion(finalUnit)
-          });
+          await settingsService.addCompanyUnit(profile.companyId, finalUnit);
         } catch (e) {
           console.error("Could not save new unit", e);
         }
@@ -244,16 +240,10 @@ export function ProductFormDialog({
 
         if (changes.length > 0) {
            try {
-             const { query, collection, where, getDocs } = await import('firebase/firestore');
-             const { db } = await import('@/lib/firebase');
-             const profilesQ = query(collection(db, 'userProfiles'), 
-                where('companyId', '==', profile.companyId), 
-                where('role', '==', 'client'), 
-                where('favoriteProductIds', 'array-contains', productToEdit.id)
-             );
-             const snap = await getDocs(profilesQ);
-             if (!snap.empty) {
-                const promises = snap.docs.map(d => {
+             const { authService } = await import('@/lib/services/authService');
+             const clients = await authService.findClientsWithFavoriteProduct(profile.companyId, productToEdit.id);
+             if (clients.length > 0) {
+                const promises = clients.map(d => {
                   return notificationService.createNotification({
                       companyId: profile.companyId,
                       title: 'تحديث حالة صنف',

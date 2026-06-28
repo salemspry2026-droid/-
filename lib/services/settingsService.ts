@@ -19,7 +19,14 @@ export const settingsService = {
     });
   },
 
-  subscribeToCollection: (companyId: string, collectionName: string, onData: (data: any[]) => void) => {
+  addCompanyUnit: async (companyId: string, unit: string) => {
+    const { arrayUnion } = require('firebase/firestore');
+    await updateDoc(doc(db, 'companies', companyId), {
+      productUnits: arrayUnion(unit)
+    });
+  },
+
+  subscribeToCollection: (companyId: string, collectionName: string, onData: (data: any[]) => void, onError?: (error: any) => void) => {
     if (!companyId) return () => {};
     const q = query(
       collection(db, collectionName),
@@ -28,7 +35,7 @@ export const settingsService = {
     );
     return onSnapshot(q, (snap) => {
       onData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
-    });
+    }, onError);
   },
 
   addDocument: async (companyId: string, collectionName: string, data: any, userId: string) => {

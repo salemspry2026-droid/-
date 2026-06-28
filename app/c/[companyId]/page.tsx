@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useStore } from '@/lib/store';
 import { Loader2, ArrowRight, UserPlus, Package, MapPin, Phone, Mail, BuildingIcon, X, Search, FileText, CheckCircle, Share2, ShieldCheck, Truck, Percent, Headphones, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';

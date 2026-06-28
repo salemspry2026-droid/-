@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, ShoppingCart, Search, Package, Gift, Plus, Minus, Trash2, Heart, Info, Clock, MapPin, Building2, AlignLeft } from 'lucide-react';
@@ -14,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import Image from 'next/image';
 import { productService } from '@/lib/services/productService';
 import { orderService } from '@/lib/services/orderService';
+import { authService } from '@/lib/services/authService';
 
 interface CartItem {
   product: any;
@@ -244,11 +243,7 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
     if (!user) return;
     try {
       const isFav = profile?.favoriteProductIds?.includes(product.id);
-      await updateDoc(doc(db, 'userProfiles', user.uid), {
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-        favoriteProductIds: isFav ? arrayRemove(product.id) : arrayUnion(product.id)
-      });
+      await authService.toggleFavoriteProduct(user.uid, product.id, isFav);
       toast.success(isFav ? 'تم الإزالة من المفضلة' : 'تمت الإضافة للمفضلة');
     } catch (err) {
       toast.error('حدث خطأ');

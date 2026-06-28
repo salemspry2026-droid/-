@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, serverTimestamp, updateDoc, arrayRemove } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Loader2, ShoppingCart, Heart, Package, Trash2, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { productService } from '@/lib/services/productService';
 import { companyService } from '@/lib/services/companyService';
 import { orderService } from '@/lib/services/orderService';
+import { authService } from '@/lib/services/authService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
 
@@ -60,11 +59,7 @@ export function ClientFavorites({ onNavigate }: { onNavigate?: (tab: string) => 
     e.stopPropagation();
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'userProfiles', user.uid), {
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-        favoriteProductIds: arrayRemove(product.id)
-      });
+      await authService.toggleFavoriteProduct(user.uid, product.id, true);
       setFavoriteProducts(prev => prev.filter(p => p.id !== product.id));
       toast.success('تم الإزالة من المفضلة');
     } catch (err) {

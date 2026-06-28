@@ -5,8 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Settings, Bell, PhoneCall, CheckCircle2, Clock, Package, Plus, LogOut, Shield, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth, signOut } from '@/lib/firebase';
+import { auth, signOut } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -15,6 +14,7 @@ import { CompanySettingsDialog } from './CompanySettings';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { AdministrationDialog } from './AdministrationDialog';
 import { orderService } from '@/lib/services/orderService';
+import { settingsService } from '@/lib/services/settingsService';
 
 export function HomeTab() {
   const { profile, setIsNotificationsOpen, setIsCallRecordingsOpen, setActiveTab, unreadNotifications } = useStore();
@@ -41,26 +41,20 @@ export function HomeTab() {
   useEffect(() => {
     if (!profile?.companyId) return;
 
-    const unsubCompany = onSnapshot(doc(db, 'companies', profile.companyId), (docSnap) => {
-      if (docSnap.exists()) {
-        setCompanyCurrency(docSnap.data().primaryCurrency || 'ر.س');
+    const unsubCompany = settingsService.subscribeToCompanySettings(profile.companyId, (data) => {
+      if (data) {
+        setCompanyCurrency(data.primaryCurrency || 'ر.س');
       }
     });
 
-    const qStages = query(
-      collection(db, 'orderStages'),
-      where('companyId', '==', profile.companyId),
-      where('isDeleted', '==', false)
-    );
-    const unsubStages = onSnapshot(qStages, (snapshot) => {
-      const stages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => a.index - b.index);
+    const unsubStages = orderService.subscribeToOrderStages(profile.companyId, (stages) => {
       setOrderStages(stages);
       
       // Fetch dashboard stats after stages are loaded
       orderService.getDashboardStats(profile.companyId, companyCurrency, stages).then(stats => {
         if (stats) setDashboardStats(stats);
       }).catch(err => console.error("Error fetching stats:", err));
-    });
+    }, (error) => console.error(error));
 
     const unsubOrders = orderService.subscribeToRecentOrders(profile.companyId, 5, (fetched) => {
       setOrders(fetched);

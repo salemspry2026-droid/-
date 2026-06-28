@@ -62,5 +62,55 @@ export const authService = {
         onData(null);
       }
     }, onError);
+  },
+
+  toggleFavoriteProduct: async (uid: string, productId: string, isCurrentlyFav: boolean) => {
+    try {
+      const { arrayUnion, arrayRemove, serverTimestamp } = require('firebase/firestore');
+      await updateDoc(doc(db, 'userProfiles', uid), {
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+        favoriteProductIds: isCurrentlyFav ? arrayRemove(productId) : arrayUnion(productId)
+      });
+    } catch (error) {
+      console.error("Error toggling favorite product:", error);
+      throw error;
+    }
+  },
+
+  findClientByPhone: async (phone: string) => {
+    try {
+      const { query, collection, where, getDocs } = require('firebase/firestore');
+      const q = query(
+        collection(db, 'userProfiles'),
+        where('phone', '==', phone),
+        where('role', '==', 'client')
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { id: snap.docs[0].id, ...snap.docs[0].data() };
+      }
+      return null;
+    } catch (error) {
+      console.error("Error looking up client by phone:", error);
+      return null;
+    }
+  },
+
+  findClientsWithFavoriteProduct: async (companyId: string, productId: string) => {
+    try {
+      const { query, collection, where, getDocs } = require('firebase/firestore');
+      const q = query(
+        collection(db, 'userProfiles'),
+        where('companyId', '==', companyId),
+        where('role', '==', 'client'),
+        where('favoriteProductIds', 'array-contains', productId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+    } catch (error) {
+      console.error("Error finding clients with favorite product:", error);
+      return [];
+    }
   }
 };
