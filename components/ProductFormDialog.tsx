@@ -224,8 +224,6 @@ export function ProductFormDialog({
         bonusType,
         bonusFixedPercent: bonusType === 'fixed' ? parseFloat(bonusFixedPercent || '0') : null,
         bonusTiers: bonusType === 'tiered' ? bonusTiers : [],
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid
       };
 
       if (productToEdit) {
