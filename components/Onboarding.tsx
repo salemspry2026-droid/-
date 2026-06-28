@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import { db, auth } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { handleFirestoreError, OperationType } from '@/lib/utils';
+import { onboardingService } from '@/lib/services/onboardingService';
 
 import { AppLogo, AppLogoText } from './AppLogo';
 
@@ -25,58 +23,13 @@ export function Onboarding() {
   const [clientPhone, setClientPhone] = useState('');
   const [clientStoreName, setClientStoreName] = useState('');
   
-//...
-
   const handleJoinEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinCode.trim() || !user) return;
 
     setLoading(true);
     try {
-      // Find company by join code
-      const q = query(collection(db, 'companies'), where('joinCode', '==', joinCode.toUpperCase()));
-      const querySnapshot = await getDocs(q).catch(err => {
-        handleFirestoreError(err, OperationType.LIST, `companies`);
-        return null;
-      });
-
-      if (!querySnapshot || querySnapshot.empty) {
-        toast.error('رمز الانضمام غير صحيح');
-        setLoading(false);
-        return;
-      }
-
-      const companyDoc = querySnapshot.docs[0];
-      const selectedCompanyId = companyDoc.id;
-
-      // Create user profile as pending employee
-      await setDoc(doc(db, 'userProfiles', user.uid), {
-        email: user.email,
-        displayName: user.displayName || 'User',
-        companyId: null, // Don't give access yet
-        pendingCompanyId: selectedCompanyId,
-        companyName: companyDoc.data().name || '',
-        role: 'pending_employee',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `userProfiles/${user.uid}`));
-
-      // Also create a join request notification for the owner/admin
-      await setDoc(doc(db, 'notifications', `join_${user.uid}`), {
-        companyId: selectedCompanyId,
-        type: 'join_request',
-        title: 'طلب انضمام جديد',
-        message: `المستخدم ${user.displayName || user.email} يطلب الانضمام كموظف لشركتك.`,
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName,
-        isRead: false,
-        createdAt: serverTimestamp()
-      });
-
+      await onboardingService.joinAsEmployee(joinCode, user);
       toast.success('تم إرسال طلب الانضمام! في انتظار موافقة الشركة.');
     } catch (error: any) {
       toast.error(error.message || 'فشل إرسال طلب الانضمام');
@@ -91,21 +44,7 @@ export function Onboarding() {
 
     setLoading(true);
     try {
-      // Create user profile as independent client
-      await setDoc(doc(db, 'userProfiles', user.uid), {
-        email: user.email,
-        displayName: user.displayName || 'Customer',
-        phone: clientPhone.trim(),
-        storeName: clientStoreName.trim(),
-        companyId: '', // Clients don't belong to a specific company anymore
-        role: 'client',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `userProfiles/${user.uid}`));
-
+      await onboardingService.joinAsClient(user, clientPhone, clientStoreName);
       toast.success('تم إنشاء حساب العميل بنجاح!');
     } catch (error: any) {
       toast.error(error.message || 'فشل إنشاء الحساب');
@@ -120,37 +59,7 @@ export function Onboarding() {
 
     setLoading(true);
     try {
-      // Generate a unique company ID
-      const companyId = `comp_${Math.random().toString(36).substring(2, 11)}`;
-      const generatedJoinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-      // Create company document
-      await setDoc(doc(db, 'companies', companyId), {
-        name: companyName,
-        joinCode: generatedJoinCode,
-        ownerId: user.uid,
-        isActive: true,
-        companyType: 'other',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `companies/${companyId}`));
-
-      // Create user profile as an owner
-      await setDoc(doc(db, 'userProfiles', user.uid), {
-        email: user.email,
-        displayName: user.displayName || 'Owner',
-        companyId: companyId,
-        role: 'owner',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        isDeleted: false
-      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `userProfiles/${user.uid}`));
-
+      await onboardingService.createCompany(companyName, user);
       toast.success('تم إنشاء الشركة بنجاح!');
     } catch (error: any) {
       toast.error(error.message || 'حدث خطأ أثناء إنشاء الشركة');

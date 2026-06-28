@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 
 export const productService = {
   subscribeToProducts: (companyId: string, onData: (data: any[]) => void, onError?: (err: any) => void) => {
