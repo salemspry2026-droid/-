@@ -137,6 +137,11 @@ export function ClientOrders() {
                   <p className="text-sm text-gray-500 flex items-center gap-1 mb-1">
                     {order.items?.length || 0} صنف
                   </p>
+                  {order.companyName && (
+                    <span className="inline-block mt-1 bg-green-50 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold ml-1">
+                      {order.companyName}
+                    </span>
+                  )}
                   {order.source === 'customer' ? (
                     <span className="inline-block bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
                       تم الرفع بواسطتك

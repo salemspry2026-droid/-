@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, setDoc, arrayUnion } from 'firebase/firestore';
 
 export const settingsService = {
   subscribeToCompanySettings: (companyId: string, onData: (data: any) => void) => {
@@ -20,7 +20,6 @@ export const settingsService = {
   },
 
   addCompanyUnit: async (companyId: string, unit: string) => {
-    const { arrayUnion } = require('firebase/firestore');
     await updateDoc(doc(db, 'companies', companyId), {
       productUnits: arrayUnion(unit)
     });

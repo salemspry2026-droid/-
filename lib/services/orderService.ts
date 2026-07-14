@@ -288,7 +288,8 @@ export const orderService = {
     items: any[],
     invoiceType: string,
     totalAmountByCurrency: Record<string, number>,
-    status: string = 'pending'
+    status: string = 'pending',
+    companyName?: string
   ) => {
     // Check if user has an existing CRM linked ID for this company
     let existingLinkedCrmCustomerId = null;
@@ -314,6 +315,7 @@ export const orderService = {
     const orderId = `ord_${Math.random().toString(36).substring(2, 11)}`;
     const orderData = {
       companyId,
+      companyName: companyName || '',
       customerId: existingCustomerId,
       ...(existingLinkedCrmCustomerId && { linkedCrmCustomerId: existingLinkedCrmCustomerId }),
       clientUid: userUid,

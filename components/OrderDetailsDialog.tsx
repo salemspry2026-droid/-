@@ -240,7 +240,6 @@ export function OrderDetailsDialog({
       // Create reminder notification
       const hours = parseInt(reminderHours) || 24;
       const remindAtTime = Date.now() + hours * 3600 * 1000;
-      const { Timestamp } = await import('firebase/firestore');
       
       await notificationService.createNotification({
         companyId: order.companyId,
@@ -248,7 +247,7 @@ export function OrderDetailsDialog({
         message: `طلب مجدول: العميل ${order.customerName} يحتاج لتوفير أصناف نفذت.`,
         type: 'reminder',
         orderId: newOrderId,
-        remindAt: Timestamp.fromMillis(remindAtTime),
+        remindAt: remindAtTime,
       }, user?.uid || 'system').catch(err => console.error(err));
 
       toast.success('تم استثناء الأصناف وإنشاء طلب جديد لها بنجاح.');
@@ -405,6 +404,14 @@ export function OrderDetailsDialog({
                   <span className="text-gray-400 text-xs mb-1">التاريخ</span>
                   <span className="font-bold text-gray-900 text-sm">{timeString}</span>
                 </div>
+                {order.companyName && (
+                  <div className="flex flex-col items-end text-right">
+                    <span className="text-gray-400 text-xs mb-1">الشركة</span>
+                    <span className="font-bold text-green-700 text-sm bg-green-50 px-2 py-1 rounded">
+                      {order.companyName}
+                    </span>
+                  </div>
+                )}
                 <div className="flex flex-col items-end text-right">
                   <span className="text-gray-400 text-xs mb-1">الموظف</span>
                   <span className="font-bold text-gray-900 text-sm truncate max-w-full" dir="rtl">{order.createdByName || order.createdBy}</span>

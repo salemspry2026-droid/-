@@ -52,9 +52,13 @@ export const notificationService = {
   },
 
   createNotification: async (notificationData: any, userId: string) => {
+    const { remindAt, ...rest } = notificationData;
     const notifId = `notif_${crypto.randomUUID()}`;
+    const { Timestamp } = await import('firebase/firestore');
+    
     await setDoc(doc(db, 'notifications', notifId), {
-      ...notificationData,
+      ...rest,
+      ...(remindAt && { remindAt: typeof remindAt === 'number' ? Timestamp.fromMillis(remindAt) : remindAt }),
       readBy: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

@@ -333,7 +333,6 @@ export function OrderRegistrationDialog({
       const customer = customers.find(c => c.id === selectedCustomerId);
       
       if (isEditing) {
-        const { updateDoc } = await import('firebase/firestore');
         const orderId = editOrder.id;
         const items = cart.map(i => ({
           productId: i.productObj.id,

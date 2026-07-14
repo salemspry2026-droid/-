@@ -125,7 +125,8 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
         items,
         invoiceType,
         totalAmountByCurrency,
-        initialStatus
+        initialStatus,
+        clientSelectedCompany.name
       );
 
       toast.success('تم إرسال الطلب بنجاح وهو في انتظار التأكيد!');
@@ -508,6 +509,10 @@ export function ClientProducts({ onNavigate }: { onNavigate?: (tab: string) => v
             <DialogTitle>مراجعة الطلب</DialogTitle>
             <DialogDescription>
               الرجاء مراجعة الأصناف المحددة قبل إرسال الطلب. الطلب سيكون في انتظار التأكيد من قبل الشركة.
+              <br />
+              <span className="text-green-700 font-bold mt-2 inline-block">
+                سيتم إرسال هذا الطلب إلى شركة: {clientSelectedCompany?.name}
+              </span>
             </DialogDescription>
           </DialogHeader>
           
