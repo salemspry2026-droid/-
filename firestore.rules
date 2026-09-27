@@ -123,10 +123,14 @@ service cloud.firestore {
       return hasRequiredFields(['email', 'displayName', 'companyId', 'role', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
              isValidString(data.email, 3, 100) &&
              isValidString(data.displayName, 1, 100) &&
-             isValidString(data.companyId, 0, 100) && // Can be empty initially
-             data.role in ['owner', 'admin', 'sales', 'client'] &&
+             (data.companyId == null || (data.companyId is string && data.companyId.size() <= 100)) &&
+             data.role in ['owner', 'admin', 'sales', 'client', 'pending_employee'] &&
              data.isDeleted is bool &&
-             isValidOptionalString('jobTitle', 0, 100);
+             isValidOptionalString('jobTitle', 0, 100) &&
+             (!('pendingCompanyId' in data) || data.pendingCompanyId == null || isValidString(data.pendingCompanyId, 0, 100)) &&
+             isValidOptionalString('companyName', 0, 100) &&
+             isValidOptionalString('phone', 0, 50) &&
+             isValidOptionalString('storeName', 0, 100);
     }
 
     function isValidProduct(data) {
@@ -172,13 +176,16 @@ service cloud.firestore {
     }
 
     function isValidNotification(data) {
-      return hasRequiredFields(['companyId', 'title', 'message', 'type', 'orderId', 'readBy', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+      return hasRequiredFields(['companyId', 'title', 'message', 'type', 'readBy', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
              isValidString(data.companyId, 1, 100) &&
              isValidString(data.title, 1, 200) &&
              isValidString(data.message, 1, 1000) &&
              isValidString(data.type, 1, 50) &&
-             isValidString(data.orderId, 1, 100) &&
+             isValidOptionalString('orderId', 0, 100) &&
              isValidOptionalString('clientUid', 0, 100) &&
+             isValidOptionalString('userId', 0, 100) &&
+             isValidOptionalString('userEmail', 0, 100) &&
+             isValidOptionalString('userName', 0, 100) &&
              data.readBy is list && data.readBy.size() <= 1000 &&
              data.isDeleted is bool;
     }
@@ -250,7 +257,10 @@ service cloud.firestore {
                     areImmutableFieldsUnchanged(['createdAt', 'createdBy']) &&
                     (
                       (request.auth.uid == userId && areImmutableFieldsUnchanged(['role'])) || 
-                      (resource != null && isCompanyAdmin(resource.data.companyId)) || 
+                      (resource != null && (
+                        isCompanyAdmin(resource.data.companyId) || 
+                        (('pendingCompanyId' in resource.data) && resource.data.pendingCompanyId != null && isCompanyAdmin(resource.data.pendingCompanyId))
+                      )) || 
                       isSystemAdmin()
                     );
     }
@@ -330,8 +340,25 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidNotification(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && (isCompanyAdmin(request.resource.data.companyId) || isCompanySales(request.resource.data.companyId) || isCompanyClient(request.resource.data.companyId));
-      allow update: if isAuthenticated() && isValidNotification(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'clientUid', 'title', 'message', 'type', 'orderId']) && (isCompanyMember(resource.data.companyId) || (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid));
+      allow create: if isAuthenticated() && 
+                    isValidNotification(request.resource.data) && 
+                    isCreatedByCurrentUser() && 
+                    isUpdatedByCurrentUser() && 
+                    (
+                      isCompanyAdmin(request.resource.data.companyId) || 
+                      isCompanySales(request.resource.data.companyId) || 
+                      isCompanyClient(request.resource.data.companyId) ||
+                      (request.resource.data.type == 'join_request' && request.resource.data.userId == request.auth.uid)
+                    );
+      allow update: if isAuthenticated() && 
+                    isValidNotification(request.resource.data) && 
+                    isUpdatedByCurrentUser() && 
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId', 'type']) && 
+                    (
+                      isCompanyMember(resource.data.companyId) || 
+                      (resource.data.clientUid != null && resource.data.clientUid == request.auth.uid) ||
+                      (resource.data.userId != null && resource.data.userId == request.auth.uid)
+                    );
     }
 
     match /orderStages/{stageId} {

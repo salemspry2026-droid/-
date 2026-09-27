@@ -49,7 +49,12 @@
         "email": { "type": "string", "format": "email", "description": "User email address" },
         "displayName": { "type": "string", "description": "User's full name" },
         "companyId": { "type": "string", "description": "ID of the company the user belongs to" },
-        "role": { "type": "string", "enum": ["owner", "admin", "sales", "client"], "description": "User's role within the company" },
+        "pendingCompanyId": { "type": "string", "description": "ID of company user requested to join" },
+        "companyName": { "type": "string", "description": "Name of company user requested to join" },
+        "role": { "type": "string", "enum": ["owner", "admin", "sales", "client", "pending_employee"], "description": "User's role within the company" },
+        "jobTitle": { "type": "string", "description": "User job title" },
+        "phone": { "type": "string", "description": "Contact phone" },
+        "storeName": { "type": "string", "description": "Client store name" },
         "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
         "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
         "createdBy": { "type": "string", "description": "UID of creator" },
@@ -155,6 +160,9 @@
         "message": { "type": "string" },
         "type": { "type": "string" },
         "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
         "readBy": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "timestamp" },
         "updatedAt": { "type": "timestamp" },
@@ -162,7 +170,7 @@
         "updatedBy": { "type": "string" },
         "isDeleted": { "type": "boolean" }
       },
-      "required": ["companyId", "title", "message", "type", "orderId", "readBy", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
+      "required": ["companyId", "title", "message", "type", "readBy", "createdAt", "updatedAt", "createdBy", "updatedBy", "isDeleted"]
     },
     "ProductCategory": {
       "title": "ProductCategory",

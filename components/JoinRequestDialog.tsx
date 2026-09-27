@@ -37,8 +37,8 @@ export function JoinRequestDialog({
         // Reject - clear pending state
         await companyService.updateEmployee(notif.userId, {
           pendingCompanyId: null,
-          companyId: null,
-          role: 'client', // Revert to generic role or keep null
+          companyId: '',
+          role: 'client', // Revert to generic role
         }, user.uid);
         toast.success('تم رفض طلب الانضمام');
       }

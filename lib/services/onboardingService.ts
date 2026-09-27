@@ -21,7 +21,7 @@ export const onboardingService = {
       await setDoc(doc(db, 'userProfiles', user.uid), {
         email: user.email,
         displayName: user.displayName || 'User',
-        companyId: null, // Don't give access yet
+        companyId: '', // Don't give access yet, keep valid empty string
         pendingCompanyId: selectedCompanyId,
         companyName: companyDoc.data().name || '',
         role: 'pending_employee',
@@ -39,10 +39,14 @@ export const onboardingService = {
         title: 'طلب انضمام جديد',
         message: `المستخدم ${user.displayName || user.email} يطلب الانضمام كموظف لشركتك.`,
         userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName,
-        isRead: false,
-        createdAt: serverTimestamp()
+        userEmail: user.email || '',
+        userName: user.displayName || 'مستخدم جديد',
+        readBy: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user.uid,
+        updatedBy: user.uid,
+        isDeleted: false
       });
     } catch (error: any) {
       if (error.message === 'رمز الانضمام غير صحيح') throw error;
