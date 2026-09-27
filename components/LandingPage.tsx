@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { AppLogo, AppLogoText } from './AppLogo';
 import { Smartphone, Clock, PieChart, ServerCrash, CreditCard, ShieldCheck, Phone, Handshake, CheckCircle2, TrendingUp, ArrowLeft, Menu, X, LayoutDashboard, ShoppingBag, Users, Store, ReceiptText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { DownloadAppButton } from './DownloadAppButton';
 
 interface LandingPageProps {
   onLoginClick: () => void;
@@ -57,6 +58,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           </div>
 
           <div className="flex items-center gap-4">
+            <DownloadAppButton variant="header" label="تحميل APK" />
             <Button onClick={onLoginClick} className="hidden md:flex bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-full shadow-lg shadow-blue-200/50 transition-all hover:-translate-y-0.5">
               تسجيل الدخول
             </Button>
@@ -90,10 +92,11 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                     {link.name}
                   </button>
                 ))}
-                <div className="pt-4 border-t border-gray-100">
+                <div className="pt-4 border-t border-gray-100 space-y-3">
                   <Button onClick={onLoginClick} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl">
                     تسجيل الدخول
                   </Button>
+                  <DownloadAppButton variant="outline" label="تحميل تطبيق أندرويد" className="w-full h-12 text-base rounded-xl" />
                 </div>
               </div>
             </motion.div>
@@ -145,6 +148,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                   ابدأ التجربة مجاناً
                   <ArrowLeft className="w-6 h-6 mr-3" />
                 </Button>
+                <DownloadAppButton />
                 <Button variant="outline" onClick={() => scrollToSection('preview')} className="h-16 px-10 text-xl font-bold rounded-full border-2 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
                   استكشف الواجهات
                 </Button>
@@ -329,7 +333,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 { icon: PieChart, title: 'مساعد الوصف الذكي (AI)', desc: 'لا تضيع وقتك في كتابة أوصاف المنتجات؛ دع محرك الذكاء الاصطناعي لدينا ينشئ لك أوصافاً إبداعية ومحسنة لمحركات البحث بناءً على بيانات منتجك.', delay: 0.1 },
-                { icon: ServerCrash, title: 'العمل بلا حدود (Offline Mode)', desc: 'سجل طلباتك، أضف عملائك، وتابع عملك حتى بدون إنترنت. سيقوم Flowexa بمزامنة كل شيء تلقائياً بمجرد عودتك للشبكة.', delay: 0.2 },
+                { icon: ServerCrash, title: 'العمل بلا حدود (Offline Mode)', desc: 'سجل طلباتك، أضف عملائك، وتابع عملك حتى بدون إنترنت من تطبيق أندرويد أو الويب. سيقوم Flowexa بمزامنة كل شيء تلقائياً بمجرد عودتك للشبكة.', delay: 0.2 },
                 { icon: TrendingUp, title: 'لوحة تحكم وتحليلات حية', desc: 'راقب أداء مبيعاتك اليومية، وتتبع متوسطات البيع حسب العملات المختلفة في واجهة تفاعلية واحدة ومنظمة تدعم الفرز المتقدم.', delay: 0.3 }
               ].map((feature, idx) => (
                 <motion.div 
@@ -484,11 +488,14 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-500 to-green-500"></div>
               
               <h2 className="text-4xl md:text-6xl font-black text-[#163C85] mb-8 leading-tight">جاهز لتنظيم تدفق مبيعاتك؟</h2>
-              <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto">انضم إلى Flowexa اليوم، واختبر الكفاءة الحقيقية في كل طلب وفي كل عملية بيع.</p>
+              <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto">انضم إلى Flowexa اليوم من المتصفح أو حمّل تطبيق أندرويد للعمل أونلاين وأوفلاين.</p>
               
-              <Button onClick={onLoginClick} className="h-16 px-12 bg-[#2E5CA6] hover:bg-[#163C85] text-white text-xl font-bold rounded-full shadow-2xl shadow-blue-600/30 transition-transform hover:scale-110">
-                تسجيل الدخول الآن
-              </Button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button onClick={onLoginClick} className="h-16 px-12 bg-[#2E5CA6] hover:bg-[#163C85] text-white text-xl font-bold rounded-full shadow-2xl shadow-blue-600/30 transition-transform hover:scale-110">
+                  تسجيل الدخول الآن
+                </Button>
+                <DownloadAppButton variant="outline" />
+              </div>
             </div>
           </motion.div>
         </section>

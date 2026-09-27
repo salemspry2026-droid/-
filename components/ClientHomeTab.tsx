@@ -4,6 +4,8 @@ import { useStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Search, Package, MapPin, ChevronLeft, LogOut, Bell } from 'lucide-react';
+import { OfflineStatus } from './OfflineStatus';
+import { DownloadAppButton } from './DownloadAppButton';
 import { useState, useEffect } from 'react';
 import { auth, signOut } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
@@ -122,6 +124,13 @@ export function ClientHomeTab({ onNavigate }: { onNavigate: (tab: string) => voi
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="px-4">
+        <OfflineStatus />
+      </div>
+      <div className="px-4">
+        <DownloadAppButton variant="outline" label="تحميل تطبيق أندرويد APK" className="w-full h-12 text-base rounded-xl border-green-600 text-green-700 hover:bg-green-50" />
       </div>
 
       {/* Search & Companies List */}

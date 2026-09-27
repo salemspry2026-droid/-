@@ -1,5 +1,6 @@
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { withOfflineWrite } from '@/lib/offline/writeQueue';
 
 export const productService = {
   subscribeToProducts: (companyId: string, onData: (data: any[]) => void, onError?: (err: any) => void) => {
@@ -108,12 +109,17 @@ export const productService = {
   },
 
   updateProduct: async (productId: string, productData: any, userId: string, companyId?: string) => {
-    const productRef = doc(db, 'products', productId);
-    await updateDoc(productRef, {
-      ...productData,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
+    await withOfflineWrite(
+      { collection: 'products', action: 'update', docId: productId, data: { ...productData, updatedBy: userId, updatedAtMs: Date.now() } },
+      async () => {
+        await updateDoc(doc(db, 'products', productId), {
+          ...productData,
+          updatedAt: serverTimestamp(),
+          updatedBy: userId
+        });
+      },
+      undefined
+    );
     if (companyId) {
       import('@/lib/services/auditLogService').then(({ auditLogService }) => {
         auditLogService.logAction(companyId, 'UPDATE_PRODUCT', { productId, keysChanged: Object.keys(productData) }, userId);
@@ -122,15 +128,20 @@ export const productService = {
   },
 
   createProduct: async (productId: string, productData: any, userId: string, companyId?: string) => {
-    const productRef = doc(db, 'products', productId);
-    await setDoc(productRef, {
-      ...productData,
-      isDeleted: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      createdBy: userId,
-      updatedBy: userId,
-    });
+    await withOfflineWrite(
+      { collection: 'products', action: 'set', docId: productId, data: { ...productData, isDeleted: false, createdBy: userId, updatedBy: userId, createdAtMs: Date.now() } },
+      async () => {
+        await setDoc(doc(db, 'products', productId), {
+          ...productData,
+          isDeleted: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: userId,
+          updatedBy: userId,
+        });
+      },
+      undefined
+    );
     if (companyId) {
       import('@/lib/services/auditLogService').then(({ auditLogService }) => {
         auditLogService.logAction(companyId, 'CREATE_PRODUCT', { productId, name: productData.name }, userId);

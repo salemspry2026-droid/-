@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Flowexa</string>
+    <string name="offline_title">وضع عدم الاتصال</string>
+    <string name="offline_message">يمكنك متابعة العمل. ستتم المزامنة تلقائياً عند عودة الإنترنت.</string>
+    <string name="retry">إعادة المحاولة</string>
+</resources>

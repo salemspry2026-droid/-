@@ -1,5 +1,6 @@
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, serverTimestamp, setDoc, onSnapshot, getCountFromServer, getAggregateFromServer, sum, average, limit, orderBy, startAfter, QueryConstraint, DocumentSnapshot } from 'firebase/firestore';
+import { withOfflineWrite } from '@/lib/offline/writeQueue';
 
 export interface ProductStats {
   timesOrdered: number;
@@ -222,12 +223,18 @@ export const orderService = {
   },
 
   updateOrderStatus: async (orderId: string, newStatus: string, userId: string, companyId?: string) => {
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, {
+    const payload = {
       status: newStatus,
       updatedAt: serverTimestamp(),
       updatedBy: userId
-    });
+    };
+    await withOfflineWrite(
+      { collection: 'orders', action: 'update', docId: orderId, data: { status: newStatus, updatedBy: userId, updatedAtMs: Date.now() } },
+      async () => {
+        await updateDoc(doc(db, 'orders', orderId), payload);
+      },
+      undefined
+    );
     if (companyId) {
       import('@/lib/services/auditLogService').then(({ auditLogService }) => {
         auditLogService.logAction(companyId, 'UPDATE_ORDER_STATUS', { orderId, newStatus }, userId);
@@ -236,12 +243,17 @@ export const orderService = {
   },
 
   updateOrder: async (orderId: string, data: any, userId: string, companyId?: string) => {
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
+    await withOfflineWrite(
+      { collection: 'orders', action: 'update', docId: orderId, data: { ...data, updatedBy: userId, updatedAtMs: Date.now() } },
+      async () => {
+        await updateDoc(doc(db, 'orders', orderId), {
+          ...data,
+          updatedAt: serverTimestamp(),
+          updatedBy: userId
+        });
+      },
+      undefined
+    );
     if (companyId) {
       import('@/lib/services/auditLogService').then(({ auditLogService }) => {
         auditLogService.logAction(companyId, 'UPDATE_ORDER', { orderId, keysChanged: Object.keys(data) }, userId);
@@ -269,16 +281,22 @@ export const orderService = {
 
   createOrder: async (orderData: any, userId: string) => {
     const orderId = orderData.id || `ord_${crypto.randomUUID()}`;
-    const orderRef = doc(db, 'orders', orderId);
-    await setDoc(orderRef, {
+    const payload = {
       ...orderData,
       isDeleted: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
       updatedBy: userId,
-    });
-    return orderId;
+    };
+    return withOfflineWrite(
+      { collection: 'orders', action: 'set', docId: orderId, data: { ...orderData, isDeleted: false, createdBy: userId, updatedBy: userId, createdAtMs: Date.now(), pendingSync: true } },
+      async () => {
+        await setDoc(doc(db, 'orders', orderId), payload);
+        return orderId;
+      },
+      orderId
+    );
   },
 
   placeClientOrder: async (
@@ -335,22 +353,50 @@ export const orderService = {
       updatedBy: userUid,
     };
 
-    await setDoc(doc(db, 'orders', orderId), orderData);
+    await withOfflineWrite(
+      { collection: 'orders', action: 'set', docId: orderId, data: { ...orderData, createdAtMs: Date.now(), pendingSync: true } },
+      async () => {
+        await setDoc(doc(db, 'orders', orderId), orderData);
+      },
+      undefined
+    );
 
     const notifId = `notif_${Math.random().toString(36).substring(2, 11)}`;
-    await setDoc(doc(db, 'notifications', notifId), {
-      companyId,
-      title: 'طلب جديد من عميل',
-      message: `تم تسجيل طلب جديد رقم #${orderId.substring(0, 6)} من قِبل العميل المباشر`,
-      type: 'client_order',
-      orderId: orderId,
-      readBy: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      createdBy: userUid,
-      updatedBy: userUid,
-      isDeleted: false
-    }).catch(() => {});
+    withOfflineWrite(
+      {
+        collection: 'notifications',
+        action: 'set',
+        docId: notifId,
+        data: {
+          companyId,
+          title: 'طلب جديد من عميل',
+          message: `تم تسجيل طلب جديد رقم #${orderId.substring(0, 6)} من قِبل العميل المباشر`,
+          type: 'client_order',
+          orderId,
+          readBy: [],
+          createdBy: userUid,
+          updatedBy: userUid,
+          isDeleted: false,
+          createdAtMs: Date.now(),
+        },
+      },
+      async () => {
+        await setDoc(doc(db, 'notifications', notifId), {
+          companyId,
+          title: 'طلب جديد من عميل',
+          message: `تم تسجيل طلب جديد رقم #${orderId.substring(0, 6)} من قِبل العميل المباشر`,
+          type: 'client_order',
+          orderId: orderId,
+          readBy: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: userUid,
+          updatedBy: userUid,
+          isDeleted: false
+        });
+      },
+      undefined
+    ).catch(() => {});
 
     return orderId;
   },

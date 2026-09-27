@@ -1,5 +1,6 @@
 import { db } from '@/lib/firebase';
 import { collection, doc, query, where, getDocs, getDoc, updateDoc, setDoc, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { withOfflineWrite } from '@/lib/offline/writeQueue';
 
 export const customerService = {
   subscribeToAllCustomers: (companyId: string, onData: (data: any[]) => void, onError?: (err: any) => void) => {
@@ -52,8 +53,8 @@ export const customerService = {
 
   createCustomer: async (customerId: string, companyId: string, customerData: any, userId: string) => {
     try {
-      const docRef = doc(db, 'customers', customerId || `cust_${crypto.randomUUID()}`);
-      await setDoc(docRef, {
+      const id = customerId || `cust_${crypto.randomUUID()}`;
+      const payload = {
         ...customerData,
         companyId,
         isDeleted: false,
@@ -61,8 +62,15 @@ export const customerService = {
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
-      });
-      return docRef.id;
+      };
+      return withOfflineWrite(
+        { collection: 'customers', action: 'set', docId: id, data: { ...customerData, companyId, isDeleted: false, createdBy: userId, updatedBy: userId, createdAtMs: Date.now() } },
+        async () => {
+          await setDoc(doc(db, 'customers', id), payload);
+          return id;
+        },
+        id
+      );
     } catch (error) {
       console.error("Error creating customer:", error);
       throw error;
@@ -71,12 +79,17 @@ export const customerService = {
 
   updateCustomer: async (customerId: string, customerData: any, userId: string, companyId?: string) => {
     try {
-      const customerRef = doc(db, 'customers', customerId);
-      await updateDoc(customerRef, {
-        ...customerData,
-        updatedAt: serverTimestamp(),
-        updatedBy: userId,
-      });
+      await withOfflineWrite(
+        { collection: 'customers', action: 'update', docId: customerId, data: { ...customerData, updatedBy: userId, updatedAtMs: Date.now() } },
+        async () => {
+          await updateDoc(doc(db, 'customers', customerId), {
+            ...customerData,
+            updatedAt: serverTimestamp(),
+            updatedBy: userId,
+          });
+        },
+        undefined
+      );
       if (companyId) {
         import('@/lib/services/auditLogService').then(({ auditLogService }) => {
           auditLogService.logAction(companyId, 'UPDATE_CUSTOMER', { customerId, keysChanged: Object.keys(customerData) }, userId);

@@ -4,6 +4,8 @@ import { useStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Settings, Bell, PhoneCall, CheckCircle2, Clock, Package, Plus, LogOut, Shield, TrendingUp } from 'lucide-react';
+import { OfflineStatus } from './OfflineStatus';
+import { DownloadAppButton } from './DownloadAppButton';
 import { useState, useEffect } from 'react';
 import { auth, signOut } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/utils';
@@ -107,18 +109,8 @@ export function HomeTab() {
     <div className="space-y-6 pb-24">
       {/* Top Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center bg-green-50/50 p-3 rounded-xl border border-green-100">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <div>
-              <p className="text-sm font-bold text-gray-800">متصل بالسحابة</p>
-              <p className="text-xs text-gray-500">آخر مزامنة: الآن</p>
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-          </div>
-        </div>
+        <OfflineStatus />
+        <DownloadAppButton variant="outline" label="تحميل تطبيق أندرويد APK" className="w-full h-12 text-base rounded-xl" />
 
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
           <div className="flex items-center gap-3">
