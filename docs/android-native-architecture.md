@@ -32,12 +32,13 @@
 ---
 
 ## 3. التكامل مع Firebase (`google-services.json`)
-تم ربط التطبيق رسمياً بمشروع Firebase:
+يتطلب تفعيل Firebase قبل أول تشغيل فعلي:
 - **Project ID:** `gen-lang-client-0196712383`
-- **Project Number:** `252523271264`
 - **Application ID / Package:** `com.flowexa.app`
-- **ملف الإعداد:** `android-app/app/google-services.json`
-- **قاعدة البيانات:** اتصال صريح بالقاعدة المسماة `ai-studio-c5fd0d2f-b8be-4e45-a37c-45e344ff21a9` لضمان تطابق البيانات تماماً مع منصة الويب.
+- **ملف الإعداد المطلوب محليًا/في CI:** `android-app/app/google-services.json`
+- **قاعدة البيانات:** اتصال صريح بالقاعدة المسماة `ai-studio-c5fd0d2f-b8be-4e45-a37c-45e344ff21a9`.
+
+الملف `google-services.json` لا يُحفظ في Git لأنه مرتبط بتهيئة Firebase الخاصة بالمشروع. يجب توفيره من Firebase Console عبر Secret أو خطوة إعداد آمنة قبل البناء الإنتاجي.
 
 ---
 
@@ -74,5 +75,5 @@
 - **إجراء Gradle:** `gradle/actions/setup-gradle@v4`.
 - **الهدف الحصري:** يبني فقط من مجلد `android-app` دون أي رجوع للنسخة القديمة.
 - **نوع البناء:** `assembleRelease` حصراً.
-- **التوقيع:** يستخدم مفتاح التوقيع من `FLOWEXA_KEYSTORE_BASE64` مع آلية إنشاء مفتاح احتياطي محلي في حال غياب المفتاح.
+- **التوقيع:** يستعيد مفتاح الإصدار الدائم من `FLOWEXA_KEYSTORE_BASE64`؛ يفشل CI إذا غابت أسرار التوقيع ولا ينشئ مفتاحًا بديلًا.
 - **النشر:** يرفع الـ APK إلى GitHub Artifacts وينشر إصداراً رسمياً على GitHub Releases تحت مسمى `Flowexa.apk`.
