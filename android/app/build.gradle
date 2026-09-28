@@ -30,9 +30,9 @@ android {
     signingConfigs {
         release {
             storeFile file('flowexa-release.keystore')
-            storePassword 'flowexa123'
-            keyAlias 'flowexa'
-            keyPassword 'flowexa123'
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: (project.findProperty("KEYSTORE_PASSWORD") ?: 'flowexa123')
+            keyAlias System.getenv("KEY_ALIAS") ?: (project.findProperty("KEY_ALIAS") ?: 'flowexa')
+            keyPassword System.getenv("KEY_PASSWORD") ?: (project.findProperty("KEY_PASSWORD") ?: 'flowexa123')
         }
     }
 

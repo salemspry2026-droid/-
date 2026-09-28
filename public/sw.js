@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flowexa-v1';
+const CACHE_NAME = 'flowexa-v2';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
@@ -29,12 +29,15 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
+  // Navigation requests: Network-first, fallback to cached '/'
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          }
           return response;
         })
         .catch(() => caches.match('/') || caches.match(request))
@@ -42,9 +45,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Static assets (_next/static, images, fonts, styles): Stale-while-revalidate
   event.respondWith(
     caches.match(request).then((cached) => {
-      const network = fetch(request)
+      const fetchPromise = fetch(request)
         .then((response) => {
           if (response && response.status === 200) {
             const copy = response.clone();
@@ -53,7 +57,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => cached);
-      return cached || network;
+      return cached || fetchPromise;
     })
   );
 });
