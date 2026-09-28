@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const GITHUB_RELEASE_APK_URL = 'https://github.com/salemspry2026-droid/-/releases/latest/download/Flowexa.apk';
+
 export async function GET() {
   const apkPath = join(process.cwd(), 'public', 'downloads', 'flowexa.apk');
 
@@ -20,7 +22,13 @@ export async function GET() {
       },
     });
   } catch {
-    return NextResponse.json({ error: 'APK not available' }, { status: 404 });
+    // If local APK is not on the server disk, redirect directly to the latest GitHub Release APK
+    return NextResponse.redirect(GITHUB_RELEASE_APK_URL, {
+      status: 307,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    });
   }
 }
 
@@ -36,6 +44,13 @@ export async function HEAD() {
       },
     });
   } catch {
-    return new NextResponse(null, { status: 404 });
+    // Return OK status so client knows download endpoint is ready and will redirect to GitHub release
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Location': GITHUB_RELEASE_APK_URL,
+      },
+    });
   }
 }

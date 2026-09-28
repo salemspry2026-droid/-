@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.flowexa.app",
+      "sha256_cert_fingerprints": [
+        "14:6A:E7:5C:3A:42:0B:4F:9C:20:84:48:65:6C:54:19:9C:F6:A3:30:EF:38:6F:04:88:EC:3A:73:2E:EE:4B:87"
+      ]
+    }
+  }
+]

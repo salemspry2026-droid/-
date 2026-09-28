@@ -1,0 +1,107 @@
+name: Build and Release Flowexa Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-app/**'
+      - 'android/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Flowexa APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prepare Android Project
+        run: |
+          if [ -d "android-app" ]; then
+            echo "TARGET_DIR=android-app" >> $GITHUB_ENV
+            chmod +x android-app/gradlew
+          else
+            echo "TARGET_DIR=android" >> $GITHUB_ENV
+            chmod +x android/gradlew
+          fi
+
+      - name: Ensure Keystore for Release Signing
+        run: |
+          APP_DIR="$TARGET_DIR/app"
+          cd "$APP_DIR"
+          if [ ! -f "flowexa-release.keystore" ]; then
+            echo "Generating release keystore..."
+            keytool -genkeypair -v \
+              -keystore flowexa-release.keystore \
+              -alias flowexa \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass flowexa123 \
+              -keypass flowexa123 \
+              -dname "CN=Flowexa, OU=Mobile, O=Flowexa, L=City, S=State, C=US"
+          fi
+
+      - name: Build Android Release APK
+        working-directory: ${{ env.TARGET_DIR }}
+        env:
+          KEYSTORE_PASSWORD: "flowexa123"
+          KEY_ALIAS: "flowexa"
+          KEY_PASSWORD: "flowexa123"
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify and Locate APK
+        id: locate_apk
+        run: |
+          APK_FILE=$(find $TARGET_DIR/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "ERROR: APK file not found!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_FILE"
+          mkdir -p build-output
+          cp "$APK_FILE" build-output/Flowexa.apk
+          ls -lh build-output/Flowexa.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Flowexa-Android-APK
+          path: build-output/Flowexa.apk
+          retention-days: 30
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v2.0.0
+          name: Flowexa Android v2.0.0
+          body: |
+            تطبيق Flowexa Native للأندرويد (Flowexa Native Android v2.0.0).
+            
+            - تطبيق ناتيف 100% بنظام Kotlin + Jetpack Compose + Material 3.
+            - قاعدة بيانات محلية Room Database كاملة لدعم العمل دون اتصال بالإنترنت (Offline-First).
+            - محرك مزامنة Outbox وسيط (SyncEngine) متوافق مع Firebase Firestore.
+            - دعم إنشاء الطلبات وحساب البونص وتعدد العملات أوفلاين.
+            - واجهة كاملة باللغة العربية مع دعم RTL وشعار Flowexa الرسمي.
+          files: build-output/Flowexa.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

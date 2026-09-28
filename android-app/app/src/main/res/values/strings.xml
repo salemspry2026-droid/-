@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Flowexa</string>
+    <string name="app_slogan">نُدير أعمالك .. نربط عملاءك .. ننمي مبيعاتك</string>
+    <string name="offline_status">أنت تعمل بدون اتصال بالإنترنت</string>
+    <string name="syncing_status">جارٍ مزامنة البيانات مع السيرفر...</string>
+    <string name="synced_status">البيانات محدثة</string>
+</resources>

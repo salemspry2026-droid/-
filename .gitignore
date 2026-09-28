@@ -17,4 +17,15 @@ android/app/build/
 android/local.properties
 android/app/*.keystore
 android/.idea/
+
+# Android Native App
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/app/*.keystore
+android-app/.idea/
+android-app/.kotlin/
+
 public/downloads/Flowexa.apk
+public/downloads/flowexa.apk

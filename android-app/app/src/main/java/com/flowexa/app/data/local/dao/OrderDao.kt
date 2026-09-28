@@ -1,0 +1,65 @@
+package com.flowexa.app.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
+import com.flowexa.app.data.local.entity.OrderEntity
+import com.flowexa.app.data.local.entity.OrderItemEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface OrderDao {
+    @Query("""
+        SELECT * FROM orders 
+        WHERE companyId = :companyId AND isDeleted = 0 
+        ORDER BY createdAtMs DESC
+    """)
+    fun observeOrders(companyId: String): Flow<List<OrderEntity>>
+
+    @Query("""
+        SELECT * FROM orders 
+        WHERE companyId = :companyId AND status = :status AND isDeleted = 0 
+        ORDER BY createdAtMs DESC
+    """)
+    fun observeOrdersByStatus(companyId: String, status: String): Flow<List<OrderEntity>>
+
+    @Query("""
+        SELECT * FROM orders 
+        WHERE clientUid = :clientUid AND isDeleted = 0 
+        ORDER BY createdAtMs DESC
+    """)
+    fun observeClientOrders(clientUid: String): Flow<List<OrderEntity>>
+
+    @Query("SELECT * FROM orders WHERE id = :id LIMIT 1")
+    suspend fun getOrder(id: String): OrderEntity?
+
+    @Query("SELECT * FROM order_items WHERE orderId = :orderId")
+    fun observeOrderItems(orderId: String): Flow<List<OrderItemEntity>>
+
+    @Query("SELECT * FROM order_items WHERE orderId = :orderId")
+    suspend fun getOrderItems(orderId: String): List<OrderItemEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrder(order: OrderEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrderItems(items: List<OrderItemEntity>)
+
+    @Update
+    suspend fun updateOrder(order: OrderEntity)
+
+    @Query("UPDATE orders SET status = :newStatus, updatedAtMs = :timestamp, syncState = 'PENDING' WHERE id = :orderId")
+    suspend fun updateOrderStatus(orderId: String, newStatus: String, timestamp: Long)
+
+    @Query("UPDATE orders SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
+    suspend fun softDelete(id: String)
+
+    @Transaction
+    suspend fun saveOrderWithItems(order: OrderEntity, items: List<OrderItemEntity>) {
+        insertOrder(order)
+        insertOrderItems(items)
+    }
+}
