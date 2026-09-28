@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { onboardingService } from '@/lib/services/onboardingService';
+import { signOut, auth } from '@/lib/firebase';
 
 import { AppLogo, AppLogoText } from './AppLogo';
 
@@ -69,9 +70,18 @@ export function Onboarding() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#F0F2F5] p-4">
-      <Card className="w-full max-w-md border-none shadow-lg rounded-2xl">
-        <CardHeader className="text-center pb-2">
+    <div className="flex items-center justify-center min-h-screen bg-[#F0F2F5] p-4 relative" dir="rtl">
+      <Card className="w-full max-w-md border-none shadow-lg rounded-2xl relative">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="absolute top-4 left-4 text-gray-500 hover:text-red-600 gap-1 text-xs" 
+          onClick={() => signOut(auth)}
+        >
+          <LogOut className="w-4 h-4" />
+          خروج
+        </Button>
+        <CardHeader className="text-center pb-2 pt-8">
           <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
             <AppLogo className="w-16 h-16" />
           </div>

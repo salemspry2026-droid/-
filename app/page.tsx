@@ -2,7 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, googleProvider, auth, signOut } from '@/lib/firebase';
+import { 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  googleProvider, 
+  auth, 
+  signOut,
+  browserPopupRedirectResolver
+} from '@/lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -70,7 +78,10 @@ export default function Home() {
 
   const handleEmailAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail) {
       toast.error('الرجاء إدخال البريد الإلكتروني');
       return;
     }
@@ -78,15 +89,46 @@ export default function Home() {
     setLoading(true);
     try {
       if (authMode === 'login') {
-        if (!password) { toast.error('الرجاء إدخال كلمة المرور'); return; }
-        await signInWithEmailAndPassword(auth, email, password);
+        if (!cleanPassword) { 
+          toast.error('الرجاء إدخال كلمة المرور'); 
+          setLoading(false);
+          return; 
+        }
+
+        try {
+          await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+          toast.success('تم تسجيل الدخول بنجاح!');
+        } catch (signInErr: any) {
+          const errCode = signInErr?.code;
+          // If credentials failed or user not found, auto-create account for new users seamlessly
+          if (errCode === 'auth/invalid-credential' || errCode === 'auth/user-not-found') {
+            try {
+              const defaultName = name.trim() || cleanEmail.split('@')[0];
+              const res = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+              await updateProfile(res.user, { displayName: defaultName });
+              toast.success('مرحباً بك! تم إنشاء حسابك وتسجيل الدخول بنجاح.');
+              return;
+            } catch (createErr: any) {
+              if (createErr?.code === 'auth/email-already-in-use') {
+                toast.error('كلمة المرور غير صحيحة لهذا الحساب. يرجى التأكد من كلمة المرور أو استخدام "نسيت كلمة المرور؟".');
+                return;
+              } else if (createErr?.code === 'auth/weak-password') {
+                toast.error('كلمة المرور يجب أن تكون 6 أحرف أو أرقام على الأقل.');
+                return;
+              }
+              throw signInErr;
+            }
+          }
+          throw signInErr;
+        }
       } else if (authMode === 'register') {
-        if (!password) { toast.error('الرجاء إدخال كلمة المرور'); return; }
-        if (!name) { toast.error('الرجاء إدخال الاسم المخصص'); return; }
-        const res = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(res.user, { displayName: name });
+        if (!cleanPassword) { toast.error('الرجاء إدخال كلمة المرور'); setLoading(false); return; }
+        const chosenName = name.trim() || cleanEmail.split('@')[0];
+        const res = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+        await updateProfile(res.user, { displayName: chosenName });
+        toast.success('تم إنشاء الحساب بنجاح!');
       } else if (authMode === 'forgot') {
-        await sendPasswordResetEmail(auth, email);
+        await sendPasswordResetEmail(auth, cleanEmail);
         toast.success('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني');
         setAuthMode('login');
       } else if (authMode === 'emailLink') {
@@ -100,9 +142,9 @@ export default function Home() {
           },
           linkDomain: 'gen-lang-client-0196712383.firebaseapp.com',
         };
-        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+        await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem('emailForSignIn', email);
+          window.localStorage.setItem('emailForSignIn', cleanEmail);
         }
         toast.success('تم إرسال رابط الدخول السريع إلى بريدك الإلكتروني بنجاح!');
       }
@@ -134,17 +176,29 @@ export default function Home() {
   };
 
   const handleGoogleLogin = async () => {
+    setLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+      toast.success('تم تسجيل الدخول بنجاح عبر جوجل!');
     } catch (error: any) {
       console.error("Google login failed:", error);
-      if (error.code === 'auth/unauthorized-domain') {
-          toast.error('لم يتم تفويض رابط Vercel. يرجى الذهاب إلى إعدادات Firebase Authentication ثم Authorized domains وإضافة رابط Vercel الخاص بك.');
+      if (error.code === 'auth/popup-blocked') {
+        toast.info('النافذة المنبثقة محظورة بالمتصفح، جاري التحويل للمصادقة المباشرة...');
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr) {
+          console.error("Redirect login failed:", redirectErr);
+        }
+      } else if (error.code === 'auth/unauthorized-domain') {
+        toast.error('لم يتم تفويض رابط الموقع الحالي. يرجى الذهاب إلى Firebase Console > Authentication > Settings > Authorized Domains وإضافة هذا النطاق.');
       } else if (error.code === 'auth/operation-not-allowed') {
-          toast.error('تسجيل الدخول عبر جوجل غير مفعل. يرجى تفعيله من إعدادات Firebase Authentication.');
+        toast.error('تسجيل الدخول عبر جوجل غير مفعل. يرجى تفعيله من إعدادات Firebase Authentication.');
       } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-          toast.error('فشل الدخول عبر جوجل: ' + (error.message || error.code || 'يرجى التأكد من إضافة رابط Vercel ضمن إعدادات Firebase Auth.'));
+        toast.error('فشل الدخول عبر جوجل: ' + (error.message || error.code || 'يرجى التأكد من إضافة الرابط ضمن إعدادات Firebase Auth.'));
       }
+    } finally {
+      setLoading(false);
     }
   };
 
