@@ -12,26 +12,22 @@ class SyncWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        return try {
-            val db = FlowexaDatabase.getInstance(applicationContext)
-            val syncEngine = SyncEngine(db)
+        val db = FlowexaDatabase.getInstance(applicationContext)
+        val syncEngine = SyncEngine(db)
 
-            // 1. Upload local changes to Firestore
-            syncEngine.syncOutbox()
+        val upload = syncEngine.syncOutbox()
+        if (upload.isFailure) return Result.retry()
 
-            // 2. Refresh local cache if user is signed in
-            val currentUserId = FirebaseProvider.auth.currentUser?.uid
-            if (currentUserId != null) {
-                val profile = db.userProfileDao().getProfile(currentUserId)
-                val companyId = profile?.companyId
-                if (!companyId.isNullOrEmpty()) {
-                    syncEngine.syncCompanyData(companyId, currentUserId)
-                }
+        val currentUserId = FirebaseProvider.auth.currentUser?.uid ?: return Result.success()
+        val companyId = db.userProfileDao().getProfile(currentUserId)?.companyId
+        if (companyId.isNullOrEmpty()) return Result.success()
+
+        val pull = syncEngine.syncCompanyData(companyId, currentUserId)
+        return pull.fold(
+            onSuccess = { Result.success() },
+            onFailure = { error ->
+                if (isTransientSyncError(error)) Result.retry() else Result.failure()
             }
-
-            Result.success()
-        } catch (e: Exception) {
-            Result.retry()
-        }
+        )
     }
 }
