@@ -164,8 +164,10 @@ object FirestoreMappers {
         return Pair(order, items)
     }
 
-    fun docToNotification(doc: DocumentSnapshot): NotificationEntity {
+    fun docToNotification(doc: DocumentSnapshot, currentUid: String? = null): NotificationEntity {
         val data = doc.data ?: emptyMap<String, Any?>()
+        val readBy = (data["readBy"] as? List<*>) ?: emptyList<Any>()
+        val isRead = if (!currentUid.isNullOrEmpty()) readBy.contains(currentUid) else readBy.isNotEmpty()
         return NotificationEntity(
             id = doc.id,
             companyId = data["companyId"] as? String ?: "",
@@ -174,7 +176,7 @@ object FirestoreMappers {
             type = data["type"] as? String ?: "general",
             orderId = data["orderId"] as? String,
             clientUid = data["clientUid"] as? String,
-            isRead = (data["readBy"] as? List<*>)?.isNotEmpty() ?: false,
+            isRead = isRead,
             createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time
         )
     }

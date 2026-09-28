@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'android-app/**'
-      - 'android/**'
       - '.github/workflows/build-flowexa-apk.yml'
   workflow_dispatch:
 
@@ -14,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Flowexa APK
+    name: Build Flowexa Native APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -37,60 +36,65 @@ jobs:
         id: build_apk
         shell: bash
         env:
-          KEYSTORE_PASSWORD: "flowexa123"
-          KEY_ALIAS: "flowexa"
-          KEY_PASSWORD: "flowexa123"
+          KEYSTORE_BASE64: ${{ secrets.FLOWEXA_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FLOWEXA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FLOWEXA_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.FLOWEXA_KEY_PASSWORD }}
         run: |
           set -e
 
-          # Detect target android directory
-          if [ -d "android-app" ]; then
-            TARGET="android-app"
-          else
-            TARGET="android"
+          TARGET="android-app"
+          echo "Targeting Native Android project in: $TARGET"
+          
+          if [ ! -d "$TARGET" ]; then
+            echo "::error::Target directory $TARGET does not exist!"
+            exit 1
           fi
-          echo "Selected project directory: $TARGET"
 
-          # Ensure gradlew is executable
+          # Ensure gradlew has executable permission
           chmod +x "$TARGET/gradlew"
 
-          # Ensure keystore exists for signing
-          mkdir -p "$TARGET/app"
+          # Restore Keystore from Secret if available, or generate persistent keystore
           KEYSTORE_PATH="$TARGET/app/flowexa-release.keystore"
-          if [ ! -f "$KEYSTORE_PATH" ]; then
-            echo "Generating release keystore at $KEYSTORE_PATH..."
+          mkdir -p "$TARGET/app"
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Restoring release keystore from GitHub Secret..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          elif [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Generating fallback release keystore..."
             keytool -genkeypair -v \
               -keystore "$KEYSTORE_PATH" \
-              -alias flowexa \
+              -alias "${KEY_ALIAS:-flowexa}" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -storepass flowexa123 \
-              -keypass flowexa123 \
+              -storepass "${KEYSTORE_PASSWORD:-flowexa123}" \
+              -keypass "${KEY_PASSWORD:-flowexa123}" \
               -dname "CN=Flowexa, OU=Mobile, O=Flowexa, L=City, S=State, C=US"
           fi
 
-          # Accept SDK licenses if sdkmanager exists
+          # Accept SDK licenses
           if [ -n "$ANDROID_HOME" ] && [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
           fi
 
-          # Run Gradle build
+          # Build strict Release APK
           cd "$TARGET"
-          echo "Starting Gradle build..."
-          ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
+          echo "Running assembleRelease..."
+          ./gradlew assembleRelease --no-daemon --stacktrace
           cd ..
 
-          # Locate and copy generated APK
+          # Verify generated APK
           mkdir -p build-output
-          APK_FILE=$(find "$TARGET/app/build/outputs/apk" -type f -name "*.apk" | head -n 1)
+          APK_FILE=$(find "$TARGET/app/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "::error::No APK file generated!"
+            echo "::error::Release APK file was not produced!"
             exit 1
           fi
 
-          echo "Found generated APK: $APK_FILE"
+          echo "Found generated Release APK: $APK_FILE"
           cp "$APK_FILE" build-output/Flowexa.apk
           ls -lh build-output/Flowexa.apk
 
@@ -113,7 +117,7 @@ jobs:
             - تطبيق ناتيف 100% بنظام Kotlin + Jetpack Compose + Material 3.
             - قاعدة بيانات محلية Room Database كاملة لدعم العمل دون اتصال بالإنترنت (Offline-First).
             - محرك مزامنة Outbox وسيط (SyncEngine) متوافق مع Firebase Firestore.
-            - دعم إنشاء الطلبات وحساب البونص وتعدد العملات أوفلاين.
+            - دعم إنشاء وإدارة الطلبات والعملاء والأصناف وحساب البونص والعملات المتعددة.
             - واجهة كاملة باللغة العربية مع دعم RTL وشعار Flowexa الرسمي.
           files: build-output/Flowexa.apk
           draft: false

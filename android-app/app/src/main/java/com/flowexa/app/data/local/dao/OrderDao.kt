@@ -57,6 +57,9 @@ interface OrderDao {
     @Query("UPDATE orders SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
     suspend fun softDelete(id: String)
 
+    @Query("UPDATE orders SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
+
     @Transaction
     suspend fun saveOrderWithItems(order: OrderEntity, items: List<OrderItemEntity>) {
         insertOrder(order)

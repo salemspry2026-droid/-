@@ -16,6 +16,12 @@ interface CompanyDao {
     @Query("SELECT * FROM companies WHERE id = :id LIMIT 1")
     suspend fun getCompany(id: String): CompanyEntity?
 
+    @Query("SELECT * FROM companies WHERE joinCode = :code AND isDeleted = 0 LIMIT 1")
+    suspend fun getCompanyByJoinCode(code: String): CompanyEntity?
+
+    @Query("SELECT * FROM companies WHERE clientJoinCode = :code AND isDeleted = 0 LIMIT 1")
+    suspend fun getCompanyByClientJoinCode(code: String): CompanyEntity?
+
     @Query("SELECT * FROM companies WHERE isDeleted = 0")
     fun observeAllCompanies(): Flow<List<CompanyEntity>>
 
@@ -24,6 +30,9 @@ interface CompanyDao {
 
     @Update
     suspend fun update(company: CompanyEntity)
+
+    @Query("UPDATE companies SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
 
     @Query("DELETE FROM companies WHERE id = :id")
     suspend fun delete(id: String)

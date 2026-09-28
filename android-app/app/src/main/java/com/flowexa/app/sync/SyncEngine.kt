@@ -33,7 +33,6 @@ class SyncEngine(
                 when (op.operation) {
                     "CREATE", "UPDATE" -> {
                         val payloadMap = jsonToMap(JSONObject(op.payloadJson))
-                        // Add server timestamp for updatedAt
                         val finalPayload = payloadMap.toMutableMap().apply {
                             put("updatedAt", FieldValue.serverTimestamp())
                             if (op.operation == "CREATE" && !containsKey("createdAt")) {
@@ -45,7 +44,6 @@ class SyncEngine(
                             .await()
                     }
                     "DELETE" -> {
-                        // Soft delete on server as per Flowexa guidelines
                         collection.document(op.documentId)
                             .update(mapOf("isDeleted" to true, "updatedAt" to FieldValue.serverTimestamp()))
                             .await()
@@ -53,6 +51,15 @@ class SyncEngine(
                 }
 
                 syncDao.markSynced(op.id)
+
+                // Update Room entity syncState to SYNCED
+                when (op.collectionName) {
+                    AppConfig.COL_PRODUCTS -> database.productDao().updateSyncState(op.documentId, AppConfig.SYNC_STATE_SYNCED)
+                    AppConfig.COL_CUSTOMERS -> database.customerDao().updateSyncState(op.documentId, AppConfig.SYNC_STATE_SYNCED)
+                    AppConfig.COL_ORDERS -> database.orderDao().updateSyncState(op.documentId, AppConfig.SYNC_STATE_SYNCED)
+                    AppConfig.COL_COMPANIES -> database.companyDao().updateSyncState(op.documentId, AppConfig.SYNC_STATE_SYNCED)
+                }
+
                 syncedCount++
             } catch (e: Exception) {
                 syncDao.markFailed(op.id, e.message)
@@ -72,44 +79,60 @@ class SyncEngine(
             val companyDoc = firestore.collection(AppConfig.COL_COMPANIES).document(companyId).get().await()
             if (companyDoc.exists()) {
                 val company = FirestoreMappers.docToCompany(companyDoc)
-                database.companyDao().insert(company)
+                val localComp = database.companyDao().getCompany(companyId)
+                if (localComp == null || localComp.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                    database.companyDao().insert(company)
+                }
             }
 
-            // 2. Sync Products
+            // 2. Sync Products (protect local uncommitted drafts)
             val productsSnapshot = firestore.collection(AppConfig.COL_PRODUCTS)
                 .whereEqualTo("companyId", companyId)
                 .whereEqualTo("isDeleted", false)
                 .get()
                 .await()
-            val products = productsSnapshot.documents.map { FirestoreMappers.docToProduct(it) }
-            database.productDao().insertAll(products)
+            val remoteProducts = productsSnapshot.documents.map { FirestoreMappers.docToProduct(it) }
+            for (rp in remoteProducts) {
+                val local = database.productDao().getProduct(rp.id)
+                if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                    database.productDao().insert(rp)
+                }
+            }
 
-            // 3. Sync Customers
+            // 3. Sync Customers (protect local uncommitted drafts)
             val customersSnapshot = firestore.collection(AppConfig.COL_CUSTOMERS)
                 .whereEqualTo("companyId", companyId)
                 .whereEqualTo("isDeleted", false)
                 .get()
                 .await()
-            val customers = customersSnapshot.documents.map { FirestoreMappers.docToCustomer(it) }
-            database.customerDao().insertAll(customers)
+            val remoteCustomers = customersSnapshot.documents.map { FirestoreMappers.docToCustomer(it) }
+            for (rc in remoteCustomers) {
+                val local = database.customerDao().getCustomer(rc.id)
+                if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                    database.customerDao().insert(rc)
+                }
+            }
 
-            // 4. Sync Orders
+            // 4. Sync Orders (protect local uncommitted drafts)
             val ordersSnapshot = firestore.collection(AppConfig.COL_ORDERS)
                 .whereEqualTo("companyId", companyId)
                 .whereEqualTo("isDeleted", false)
                 .get()
                 .await()
             for (orderDoc in ordersSnapshot.documents) {
-                val (order, items) = FirestoreMappers.docToOrder(orderDoc)
-                database.orderDao().saveOrderWithItems(order, items)
+                val (remoteOrder, items) = FirestoreMappers.docToOrder(orderDoc)
+                val local = database.orderDao().getOrder(remoteOrder.id)
+                if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                    database.orderDao().saveOrderWithItems(remoteOrder, items)
+                }
             }
 
-            // 5. Sync Notifications
+            // 5. Sync Notifications (per-user read state)
             val notifsSnapshot = firestore.collection(AppConfig.COL_NOTIFICATIONS)
                 .whereEqualTo("companyId", companyId)
                 .get()
                 .await()
-            val notifications = notifsSnapshot.documents.map { FirestoreMappers.docToNotification(it) }
+            val notifications = notifsSnapshot.documents.map { FirestoreMappers.docToNotification(it, uid) }
             database.notificationDao().insertAll(notifications)
 
             Result.success(Unit)

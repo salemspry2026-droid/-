@@ -13,13 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.flowexa.app.auth.GoogleAuthManager
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
+import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.data.repository.*
 import com.flowexa.app.sync.SyncEngine
 import com.flowexa.app.sync.SyncScheduler
@@ -30,17 +30,22 @@ import com.flowexa.app.ui.auth.RegisterScreen
 import com.flowexa.app.ui.catalog.PublicCatalogScreen
 import com.flowexa.app.ui.client.ClientCatalogScreen
 import com.flowexa.app.ui.client.ClientHomeScreen
+import com.flowexa.app.ui.client.FavoritesScreen
 import com.flowexa.app.ui.components.FlowexaBottomBar
 import com.flowexa.app.ui.components.FlowexaTopBar
 import com.flowexa.app.ui.customers.CustomersScreen
+import com.flowexa.app.ui.notifications.NotificationsScreen
 import com.flowexa.app.ui.onboarding.OnboardingScreen
 import com.flowexa.app.ui.orders.CreateOrderScreen
 import com.flowexa.app.ui.orders.OrderDetailScreen
 import com.flowexa.app.ui.orders.OrdersScreen
 import com.flowexa.app.ui.products.ProductsScreen
 import com.flowexa.app.ui.settings.CompanySettingsScreen
+import com.flowexa.app.ui.staff.StaffScreen
 import com.flowexa.app.ui.theme.FlowexaBlue
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.util.Calendar
 import java.util.UUID
 
 @Composable
@@ -51,31 +56,40 @@ fun FlowexaApp(
     val coroutineScope = rememberCoroutineScope()
     val navController = rememberNavController()
 
-    // Database & Repositories
+    // Local DB & Repositories
     val db = remember { FlowexaDatabase.getInstance(context) }
-    val authRepo = remember { AuthRepository(db) }
+    val authRepo = remember { AuthRepository(db, context) }
+    val companyRepo = remember { CompanyRepository(db, context) }
     val productRepo = remember { ProductRepository(db, context) }
     val customerRepo = remember { CustomerRepository(db, context) }
     val orderRepo = remember { OrderRepository(db, context) }
-    val companyRepo = remember { CompanyRepository(db, context) }
-    val googleAuthManager = remember { GoogleAuthManager(context) }
     val syncEngine = remember { SyncEngine(db) }
+    val googleAuthManager = remember { GoogleAuthManager(context, authRepo) }
 
-    // Network connectivity monitoring
+    // Network Connectivity State
     var isOnline by remember { mutableStateOf(true) }
     DisposableEffect(context) {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 isOnline = true
-                SyncScheduler.scheduleImmediateSync(context)
+                coroutineScope.launch {
+                    syncEngine.syncOutbox()
+                }
             }
             override fun onLost(network: Network) {
                 isOnline = false
             }
         }
-        val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
         cm?.registerNetworkCallback(request, callback)
+
+        val active = cm?.activeNetwork
+        val caps = cm?.getNetworkCapabilities(active)
+        isOnline = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+
         onDispose {
             cm?.unregisterNetworkCallback(callback)
         }
@@ -126,7 +140,9 @@ fun FlowexaApp(
         Routes.Settings.route,
         Routes.ClientHome.route,
         Routes.ClientCatalog.route,
-        Routes.ClientOrders.route
+        Routes.ClientOrders.route,
+        Routes.Staff.route,
+        Routes.Notifications.route
     )
 
     val isClient = userProfile?.role == AppConfig.ROLE_CLIENT
@@ -139,17 +155,31 @@ fun FlowexaApp(
                     companyName = company?.name ?: userProfile?.companyName,
                     isOnline = isOnline,
                     pendingSyncCount = pendingSyncCount,
-                    onNotificationsClick = {
-                        navController.navigate(Routes.Notifications.route)
+                    onNotificationsClick = { navController.navigate(Routes.Notifications.route) },
+                    onSyncClick = {
+                        coroutineScope.launch {
+                            syncEngine.syncOutbox()
+                            if (currentCompanyId.isNotEmpty() && currentUser != null) {
+                                syncEngine.syncCompanyData(currentCompanyId, currentUser.uid)
+                            }
+                        }
                     }
                 )
             }
         },
         bottomBar = {
-            if (showBars) {
+            if (showBars && currentRoute != Routes.Notifications.route && currentRoute != Routes.Staff.route) {
                 FlowexaBottomBar(
                     currentRoute = currentRoute,
-                    onNavigate = { route -> navController.navigate(route) },
+                    onNavigate = { targetRoute ->
+                        navController.navigate(targetRoute) {
+                            popUpTo(if (isClient) Routes.ClientHome.route else Routes.AdminHome.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                     isClient = isClient
                 )
             }
@@ -157,15 +187,48 @@ fun FlowexaApp(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = when {
-                currentUser == null -> Routes.Login.route
-                userProfile?.companyId.isNullOrEmpty() -> Routes.Onboarding.route
-                isClient -> Routes.ClientHome.route
-                else -> Routes.AdminHome.route
-            },
+            startDestination = Routes.Splash.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Auth Routes
+            // Splash / Initial Auth check
+            composable(Routes.Splash.route) {
+                LaunchedEffect(Unit) {
+                    val user = authRepo.currentUser
+                    if (user == null) {
+                        navController.navigate(Routes.Login.route) {
+                            popUpTo(Routes.Splash.route) { inclusive = true }
+                        }
+                    } else {
+                        val profile = authRepo.fetchAndCacheUserProfile(user.uid)
+                        when {
+                            profile.role == AppConfig.ROLE_PENDING_EMPLOYEE -> {
+                                navController.navigate(Routes.PendingApproval.route) {
+                                    popUpTo(Routes.Splash.route) { inclusive = true }
+                                }
+                            }
+                            profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT -> {
+                                navController.navigate(Routes.Onboarding.route) {
+                                    popUpTo(Routes.Splash.route) { inclusive = true }
+                                }
+                            }
+                            profile.role == AppConfig.ROLE_CLIENT -> {
+                                navController.navigate(Routes.ClientHome.route) {
+                                    popUpTo(Routes.Splash.route) { inclusive = true }
+                                }
+                            }
+                            else -> {
+                                navController.navigate(Routes.AdminHome.route) {
+                                    popUpTo(Routes.Splash.route) { inclusive = true }
+                                }
+                            }
+                        }
+                    }
+                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = FlowexaBlue)
+                }
+            }
+
             composable(Routes.Login.route) {
                 LoginScreen(
                     onLoginClick = { email, pass ->
@@ -174,18 +237,26 @@ fun FlowexaApp(
                             authError = null
                             val res = authRepo.login(email, pass)
                             isAuthLoading = false
-                            res.onSuccess { profile ->
-                                if (profile.companyId.isNullOrEmpty()) {
-                                    navController.navigate(Routes.Onboarding.route) {
-                                        popUpTo(Routes.Login.route) { inclusive = true }
-                                    }
-                                } else if (profile.role == AppConfig.ROLE_CLIENT) {
-                                    navController.navigate(Routes.ClientHome.route) {
-                                        popUpTo(Routes.Login.route) { inclusive = true }
-                                    }
-                                } else {
-                                    navController.navigate(Routes.AdminHome.route) {
-                                        popUpTo(Routes.Login.route) { inclusive = true }
+                            res.onSuccess {
+                                val user = authRepo.currentUser
+                                if (user != null) {
+                                    val profile = authRepo.fetchAndCacheUserProfile(user.uid)
+                                    if (profile.role == AppConfig.ROLE_PENDING_EMPLOYEE) {
+                                        navController.navigate(Routes.PendingApproval.route) {
+                                            popUpTo(Routes.Login.route) { inclusive = true }
+                                        }
+                                    } else if (profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT) {
+                                        navController.navigate(Routes.Onboarding.route) {
+                                            popUpTo(Routes.Login.route) { inclusive = true }
+                                        }
+                                    } else if (profile.role == AppConfig.ROLE_CLIENT) {
+                                        navController.navigate(Routes.ClientHome.route) {
+                                            popUpTo(Routes.Login.route) { inclusive = true }
+                                        }
+                                    } else {
+                                        navController.navigate(Routes.AdminHome.route) {
+                                            popUpTo(Routes.Login.route) { inclusive = true }
+                                        }
                                     }
                                 }
                             }.onFailure { err ->
@@ -203,8 +274,12 @@ fun FlowexaApp(
                                 val user = authRepo.currentUser
                                 if (user != null) {
                                     val profile = authRepo.fetchAndCacheUserProfile(user.uid)
-                                    if (profile.companyId.isNullOrEmpty()) {
+                                    if (profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT) {
                                         navController.navigate(Routes.Onboarding.route) {
+                                            popUpTo(Routes.Login.route) { inclusive = true }
+                                        }
+                                    } else if (profile.role == AppConfig.ROLE_CLIENT) {
+                                        navController.navigate(Routes.ClientHome.route) {
                                             popUpTo(Routes.Login.route) { inclusive = true }
                                         }
                                     } else {
@@ -271,52 +346,88 @@ fun FlowexaApp(
             // Onboarding
             composable(Routes.Onboarding.route) {
                 OnboardingScreen(
-                    onCreateCompany = { name, phone ->
+                    onCreateCompany = { name, _ ->
                         coroutineScope.launch {
                             val user = authRepo.currentUser ?: return@launch
-                            val companyId = "comp_${UUID.randomUUID()}"
-                            val joinCode = UUID.randomUUID().toString().take(6).uppercase()
-                            val clientCode = UUID.randomUUID().toString().take(6).uppercase()
-
-                            val newCompany = com.flowexa.app.data.local.entity.CompanyEntity(
-                                id = companyId,
+                            isAuthLoading = true
+                            authError = null
+                            val res = companyRepo.createCompany(
                                 name = name,
+                                primaryCurrency = "SAR",
                                 ownerId = user.uid,
-                                phone = phone,
-                                joinCode = joinCode,
-                                clientJoinCode = clientCode
+                                ownerEmail = user.email ?: "",
+                                ownerDisplayName = user.displayName ?: "المدير"
                             )
-                            companyRepo.updateCompany(newCompany)
-
-                            // Update user profile
-                            val updatedProfile = userProfile?.copy(
-                                companyId = companyId,
-                                companyName = name,
-                                role = AppConfig.ROLE_OWNER
-                            ) ?: com.flowexa.app.data.local.entity.UserProfileEntity(
-                                id = user.uid,
-                                email = user.email ?: "",
-                                displayName = user.displayName ?: "المدير",
-                                companyId = companyId,
-                                companyName = name,
-                                role = AppConfig.ROLE_OWNER
-                            )
-                            db.userProfileDao().insert(updatedProfile)
-
-                            navController.navigate(Routes.AdminHome.route) {
-                                popUpTo(Routes.Onboarding.route) { inclusive = true }
+                            isAuthLoading = false
+                            res.onSuccess {
+                                navController.navigate(Routes.AdminHome.route) {
+                                    popUpTo(Routes.Onboarding.route) { inclusive = true }
+                                }
+                            }.onFailure { err ->
+                                authError = err.message ?: "فشل إنشاء الشركة"
                             }
                         }
                     },
                     onJoinAsEmployee = { code ->
-                        // Query or handle join code
-                        navController.navigate(Routes.AdminHome.route)
+                        coroutineScope.launch {
+                            val user = authRepo.currentUser ?: return@launch
+                            isAuthLoading = true
+                            authError = null
+                            val res = companyRepo.joinAsEmployee(
+                                joinCode = code,
+                                userUid = user.uid,
+                                userEmail = user.email ?: "",
+                                userDisplayName = user.displayName ?: "موظف"
+                            )
+                            isAuthLoading = false
+                            res.onSuccess {
+                                navController.navigate(Routes.PendingApproval.route) {
+                                    popUpTo(Routes.Onboarding.route) { inclusive = true }
+                                }
+                            }.onFailure { err ->
+                                authError = err.message ?: "فشل الانضمام بالرمز المدخل"
+                            }
+                        }
                     },
                     onJoinAsClient = { code ->
-                        navController.navigate(Routes.ClientHome.route)
+                        coroutineScope.launch {
+                            val user = authRepo.currentUser ?: return@launch
+                            isAuthLoading = true
+                            authError = null
+                            val res = companyRepo.joinAsClient(
+                                clientJoinCode = code,
+                                userUid = user.uid,
+                                userEmail = user.email ?: "",
+                                userDisplayName = user.displayName ?: "عميل"
+                            )
+                            isAuthLoading = false
+                            res.onSuccess {
+                                navController.navigate(Routes.ClientHome.route) {
+                                    popUpTo(Routes.Onboarding.route) { inclusive = true }
+                                }
+                            }.onFailure { err ->
+                                authError = err.message ?: "فشل الانضمام كعميل"
+                            }
+                        }
                     },
-                    isLoading = isAuthLoading
+                    isLoading = isAuthLoading,
+                    errorMessage = authError
                 )
+            }
+
+            // Pending Approval Screen
+            composable(Routes.PendingApproval.route) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Text(
+                        text = "طلب انضمامك قيد المراجعة والموافقة من قبل إدارة الشركة.",
+                        color = FlowexaBlue,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
             }
 
             // Admin Screens
@@ -325,10 +436,34 @@ fun FlowexaApp(
                 val products by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
                 val customers by customerRepo.observeCustomers(currentCompanyId).collectAsState(initial = emptyList())
 
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val startOfTodayMs = calendar.timeInMillis
+                val todayOrders = orders.filter { (it.createdAtMs ?: 0L) >= startOfTodayMs }
+                val todayOrdersCount = todayOrders.size
+
+                val totalSales = todayOrders.sumOf { order ->
+                    try {
+                        val json = JSONObject(order.totalAmountByCurrencyJson)
+                        var sum = 0.0
+                        val keys = json.keys()
+                        while (keys.hasNext()) {
+                            sum += json.optDouble(keys.next(), 0.0)
+                        }
+                        sum
+                    } catch (_: Exception) {
+                        0.0
+                    }
+                }
+
                 AdminHomeScreen(
                     companyName = company?.name ?: "Flowexa",
-                    todayOrdersCount = orders.size,
-                    totalSales = orders.sumOf { 0.0 }, // Dynamic totals
+                    todayOrdersCount = todayOrdersCount,
+                    totalSales = totalSales,
                     currency = company?.primaryCurrency ?: "SAR",
                     productsCount = products.size,
                     customersCount = customers.size,
@@ -348,16 +483,13 @@ fun FlowexaApp(
                     products = products,
                     searchQuery = query,
                     onSearchChange = { query = it },
-                    onSaveProduct = { prod, isNew ->
-                        coroutineScope.launch {
-                            productRepo.saveProduct(prod, isNew)
-                        }
+                    onSaveProduct = { p, isNew ->
+                        coroutineScope.launch { productRepo.saveProduct(p, isNew) }
                     },
                     onDeleteProduct = { id ->
                         coroutineScope.launch { productRepo.deleteProduct(id) }
                     },
-                    companyId = currentCompanyId,
-                    primaryCurrency = company?.primaryCurrency ?: "SAR"
+                    companyId = currentCompanyId
                 )
             }
 
@@ -369,10 +501,8 @@ fun FlowexaApp(
                     customers = customers,
                     searchQuery = query,
                     onSearchChange = { query = it },
-                    onSaveCustomer = { cust, isNew ->
-                        coroutineScope.launch {
-                            customerRepo.saveCustomer(cust, isNew)
-                        }
+                    onSaveCustomer = { c, isNew ->
+                        coroutineScope.launch { customerRepo.saveCustomer(c, isNew) }
                     },
                     onDeleteCustomer = { id ->
                         coroutineScope.launch { customerRepo.deleteCustomer(id) }
@@ -450,6 +580,76 @@ fun FlowexaApp(
                         coroutineScope.launch {
                             orderRepo.updateStatus(orderId, newStatus, currentUser?.uid ?: "")
                             order = orderRepo.getOrder(orderId)
+                        }
+                    }
+                )
+            }
+
+            composable(Routes.Staff.route) {
+                val staffList by db.userProfileDao().observeStaff(currentCompanyId).collectAsState(initial = emptyList())
+                val pendingEmployees by db.userProfileDao().observePendingStaff(currentCompanyId).collectAsState(initial = emptyList())
+
+                StaffScreen(
+                    joinCode = company?.joinCode,
+                    staffList = staffList,
+                    pendingEmployees = pendingEmployees,
+                    onBackClick = { navController.popBackStack() },
+                    onApproveEmployee = { emp ->
+                        coroutineScope.launch {
+                            db.userProfileDao().updateRole(emp.id, AppConfig.ROLE_SALES)
+                            val syncDao = db.syncOperationDao()
+                            val payload = JSONObject().apply {
+                                put("role", AppConfig.ROLE_SALES)
+                                put("updatedBy", currentUser?.uid ?: "")
+                            }
+                            syncDao.insert(
+                                SyncOperationEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    collectionName = AppConfig.COL_USER_PROFILES,
+                                    documentId = emp.id,
+                                    operation = "UPDATE",
+                                    payloadJson = payload.toString()
+                                )
+                            )
+                            SyncScheduler.scheduleImmediateSync(context)
+                        }
+                    },
+                    onRejectEmployee = { emp ->
+                        coroutineScope.launch {
+                            db.userProfileDao().softDelete(emp.id)
+                            val syncDao = db.syncOperationDao()
+                            syncDao.insert(
+                                SyncOperationEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    collectionName = AppConfig.COL_USER_PROFILES,
+                                    documentId = emp.id,
+                                    operation = "DELETE",
+                                    payloadJson = "{}"
+                                )
+                            )
+                            SyncScheduler.scheduleImmediateSync(context)
+                        }
+                    }
+                )
+            }
+
+            composable(Routes.Notifications.route) {
+                val notifications by db.notificationDao().observeNotifications(currentCompanyId).collectAsState(initial = emptyList())
+
+                NotificationsScreen(
+                    notifications = notifications,
+                    onBackClick = { navController.popBackStack() },
+                    onNotificationClick = { notif ->
+                        coroutineScope.launch {
+                            db.notificationDao().markAsRead(notif.id)
+                            if (!notif.orderId.isNullOrEmpty()) {
+                                navController.navigate(Routes.OrderDetail.createRoute(notif.orderId))
+                            }
+                        }
+                    },
+                    onMarkAllAsRead = {
+                        coroutineScope.launch {
+                            notifications.forEach { db.notificationDao().markAsRead(it.id) }
                         }
                     }
                 )

@@ -16,8 +16,11 @@ interface UserProfileDao {
     @Query("SELECT * FROM user_profiles WHERE id = :id LIMIT 1")
     suspend fun getProfile(id: String): UserProfileEntity?
 
-    @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND isDeleted = 0")
+    @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND role != 'pending_employee' AND isDeleted = 0")
     fun observeStaff(companyId: String): Flow<List<UserProfileEntity>>
+
+    @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND role = 'pending_employee' AND isDeleted = 0")
+    fun observePendingStaff(companyId: String): Flow<List<UserProfileEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(profile: UserProfileEntity)
@@ -25,9 +28,12 @@ interface UserProfileDao {
     @Update
     suspend fun update(profile: UserProfileEntity)
 
+    @Query("UPDATE user_profiles SET role = :newRole, syncState = 'PENDING' WHERE id = :id")
+    suspend fun updateRole(id: String, newRole: String)
+
+    @Query("UPDATE user_profiles SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
+    suspend fun softDelete(id: String)
+
     @Query("DELETE FROM user_profiles WHERE id = :id")
     suspend fun delete(id: String)
-
-    @Query("DELETE FROM user_profiles")
-    suspend fun clear()
 }

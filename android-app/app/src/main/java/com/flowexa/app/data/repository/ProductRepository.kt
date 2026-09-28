@@ -9,6 +9,7 @@ import com.flowexa.app.sync.SyncScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
@@ -53,10 +54,33 @@ class ProductRepository(
             put("inStock", finalProduct.inStock)
             put("isNewProduct", finalProduct.isNewProduct)
             put("isLowStock", finalProduct.isLowStock)
+            put("invoiceTypeRestriction", finalProduct.invoiceTypeRestriction)
+            put("currencyRestrictionType", finalProduct.currencyRestrictionType)
             put("bonusType", finalProduct.bonusType)
             put("bonusFixedPercent", finalProduct.bonusFixedPercent)
             put("isActive", finalProduct.isActive)
             put("isDeleted", false)
+
+            if (!finalProduct.specialOfferJson.isNullOrEmpty()) {
+                try {
+                    put("specialOffer", JSONObject(finalProduct.specialOfferJson))
+                } catch (_: Exception) {}
+            }
+            if (finalProduct.specificCurrenciesJson.isNotEmpty()) {
+                try {
+                    put("specificCurrencies", JSONArray(finalProduct.specificCurrenciesJson))
+                } catch (_: Exception) {}
+            }
+            if (finalProduct.expiryDatesJson.isNotEmpty()) {
+                try {
+                    put("expiryDates", JSONArray(finalProduct.expiryDatesJson))
+                } catch (_: Exception) {}
+            }
+            if (finalProduct.bonusTiersJson.isNotEmpty()) {
+                try {
+                    put("bonusTiers", JSONArray(finalProduct.bonusTiersJson))
+                } catch (_: Exception) {}
+            }
         }
 
         syncDao.insert(

@@ -64,8 +64,27 @@ fun CreateOrderScreen(
                 (qty * (percent / 100.0)).toInt().toDouble()
             }
             "tiered" -> {
-                // Example 10 + 1 logic
-                if (qty >= 50) 5.0 else if (qty >= 20) 2.0 else if (qty >= 10) 1.0 else 0.0
+                var calculatedBonus = 0.0
+                if (!product.bonusTiersJson.isNullOrEmpty() && product.bonusTiersJson != "[]") {
+                    try {
+                        val tiers = org.json.JSONArray(product.bonusTiersJson)
+                        var bestMinQty = 0.0
+                        for (i in 0 until tiers.length()) {
+                            val tier = tiers.getJSONObject(i)
+                            val minQty = tier.optDouble("minQty", tier.optDouble("quantity", 0.0))
+                            val bonus = tier.optDouble("bonus", tier.optDouble("bonusQty", 0.0))
+                            if (qty >= minQty && minQty >= bestMinQty) {
+                                bestMinQty = minQty
+                                calculatedBonus = bonus
+                            }
+                        }
+                    } catch (_: Exception) {
+                        calculatedBonus = if (qty >= 50) 5.0 else if (qty >= 20) 2.0 else if (qty >= 10) 1.0 else 0.0
+                    }
+                } else {
+                    calculatedBonus = if (qty >= 50) 5.0 else if (qty >= 20) 2.0 else if (qty >= 10) 1.0 else 0.0
+                }
+                calculatedBonus
             }
             else -> 0.0
         }

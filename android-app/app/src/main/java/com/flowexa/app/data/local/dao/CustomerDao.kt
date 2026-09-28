@@ -42,4 +42,7 @@ interface CustomerDao {
 
     @Query("UPDATE customers SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
     suspend fun softDelete(id: String)
+
+    @Query("UPDATE customers SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
 }

@@ -42,4 +42,7 @@ interface ProductDao {
 
     @Query("UPDATE products SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
     suspend fun softDelete(id: String)
+
+    @Query("UPDATE products SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
 }

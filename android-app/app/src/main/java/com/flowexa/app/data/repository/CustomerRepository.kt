@@ -47,6 +47,11 @@ class CustomerRepository(
             put("notes", finalCustomer.notes)
             put("appUserId", finalCustomer.appUserId)
             put("isDeleted", false)
+            if (finalCustomer.contactNumbersJson.isNotEmpty()) {
+                try {
+                    put("contactNumbers", org.json.JSONArray(finalCustomer.contactNumbersJson))
+                } catch (_: Exception) {}
+            }
         }
 
         syncDao.insert(
