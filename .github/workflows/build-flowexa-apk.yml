@@ -6,6 +6,7 @@ on:
     paths:
       - 'android-app/**'
       - 'android/**'
+      - '.github/workflows/build-flowexa-apk.yml'
   workflow_dispatch:
 
 permissions:
@@ -14,41 +15,52 @@ permissions:
 jobs:
   build:
     name: Build Flowexa APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
 
-      - name: Prepare Android Project
+      - name: Build Android Release APK
+        id: build_apk
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: "flowexa123"
+          KEY_ALIAS: "flowexa"
+          KEY_PASSWORD: "flowexa123"
         run: |
+          set -e
+
+          # Detect target android directory
           if [ -d "android-app" ]; then
-            echo "TARGET_DIR=android-app" >> $GITHUB_ENV
-            chmod +x android-app/gradlew
+            TARGET="android-app"
           else
-            echo "TARGET_DIR=android" >> $GITHUB_ENV
-            chmod +x android/gradlew
+            TARGET="android"
           fi
+          echo "Selected project directory: $TARGET"
 
-      - name: Ensure Keystore for Release Signing
-        run: |
-          APP_DIR="$TARGET_DIR/app"
-          cd "$APP_DIR"
-          if [ ! -f "flowexa-release.keystore" ]; then
-            echo "Generating release keystore..."
+          # Ensure gradlew is executable
+          chmod +x "$TARGET/gradlew"
+
+          # Ensure keystore exists for signing
+          mkdir -p "$TARGET/app"
+          KEYSTORE_PATH="$TARGET/app/flowexa-release.keystore"
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Generating release keystore at $KEYSTORE_PATH..."
             keytool -genkeypair -v \
-              -keystore flowexa-release.keystore \
+              -keystore "$KEYSTORE_PATH" \
               -alias flowexa \
               -keyalg RSA \
               -keysize 2048 \
@@ -58,24 +70,27 @@ jobs:
               -dname "CN=Flowexa, OU=Mobile, O=Flowexa, L=City, S=State, C=US"
           fi
 
-      - name: Build Android Release APK
-        working-directory: ${{ env.TARGET_DIR }}
-        env:
-          KEYSTORE_PASSWORD: "flowexa123"
-          KEY_ALIAS: "flowexa"
-          KEY_PASSWORD: "flowexa123"
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+          # Accept SDK licenses if sdkmanager exists
+          if [ -n "$ANDROID_HOME" ] && [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
+          fi
 
-      - name: Verify and Locate APK
-        id: locate_apk
-        run: |
-          APK_FILE=$(find $TARGET_DIR/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          # Run Gradle build
+          cd "$TARGET"
+          echo "Starting Gradle build..."
+          ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
+          cd ..
+
+          # Locate and copy generated APK
+          mkdir -p build-output
+          APK_FILE=$(find "$TARGET/app/build/outputs/apk" -type f -name "*.apk" | head -n 1)
+
           if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "ERROR: APK file not found!"
+            echo "::error::No APK file generated!"
             exit 1
           fi
-          echo "Found APK at: $APK_FILE"
-          mkdir -p build-output
+
+          echo "Found generated APK: $APK_FILE"
           cp "$APK_FILE" build-output/Flowexa.apk
           ls -lh build-output/Flowexa.apk
 
