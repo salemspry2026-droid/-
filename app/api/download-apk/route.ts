@@ -23,3 +23,19 @@ export async function GET() {
     return NextResponse.json({ error: 'APK not available' }, { status: 404 });
   }
 }
+
+export async function HEAD() {
+  const apkPath = join(process.cwd(), 'public', 'downloads', 'flowexa.apk');
+  try {
+    const info = await stat(apkPath);
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Length': String(info.size),
+      },
+    });
+  } catch {
+    return new NextResponse(null, { status: 404 });
+  }
+}

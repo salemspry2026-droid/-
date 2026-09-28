@@ -2,10 +2,12 @@ package com.flowexa.app;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import androidx.activity.OnBackPressedCallback;
@@ -91,7 +93,10 @@ public class MainActivity extends AppCompatActivity {
 
         registerNetworkCallback();
 
-        if (savedInstanceState != null) {
+        Intent launchIntent = getIntent();
+        if (launchIntent != null && launchIntent.getData() != null) {
+            handleIncomingUri(launchIntent.getData());
+        } else if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
             loadApp();
@@ -109,6 +114,23 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getData() != null) {
+            handleIncomingUri(intent.getData());
+        }
+    }
+
+    private void handleIncomingUri(Uri uri) {
+        if (uri == null) return;
+        String url = uri.toString();
+        if (webView != null) {
+            webView.loadUrl(url);
+        }
     }
 
     private void loadApp() {

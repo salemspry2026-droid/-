@@ -3,7 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, googleProvider, auth, signOut } from '@/lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  updateProfile,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  sendSignInLinkToEmail
+} from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,13 +32,40 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'emailLink'>('login');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getRedirectResult(auth).catch(error => {
       console.error("Redirect redirect result error:", error);
     });
+
+    // Check if the current URL is an incoming Firebase Email Sign-In Link
+    if (typeof window !== 'undefined' && isSignInWithEmailLink(auth, window.location.href)) {
+      setShowLogin(true);
+      let emailForSignIn = window.localStorage.getItem('emailForSignIn');
+      if (!emailForSignIn) {
+        emailForSignIn = window.prompt('يرجى تأكيد البريد الإلكتروني لإكمال تسجيل الدخول:');
+      }
+      if (emailForSignIn) {
+        setLoading(true);
+        signInWithEmailLink(auth, emailForSignIn, window.location.href)
+          .then(() => {
+            window.localStorage.removeItem('emailForSignIn');
+            toast.success('تم تسجيل الدخول بنجاح عبر رابط البريد الإلكتروني');
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          })
+          .catch((error: any) => {
+            console.error('Email link sign in error:', error);
+            toast.error('تعذر تسجيل الدخول بالرابط: ' + (error.message || 'الرابط غير صالح أو منتهي'));
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      }
+    }
   }, []);
 
   const handleEmailAction = async (e: React.FormEvent) => {
@@ -54,6 +89,22 @@ export default function Home() {
         await sendPasswordResetEmail(auth, email);
         toast.success('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني');
         setAuthMode('login');
+      } else if (authMode === 'emailLink') {
+        const actionCodeSettings = {
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://orderflow-topaz.vercel.app',
+          handleCodeInApp: true,
+          android: {
+            packageName: 'com.flowexa.app',
+            installApp: false,
+            minimumVersion: '1',
+          },
+          linkDomain: 'gen-lang-client-0196712383.firebaseapp.com',
+        };
+        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('emailForSignIn', email);
+        }
+        toast.success('تم إرسال رابط الدخول السريع إلى بريدك الإلكتروني بنجاح!');
       }
     } catch (error: any) {
       console.error("Auth failed:", error);
@@ -143,6 +194,7 @@ export default function Home() {
               {authMode === 'login' && 'تسجيل الدخول للمتابعة'}
               {authMode === 'register' && 'إنشاء حساب جديد'}
               {authMode === 'forgot' && 'استعادة كلمة المرور'}
+              {authMode === 'emailLink' && 'الدخول برابط سحري للبريد (بدون كلمة مرور)'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 pt-4">
@@ -158,7 +210,7 @@ export default function Home() {
                 <Label>البريد الإلكتروني</Label>
                 <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="name@example.com" dir="ltr" className="text-right" />
               </div>
-              {authMode !== 'forgot' && (
+              {authMode !== 'forgot' && authMode !== 'emailLink' && (
                 <div className="space-y-1">
                   <Label>كلمة المرور</Label>
                   <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" dir="ltr" className="text-right" />
@@ -167,18 +219,19 @@ export default function Home() {
 
               <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl text-base font-bold mt-2">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {authMode === 'login' ? 'دخول بحساب مخصص' : authMode === 'register' ? 'تسجيل كجديد' : 'إرسال الرابط'}
+                {authMode === 'login' ? 'دخول بحساب مخصص' : authMode === 'register' ? 'تسجيل كجديد' : authMode === 'emailLink' ? 'إرسال رابط الدخول للبريد' : 'إرسال رابط الاستعادة'}
               </Button>
             </form>
 
-            <div className="flex flex-wrap items-center justify-between text-sm">
+            <div className="flex flex-wrap items-center justify-between text-sm gap-2">
               {authMode === 'login' ? (
                 <>
                   <button type="button" onClick={() => setAuthMode('forgot')} className="text-blue-600 hover:underline">نسيت كلمة المرور؟</button>
+                  <button type="button" onClick={() => setAuthMode('emailLink')} className="text-emerald-700 hover:underline font-semibold">دخول برابط بدون كلمة مرور</button>
                   <button type="button" onClick={() => setAuthMode('register')} className="text-blue-600 hover:underline font-bold">إنشاء حساب مخصص</button>
                 </>
               ) : (
-                <button type="button" onClick={() => setAuthMode('login')} className="text-blue-600 hover:underline mx-auto">العودة لتسجيل الدخول</button>
+                <button type="button" onClick={() => setAuthMode('login')} className="text-blue-600 hover:underline mx-auto">العودة لتسجيل الدخول بكلمة المرور</button>
               )}
             </div>
 

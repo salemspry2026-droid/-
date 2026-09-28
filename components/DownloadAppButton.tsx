@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useSyncExternalStore, type MouseEvent } from 'react';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const APK_PATH = '/api/download-apk';
@@ -10,6 +11,10 @@ export function isNativeAndroidApp() {
   if (typeof navigator === 'undefined') return false;
   return /FlowexaApp/i.test(navigator.userAgent);
 }
+
+const emptySubscribe = () => () => {};
+const getAppSnapshot = () => isNativeAndroidApp();
+const getServerAppSnapshot = () => false;
 
 interface DownloadAppButtonProps {
   className?: string;
@@ -22,11 +27,7 @@ export function DownloadAppButton({
   label = 'تحميل تطبيق أندرويد',
   variant = 'primary',
 }: DownloadAppButtonProps) {
-  const [hidden, setHidden] = useState(false);
-
-  useEffect(() => {
-    setHidden(isNativeAndroidApp());
-  }, []);
+  const hidden = useSyncExternalStore(emptySubscribe, getAppSnapshot, getServerAppSnapshot);
 
   if (hidden) return null;
 
@@ -39,14 +40,23 @@ export function DownloadAppButton({
       'inline-flex items-center gap-2 h-10 px-3 md:px-4 rounded-full border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 text-sm',
   }[variant];
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+  const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    const link = document.createElement('a');
-    link.href = APK_PATH;
-    link.download = 'Flowexa.apk';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(APK_PATH, { method: 'HEAD' });
+      if (!res.ok) {
+        toast.info('حزمة التطبيق (APK) قيد التجهيز من ملفات الأندرويد، يمكنك أيضاً استخدام التطبيق مباشرة وتثبيته كـ PWA من المتصفح.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = APK_PATH;
+      link.download = 'Flowexa.apk';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      window.location.href = APK_PATH;
+    }
   };
 
   return (

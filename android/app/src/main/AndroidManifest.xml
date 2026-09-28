@@ -23,6 +23,27 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Firebase Hosting Email Link Authentication Intent Filter (Post-Dynamic Links migration) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="gen-lang-client-0196712383.firebaseapp.com"
+                    android:pathPrefix="/__/auth/links" />
+            </intent-filter>
+
+            <!-- Web App Deep Link Intent Filter -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="orderflow-topaz.vercel.app" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>
