@@ -2,8 +2,12 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.services)
     alias(libs.plugins.ksp)
+}
+
+// Firebase configuration is supplied outside Git.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -26,14 +30,19 @@ android {
         buildConfigField("String", "WEB_BASE_URL", "\"https://orderflow-topaz.vercel.app\"")
     }
 
+    val releaseKeystore = file("flowexa-release.keystore")
+    val hasReleaseKeystore = releaseKeystore.exists()
+
     signingConfigs {
-        create("release") {
-            val ksFile = file("flowexa-release.keystore")
-            if (ksFile.exists()) {
-                storeFile = ksFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "flowexa123"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "flowexa"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "flowexa123"
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    ?: error("KEYSTORE_PASSWORD is required when building a release")
+                keyAlias = System.getenv("KEY_ALIAS")
+                    ?: error("KEY_ALIAS is required when building a release")
+                keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: error("KEY_PASSWORD is required when building a release")
             }
         }
     }
@@ -41,11 +50,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            val ksFile = file("flowexa-release.keystore")
-            if (ksFile.exists()) {
+            if (hasReleaseKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                logger.warn("No release keystore found; release APK will be unsigned.")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
