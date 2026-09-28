@@ -5,13 +5,27 @@ import com.flowexa.app.data.local.FlowexaDatabase
 import com.flowexa.app.data.remote.FirebaseProvider
 import com.flowexa.app.data.remote.FirestoreMappers
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 
+internal fun isTransientSyncError(error: Throwable): Boolean {
+    val firestoreError = error as? FirebaseFirestoreException
+    if (firestoreError != null) {
+        return firestoreError.code in setOf(
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+            FirebaseFirestoreException.Code.DEADLINE_EXCEEDED,
+            FirebaseFirestoreException.Code.ABORTED,
+            FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED
+        )
+    }
+    return error is IOException || error.cause?.let(::isTransientSyncError) == true
+}
 class SyncEngine(
     private val database: FlowexaDatabase
 ) {
@@ -22,8 +36,10 @@ class SyncEngine(
      */
     suspend fun syncOutbox(): Result<Int> = withContext(Dispatchers.IO) {
         val syncDao = database.syncOperationDao()
+        syncDao.resetProcessingOperations()
         val pendingOps = syncDao.getPendingOperations()
         var syncedCount = 0
+        var transientError: Throwable? = null
 
         for (op in pendingOps) {
             try {
@@ -62,11 +78,17 @@ class SyncEngine(
 
                 syncedCount++
             } catch (e: Exception) {
-                syncDao.markFailed(op.id, e.message)
+                if (isTransientSyncError(e)) {
+                    syncDao.markPending(op.id, e.message)
+                    transientError = transientError ?: e
+                } else {
+                    syncDao.markFailed(op.id, e.message)
+                }
             }
         }
 
         syncDao.clearSynced()
+        transientError?.let { return@withContext Result.failure(TransientSyncException(it)) }
         Result.success(syncedCount)
     }
 
