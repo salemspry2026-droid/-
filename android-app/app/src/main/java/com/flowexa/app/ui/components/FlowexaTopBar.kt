@@ -21,6 +21,7 @@ fun FlowexaTopBar(
     companyName: String? = null,
     isOnline: Boolean = true,
     pendingSyncCount: Int = 0,
+    onSyncClick: (() -> Unit)? = null,
     onNotificationsClick: (() -> Unit)? = null
 ) {
     TopAppBar(
