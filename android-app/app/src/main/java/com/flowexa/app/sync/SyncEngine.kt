@@ -88,7 +88,7 @@ class SyncEngine(
         }
 
         syncDao.clearSynced()
-        transientError?.let { return@withContext Result.failure(TransientSyncException(it)) }
+        transientError?.let { return@withContext Result.failure(IOException("Temporary sync failure", it)) }
         Result.success(syncedCount)
     }
 
