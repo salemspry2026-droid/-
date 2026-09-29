@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -58,13 +59,13 @@ fun FlowexaApp(
 
     // Local DB & Repositories
     val db = remember { FlowexaDatabase.getInstance(context) }
-    val authRepo = remember { AuthRepository(db, context) }
+    val authRepo = remember { AuthRepository(db) }
     val companyRepo = remember { CompanyRepository(db, context) }
     val productRepo = remember { ProductRepository(db, context) }
     val customerRepo = remember { CustomerRepository(db, context) }
     val orderRepo = remember { OrderRepository(db, context) }
     val syncEngine = remember { SyncEngine(db) }
-    val googleAuthManager = remember { GoogleAuthManager(context, authRepo) }
+    val googleAuthManager = remember { GoogleAuthManager(context) }
 
     // Network Connectivity State
     var isOnline by remember { mutableStateOf(true) }
