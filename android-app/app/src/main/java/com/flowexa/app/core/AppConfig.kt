@@ -18,6 +18,7 @@ object AppConfig {
     const val ROLE_SALES = "sales"
     const val ROLE_CLIENT = "client"
     const val ROLE_PENDING = "pending_employee"
+    const val ROLE_PENDING_EMPLOYEE = ROLE_PENDING
 
     // Sync States
     const val SYNC_STATE_SYNCED = "SYNCED"
