@@ -88,8 +88,11 @@ class AuthRepository(
         profile
     }
 
-    suspend fun logout() = withContext(Dispatchers.IO) {
+    suspend fun logout(): Unit = withContext(Dispatchers.IO) {
+        val uid = auth.currentUser?.uid
         auth.signOut()
-        database.userProfileDao().clear()
+        if (uid != null) {
+            database.userProfileDao().delete(uid)
+        }
     }
 }
