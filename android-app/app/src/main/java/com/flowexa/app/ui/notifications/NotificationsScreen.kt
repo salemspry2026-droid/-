@@ -160,7 +160,7 @@ private fun NotificationCard(
                     tint = when (notification.type) {
                         "staff_join" -> FlowexaBlue
                         "order_created", "order_status" -> FlowexaGreen
-                        else = Color.Gray
+                        else -> Color.Gray
                     }
                 )
             }
