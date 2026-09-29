@@ -490,7 +490,8 @@ fun FlowexaApp(
                     onDeleteProduct = { id ->
                         coroutineScope.launch { productRepo.deleteProduct(id) }
                     },
-                    companyId = currentCompanyId
+                    companyId = currentCompanyId,
+                    primaryCurrency = company?.primaryCurrency ?: "SAR"
                 )
             }
 
