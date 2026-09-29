@@ -264,7 +264,7 @@ class CompanyRepository(
                 isRead = false,
                 createdAtMs = nowMs
             )
-            database.notificationDao().insert(notif)
+            database.notificationDao().insertAll(listOf(notif))
 
             val notifPayload = JSONObject().apply {
                 put("companyId", matchedCompany.id)
