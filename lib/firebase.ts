@@ -32,11 +32,13 @@ if (typeof window !== 'undefined') {
   auth = getAuth(app);
 }
 
-const db = isNewApp
-  ? initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    }, firebaseConfig.firestoreDatabaseId)
+const db = typeof window !== 'undefined'
+  ? (isNewApp
+      ? initializeFirestore(app, {
+          experimentalForceLongPolling: true,
+          localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        }, firebaseConfig.firestoreDatabaseId)
+      : getFirestore(app, firebaseConfig.firestoreDatabaseId))
   : getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 const storage = getStorage(app);

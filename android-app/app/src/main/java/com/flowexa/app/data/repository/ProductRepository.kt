@@ -83,7 +83,7 @@ class ProductRepository(
             }
         }
 
-        syncDao.insert(
+        syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_PRODUCTS,
@@ -98,7 +98,7 @@ class ProductRepository(
 
     suspend fun deleteProduct(id: String) = withContext(Dispatchers.IO) {
         productDao.softDelete(id)
-        syncDao.insert(
+        syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_PRODUCTS,
@@ -108,5 +108,28 @@ class ProductRepository(
             )
         )
         SyncScheduler.scheduleImmediateSync(context)
+    }
+
+    suspend fun loadPublicCatalog(companyId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val firestore = com.flowexa.app.data.remote.FirebaseProvider.firestore
+            val companyDoc = firestore.collection(AppConfig.COL_COMPANIES).document(companyId).get().await()
+            if (companyDoc.exists()) {
+                val company = com.flowexa.app.data.remote.FirestoreMappers.docToCompany(companyDoc)
+                database.companyDao().insert(company)
+            }
+
+            val productsSnapshot = firestore.collection(AppConfig.COL_PRODUCTS)
+                .whereEqualTo("companyId", companyId)
+                .whereEqualTo("isDeleted", false)
+                .get()
+                .await()
+            val products = productsSnapshot.documents.map { com.flowexa.app.data.remote.FirestoreMappers.docToProduct(it) }
+            database.productDao().insertAll(products)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

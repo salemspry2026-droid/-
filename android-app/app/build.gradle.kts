@@ -53,7 +53,10 @@ android {
             if (hasReleaseKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                logger.warn("No release keystore found; release APK will be unsigned.")
+                val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+                if (isReleaseTask) {
+                    error("Production release build requires flowexa-release.keystore but it was not found.")
+                }
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -125,4 +128,11 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // Unit Testing
+    testImplementation("junit:junit:4.13.2")
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

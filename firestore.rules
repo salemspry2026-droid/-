@@ -243,7 +243,11 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+                    request.auth.uid == userId || 
+                    isSystemAdmin() || 
+                    (resource != null && ('companyId' in resource.data) && isCompanyAdmin(resource.data.companyId))
+                  );
       
       allow create: if isAuthenticated() && 
                     request.auth.uid == userId &&
@@ -282,7 +286,10 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+                    isCompanyMember(resource.data.companyId) || 
+                    isSystemAdmin()
+                  );
       
       allow create: if isAuthenticated() && 
                     isValidCustomer(request.resource.data) && 
@@ -301,7 +308,12 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+                    isCompanyMember(resource.data.companyId) || 
+                    (resource.data.createdBy == request.auth.uid) || 
+                    (('clientUid' in resource.data) && resource.data.clientUid == request.auth.uid) || 
+                    isSystemAdmin()
+                  );
       
       allow create: if isAuthenticated() && 
                     isCreatedByCurrentUser() && 
@@ -339,7 +351,12 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+                    isCompanyMember(resource.data.companyId) || 
+                    (('clientUid' in resource.data) && resource.data.clientUid == request.auth.uid) || 
+                    (('userId' in resource.data) && resource.data.userId == request.auth.uid) || 
+                    isSystemAdmin()
+                  );
       allow create: if isAuthenticated() && 
                     isValidNotification(request.resource.data) && 
                     isCreatedByCurrentUser() && 

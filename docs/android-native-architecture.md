@@ -1,6 +1,9 @@
 # Flowexa Native Android Architecture & Implementation Guide
 
 ## 1. نظرة عامة (Overview)
+- **android-app:** المشروع الرسمي لتطبيق الأندرويد الناتيف (Official Canonical Android Application).
+- **android:** مجلد قديم مهمل (Deprecated / Legacy Only) - ممنوع استخدامه في أي بناء إنتاجي أو خطوط CI.
+
 تم تحويل تطبيق Flowexa Android من تطبيق هجين يعتمد على WebView و Java إلى تطبيق Native حقيقي 100% مبني بأحدث معايير تطوير أندرويد الرسمية.
 
 - **اللغة:** Kotlin

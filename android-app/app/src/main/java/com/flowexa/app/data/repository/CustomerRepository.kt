@@ -54,7 +54,7 @@ class CustomerRepository(
             }
         }
 
-        syncDao.insert(
+        syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_CUSTOMERS,
@@ -69,7 +69,7 @@ class CustomerRepository(
 
     suspend fun deleteCustomer(id: String) = withContext(Dispatchers.IO) {
         customerDao.softDelete(id)
-        syncDao.insert(
+        syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_CUSTOMERS,

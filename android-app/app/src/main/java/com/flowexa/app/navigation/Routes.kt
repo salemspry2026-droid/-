@@ -25,6 +25,7 @@ sealed class Routes(val route: String) {
     data object ClientHome : Routes("client_home")
     data object ClientCatalog : Routes("client_catalog")
     data object ClientOrders : Routes("client_orders")
+    data object ClientFavorites : Routes("client_favorites")
 
     // Public Catalog
     data object PublicCatalog : Routes("public_catalog/{companyId}") {

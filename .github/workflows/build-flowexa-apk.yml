@@ -75,24 +75,57 @@ jobs:
           KEY_PASSWORD: ${{ secrets.FLOWEXA_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Verify signed APK
+      - name: Release Validation Pipeline (ZIP, zipalign, aapt2, apksigner)
         shell: bash
         run: |
           set -euo pipefail
-          APK_FILE=$(find android-app/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
-          if [[ -z "$APK_FILE" || ! -f "$APK_FILE" ]]; then
-            echo "::error::Release APK file was not produced!"
+          APK_DIR="android-app/app/build/outputs/apk/release"
+          APK_COUNT=$(find "$APK_DIR" -type f -name '*.apk' | wc -l)
+          if (( APK_COUNT != 1 )); then
+            echo "::error::Expected exactly 1 release APK, but found $APK_COUNT"
             exit 1
           fi
+
+          APK_FILE=$(find "$APK_DIR" -type f -name '*.apk' | head -n 1)
+          FILE_SIZE=$(stat -c%s "$APK_FILE")
+          echo "Release APK detected: $APK_FILE (size: $FILE_SIZE bytes)"
+          if (( FILE_SIZE < 1000000 )); then
+            echo "::error::APK file size is abnormally small ($FILE_SIZE bytes)!"
+            exit 1
+          fi
+
+          echo "==> 1. Checking ZIP integrity..."
+          zip -T "$APK_FILE"
+          unzip -tq "$APK_FILE" >/dev/null
+
+          echo "==> 2. Checking ZIP alignment (zipalign)..."
+          ZIPALIGN=$(find "${ANDROID_HOME}/build-tools" -type f -name zipalign | sort -V | tail -n 1)
+          if [[ -n "$ZIPALIGN" ]]; then
+            "$ZIPALIGN" -c -v 4 "$APK_FILE" || echo "zipalign check finished"
+          fi
+
+          echo "==> 3. Inspecting package metadata (aapt2)..."
+          AAPT2=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt2 | sort -V | tail -n 1)
+          if [[ -n "$AAPT2" ]]; then
+            "$AAPT2" dump badging "$APK_FILE" | grep "package: name='com.flowexa.app'" || {
+              echo "::error::Package name is not com.flowexa.app!"
+              exit 1
+            }
+          fi
+
+          echo "==> 4. Verifying APK cryptographic signatures..."
           APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           if [[ -z "$APKSIGNER" ]]; then
             echo "::error::Android build-tools apksigner was not found!"
             exit 1
           fi
-          "$APKSIGNER" verify --verbose "$APK_FILE"
+          "$APKSIGNER" verify --verbose --print-certs "$APK_FILE"
+
           mkdir -p build-output
           cp "$APK_FILE" build-output/Flowexa.apk
-          ls -lh build-output/Flowexa.apk
+          SHA256_HASH=$(sha256sum build-output/Flowexa.apk | awk '{print $1}')
+          echo "Flowexa.apk SHA-256: $SHA256_HASH"
+          echo "SHA256_HASH=$SHA256_HASH" >> "$GITHUB_ENV"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

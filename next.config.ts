@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
+  productionBrowserSourceMaps: false,
   transpilePackages: ['motion'],
   allowedDevOrigins: ['.monkeycode-ai.live'],
   async headers() {
@@ -43,6 +43,13 @@ const nextConfig: NextConfig = {
       config.watchOptions = {
         ignored: /.*/,
       };
+    }
+    if (!dev) {
+      config.devtool = false;
+      config.parallelism = 1;
+      if (config.optimization) {
+        config.optimization.minimize = false;
+      }
     }
     return config;
   },

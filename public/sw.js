@@ -27,7 +27,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return;
 
   // Navigation requests: Network-first, fallback to cached '/'
   if (request.mode === 'navigate') {

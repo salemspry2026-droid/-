@@ -14,14 +14,21 @@ class GoogleAuthManager(private val context: Context) {
     private val credentialManager = CredentialManager.create(context)
     private val auth = FirebaseProvider.auth
 
-    // Web Client ID from google-services.json oauth_client
-    private val webClientId = "252523271264-sognisdn2l0u291qcic6f9nc5l2132c8.apps.googleusercontent.com"
+    private fun getWebClientId(): String {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        return if (resId != 0) context.getString(resId) else ""
+    }
 
     suspend fun signInWithGoogle(): Result<Unit> {
         return try {
+            val clientId = getWebClientId()
+            if (clientId.isEmpty()) {
+                return Result.failure(Exception("Google Sign-In configuration (default_web_client_id) was not found in resources."))
+            }
+
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(webClientId)
+                .setServerClientId(clientId)
                 .setAutoSelectEnabled(false)
                 .build()
 

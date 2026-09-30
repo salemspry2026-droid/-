@@ -383,25 +383,31 @@ class CompanyRepository(
     }
 
     suspend fun updateCompany(company: CompanyEntity) = withContext(Dispatchers.IO) {
-        companyDao.insert(company)
+        val nowMs = System.currentTimeMillis()
+        val pendingCompany = company.copy(
+            syncState = AppConfig.SYNC_STATE_PENDING,
+            updatedAtMs = nowMs
+        )
+        companyDao.insert(pendingCompany)
 
         val payload = JSONObject().apply {
-            put("name", company.name)
-            put("phone", company.phone)
-            put("address", company.address)
-            put("taxId", company.taxId)
-            put("aboutUs", company.aboutUs)
-            put("email", company.email)
-            put("notes", company.notes)
-            put("workingHours", company.workingHours)
-            put("primaryCurrency", company.primaryCurrency)
+            put("name", pendingCompany.name)
+            put("phone", pendingCompany.phone)
+            put("address", pendingCompany.address)
+            put("taxId", pendingCompany.taxId)
+            put("aboutUs", pendingCompany.aboutUs)
+            put("email", pendingCompany.email)
+            put("notes", pendingCompany.notes)
+            put("workingHours", pendingCompany.workingHours)
+            put("primaryCurrency", pendingCompany.primaryCurrency)
+            put("isDeleted", false)
         }
 
-        syncDao.insert(
+        syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_COMPANIES,
-                documentId = company.id,
+                documentId = pendingCompany.id,
                 operation = "UPDATE",
                 payloadJson = payload.toString()
             )

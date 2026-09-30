@@ -17,10 +17,14 @@ import com.flowexa.app.data.local.entity.*
         OrderItemEntity::class,
         NotificationEntity::class,
         CallRecordingEntity::class,
-        SyncOperationEntity::class
+        SyncOperationEntity::class,
+        ProductCategoryEntity::class,
+        ProductBrandEntity::class,
+        LocationEntity::class,
+        OrderStageEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class FlowexaDatabase : RoomDatabase() {
 
@@ -32,6 +36,10 @@ abstract class FlowexaDatabase : RoomDatabase() {
     abstract fun notificationDao(): NotificationDao
     abstract fun syncOperationDao(): SyncOperationDao
     abstract fun callRecordingDao(): CallRecordingDao
+    abstract fun productCategoryDao(): ProductCategoryDao
+    abstract fun productBrandDao(): ProductBrandDao
+    abstract fun locationDao(): LocationDao
+    abstract fun orderStageDao(): OrderStageDao
 
     companion object {
         @Volatile
@@ -44,7 +52,6 @@ abstract class FlowexaDatabase : RoomDatabase() {
                     FlowexaDatabase::class.java,
                     "flowexa.db"
                 )
-                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

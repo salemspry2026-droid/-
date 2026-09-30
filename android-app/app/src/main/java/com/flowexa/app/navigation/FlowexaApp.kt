@@ -64,6 +64,8 @@ fun FlowexaApp(
     val productRepo = remember { ProductRepository(db, context) }
     val customerRepo = remember { CustomerRepository(db, context) }
     val orderRepo = remember { OrderRepository(db, context) }
+    val notificationRepo = remember { NotificationRepository(db, context) }
+    val favoritesRepo = remember { FavoritesRepository(db, context) }
     val syncEngine = remember { SyncEngine(db) }
     val googleAuthManager = remember { GoogleAuthManager(context) }
 
@@ -200,27 +202,42 @@ fun FlowexaApp(
                             popUpTo(Routes.Splash.route) { inclusive = true }
                         }
                     } else {
-                        val profile = authRepo.fetchAndCacheUserProfile(user.uid)
-                        when {
-                            profile.role == AppConfig.ROLE_PENDING_EMPLOYEE -> {
-                                navController.navigate(Routes.PendingApproval.route) {
-                                    popUpTo(Routes.Splash.route) { inclusive = true }
+                        var profile = authRepo.getCachedProfile(user.uid)
+                        if (profile == null) {
+                            val remoteRes = authRepo.refreshUserProfile(user.uid)
+                            profile = remoteRes.getOrNull()
+                        } else {
+                            coroutineScope.launch {
+                                authRepo.refreshUserProfile(user.uid)
+                            }
+                        }
+
+                        if (profile != null) {
+                            when {
+                                profile.role == AppConfig.ROLE_PENDING_EMPLOYEE -> {
+                                    navController.navigate(Routes.PendingApproval.route) {
+                                        popUpTo(Routes.Splash.route) { inclusive = true }
+                                    }
+                                }
+                                profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT -> {
+                                    navController.navigate(Routes.Onboarding.route) {
+                                        popUpTo(Routes.Splash.route) { inclusive = true }
+                                    }
+                                }
+                                profile.role == AppConfig.ROLE_CLIENT -> {
+                                    navController.navigate(Routes.ClientHome.route) {
+                                        popUpTo(Routes.Splash.route) { inclusive = true }
+                                    }
+                                }
+                                else -> {
+                                    navController.navigate(Routes.AdminHome.route) {
+                                        popUpTo(Routes.Splash.route) { inclusive = true }
+                                    }
                                 }
                             }
-                            profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT -> {
-                                navController.navigate(Routes.Onboarding.route) {
-                                    popUpTo(Routes.Splash.route) { inclusive = true }
-                                }
-                            }
-                            profile.role == AppConfig.ROLE_CLIENT -> {
-                                navController.navigate(Routes.ClientHome.route) {
-                                    popUpTo(Routes.Splash.route) { inclusive = true }
-                                }
-                            }
-                            else -> {
-                                navController.navigate(Routes.AdminHome.route) {
-                                    popUpTo(Routes.Splash.route) { inclusive = true }
-                                }
+                        } else {
+                            navController.navigate(Routes.Onboarding.route) {
+                                popUpTo(Routes.Splash.route) { inclusive = true }
                             }
                         }
                     }
@@ -643,7 +660,8 @@ fun FlowexaApp(
                     onBackClick = { navController.popBackStack() },
                     onNotificationClick = { notif ->
                         coroutineScope.launch {
-                            db.notificationDao().markAsRead(notif.id)
+                            val uid = currentUser?.uid ?: ""
+                            notificationRepo.markAsRead(notif.id, uid)
                             if (!notif.orderId.isNullOrEmpty()) {
                                 navController.navigate(Routes.OrderDetail.createRoute(notif.orderId))
                             }
@@ -651,7 +669,8 @@ fun FlowexaApp(
                     },
                     onMarkAllAsRead = {
                         coroutineScope.launch {
-                            notifications.forEach { db.notificationDao().markAsRead(it.id) }
+                            val uid = currentUser?.uid ?: ""
+                            notifications.forEach { notificationRepo.markAsRead(it.id, uid) }
                         }
                     }
                 )
@@ -719,6 +738,24 @@ fun FlowexaApp(
                 )
             }
 
+            composable(Routes.ClientFavorites.route) {
+                val favoriteIds by favoritesRepo.observeFavoriteProductIds(currentUser?.uid ?: "").collectAsState(initial = emptyList())
+                val allProducts by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
+                val favoriteProducts = allProducts.filter { favoriteIds.contains(it.id) }
+
+                FavoritesScreen(
+                    favoriteProducts = favoriteProducts,
+                    onBackClick = { navController.popBackStack() },
+                    onOrderProduct = { navController.navigate(Routes.CreateOrder.route) },
+                    onToggleFavorite = { productId ->
+                        coroutineScope.launch {
+                            val uid = currentUser?.uid ?: ""
+                            favoritesRepo.toggleFavorite(uid, productId)
+                        }
+                    }
+                )
+            }
+
             // Deep-linked Public Catalog Screen
             composable(
                 route = Routes.PublicCatalog.route,
@@ -730,6 +767,7 @@ fun FlowexaApp(
 
                 LaunchedEffect(compId) {
                     publicCompany = companyRepo.getCompany(compId)
+                    productRepo.loadPublicCatalog(compId)
                 }
 
                 PublicCatalogScreen(

@@ -72,20 +72,49 @@ class AuthRepository(
         }
     }
 
+    suspend fun getCachedProfile(uid: String): UserProfileEntity? = withContext(Dispatchers.IO) {
+        database.userProfileDao().getProfile(uid)
+    }
+
+    suspend fun refreshUserProfile(uid: String): Result<UserProfileEntity> = withContext(Dispatchers.IO) {
+        try {
+            val doc = firestore.collection(AppConfig.COL_USER_PROFILES).document(uid).get().await()
+            val profile = if (doc.exists()) {
+                FirestoreMappers.docToUserProfile(doc)
+            } else {
+                UserProfileEntity(
+                    id = uid,
+                    email = auth.currentUser?.email ?: "",
+                    displayName = auth.currentUser?.displayName ?: "مستخدم Flowexa"
+                )
+            }
+            database.userProfileDao().insert(profile)
+            Result.success(profile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCachedOrRemoteProfile(uid: String): Result<UserProfileEntity> = withContext(Dispatchers.IO) {
+        val cached = getCachedProfile(uid)
+        if (cached != null) {
+            return@withContext Result.success(cached)
+        }
+        refreshUserProfile(uid)
+    }
+
     suspend fun fetchAndCacheUserProfile(uid: String): UserProfileEntity = withContext(Dispatchers.IO) {
-        val doc = firestore.collection(AppConfig.COL_USER_PROFILES).document(uid).get().await()
-        val profile = if (doc.exists()) {
-            FirestoreMappers.docToUserProfile(doc)
-        } else {
-            // Default placeholder profile
+        val cached = getCachedProfile(uid)
+        if (cached != null) return@withContext cached
+
+        val refreshed = refreshUserProfile(uid)
+        refreshed.getOrElse {
             UserProfileEntity(
                 id = uid,
                 email = auth.currentUser?.email ?: "",
                 displayName = auth.currentUser?.displayName ?: "مستخدم Flowexa"
             )
         }
-        database.userProfileDao().insert(profile)
-        profile
     }
 
     suspend fun logout(): Unit = withContext(Dispatchers.IO) {

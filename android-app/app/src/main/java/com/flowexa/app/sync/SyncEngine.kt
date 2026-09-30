@@ -29,17 +29,25 @@ internal fun isTransientSyncError(error: Throwable): Boolean {
 class SyncEngine(
     private val database: FlowexaDatabase
 ) {
+    companion object {
+        private val syncMutex = kotlinx.coroutines.sync.Mutex()
+    }
+
     private val firestore = FirebaseProvider.firestore
 
     /**
      * Uploads all pending local changes (Outbox pattern) to Firestore
      */
     suspend fun syncOutbox(): Result<Int> = withContext(Dispatchers.IO) {
-        val syncDao = database.syncOperationDao()
-        syncDao.resetProcessingOperations()
-        val pendingOps = syncDao.getPendingOperations()
-        var syncedCount = 0
-        var transientError: Throwable? = null
+        if (!syncMutex.tryLock()) {
+            return@withContext Result.success(0)
+        }
+        try {
+            val syncDao = database.syncOperationDao()
+            syncDao.resetProcessingOperations()
+            val pendingOps = syncDao.getPendingOperations()
+            var syncedCount = 0
+            var transientError: Throwable? = null
 
         for (op in pendingOps) {
             try {
@@ -49,15 +57,22 @@ class SyncEngine(
                 when (op.operation) {
                     "CREATE", "UPDATE" -> {
                         val payloadMap = jsonToMap(JSONObject(op.payloadJson))
-                        val finalPayload = payloadMap.toMutableMap().apply {
-                            put("updatedAt", FieldValue.serverTimestamp())
-                            if (op.operation == "CREATE" && !containsKey("createdAt")) {
-                                put("createdAt", FieldValue.serverTimestamp())
+                        val appendList = payloadMap["readByAppend"] as? List<*>
+                        if (appendList != null && appendList.isNotEmpty()) {
+                            collection.document(op.documentId)
+                                .update("readBy", FieldValue.arrayUnion(*appendList.toTypedArray()))
+                                .await()
+                        } else {
+                            val finalPayload = payloadMap.toMutableMap().apply {
+                                put("updatedAt", FieldValue.serverTimestamp())
+                                if (op.operation == "CREATE" && !containsKey("createdAt")) {
+                                    put("createdAt", FieldValue.serverTimestamp())
+                                }
                             }
+                            collection.document(op.documentId)
+                                .set(finalPayload, SetOptions.merge())
+                                .await()
                         }
-                        collection.document(op.documentId)
-                            .set(finalPayload, SetOptions.merge())
-                            .await()
                     }
                     "DELETE" -> {
                         collection.document(op.documentId)
@@ -90,6 +105,9 @@ class SyncEngine(
         syncDao.clearSynced()
         transientError?.let { return@withContext Result.failure(IOException("Temporary sync failure", it)) }
         Result.success(syncedCount)
+        } finally {
+            syncMutex.unlock()
+        }
     }
 
     /**
