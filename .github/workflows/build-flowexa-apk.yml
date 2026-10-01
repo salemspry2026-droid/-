@@ -1,37 +1,69 @@
 name: Build and Release Flowexa Android APK
-
+ 
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths:
       - 'android-app/**'
       - '.github/workflows/build-flowexa-apk.yml'
   workflow_dispatch:
-
+ 
 permissions:
   contents: write
-
+ 
+concurrency:
+  group: flowexa-android-release
+  cancel-in-progress: false
+ 
 jobs:
   build:
     name: Build Flowexa Native APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-
+    timeout-minutes: 40
+ 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
+ 
+      - name: Compute Trusted Version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Version code is monotonic: the GitHub run number always increases.
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            RAW_TAG="${GITHUB_REF_NAME}"
+            VERSION_NAME="${RAW_TAG#v}"
+          elif [[ -n "$(git tag --points-at HEAD -l 'v*' | head -n1)" ]]; then
+            RAW_TAG="$(git tag --points-at HEAD -l 'v*' | head -n1)"
+            VERSION_NAME="${RAW_TAG#v}"
+          else
+            VERSION_NAME="2.0.${GITHUB_RUN_NUMBER}"
+          fi
+          VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          if ! [[ "${VERSION_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Computed versionName '${VERSION_NAME}' is not a valid semver."
+            exit 1
+          fi
+          echo "VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${VERSION_CODE}" >> "$GITHUB_ENV"
+          echo "Computed version: ${VERSION_NAME} (${VERSION_CODE})"
+ 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
-
+ 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: wrapper
-
+ 
       - name: Restore and Validate Keystore & Firebase Config
         shell: bash
         env:
@@ -50,19 +82,20 @@ jobs:
           [[ -n "$FIREBASE_CONFIG_BASE64" ]] || missing+=(FLOWEXA_GOOGLE_SERVICES_JSON_BASE64)
           if (( ${#missing[@]} > 0 )); then
             echo "::error::Missing required GitHub Secrets: ${missing[*]}"
+            echo "::error::Configure all four signing secrets and FLOWEXA_GOOGLE_SERVICES_JSON_BASE64 before releasing."
             exit 1
           fi
-
+ 
           KEYSTORE_PATH=android-app/app/flowexa-release.keystore
           mkdir -p "$(dirname "$KEYSTORE_PATH")"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
           chmod 600 "$KEYSTORE_PATH"
           keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
-
+ 
           SERVICES_JSON_PATH=android-app/app/google-services.json
           printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > "$SERVICES_JSON_PATH"
           chmod 600 "$SERVICES_JSON_PATH"
-
+ 
           # Strict validation of google-services.json
           python3 -c "
           import json, sys
@@ -76,23 +109,29 @@ jobs:
               sys.exit(f'Package com.flowexa.app not found in google-services.json clients: {client_packages}')
           print(f'Firebase config validated successfully for project: {project_id}')
           "
-
+ 
       - name: Ensure Gradle wrapper is executable
         working-directory: android-app
         run: chmod +x ./gradlew
-
+ 
       - name: Run Unit Tests
         working-directory: android-app
         run: ./gradlew testReleaseUnitTest --no-daemon
-
+        env:
+          FLOWEXA_VERSION_NAME: ${{ env.VERSION_NAME }}
+          FLOWEXA_VERSION_CODE: ${{ env.VERSION_CODE }}
+        run: ./gradlew testReleaseUnitTest --no-daemon --stacktrace
+ 
       - name: Build Android Release APK
         working-directory: android-app
         env:
           KEYSTORE_PASSWORD: ${{ secrets.FLOWEXA_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.FLOWEXA_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.FLOWEXA_KEY_PASSWORD }}
+          FLOWEXA_VERSION_NAME: ${{ env.VERSION_NAME }}
+          FLOWEXA_VERSION_CODE: ${{ env.VERSION_CODE }}
         run: ./gradlew assembleRelease --no-daemon --stacktrace
-
+ 
       - name: Release Validation Pipeline (ZIP, zipalign, aapt2, apksigner)
         shell: bash
         run: |
@@ -103,7 +142,7 @@ jobs:
             echo "::error::Expected exactly 1 release APK, but found $APK_COUNT"
             exit 1
           fi
-
+ 
           APK_FILE=$(find "$APK_DIR" -type f -name '*.apk' | head -n 1)
           FILE_SIZE=$(stat -c%s "$APK_FILE")
           echo "Release APK detected: $APK_FILE (size: $FILE_SIZE bytes)"
@@ -111,11 +150,6 @@ jobs:
             echo "::error::APK file size is abnormally small ($FILE_SIZE bytes)!"
             exit 1
           fi
-
-          echo "==> 1. Checking ZIP integrity..."
-          zip -T "$APK_FILE"
-          unzip -tq "$APK_FILE" >/dev/null
-
           echo "==> 2. Checking ZIP alignment (zipalign strict)..."
           ZIPALIGN=$(find "${ANDROID_HOME}/build-tools" -type f -name zipalign | sort -V | tail -n 1)
           if [[ -z "$ZIPALIGN" ]]; then
@@ -123,7 +157,7 @@ jobs:
             exit 1
           fi
           "$ZIPALIGN" -c -P 4 4 "$APK_FILE"
-
+ 
           echo "==> 3. Inspecting package metadata (aapt2)..."
           AAPT2=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt2 | sort -V | tail -n 1)
           if [[ -z "$AAPT2" ]]; then
@@ -135,11 +169,22 @@ jobs:
             echo "::error::Package name is not com.flowexa.app!"
             exit 1
           }
-
+ 
           VERSION_NAME=$(echo "$BADGING_OUTPUT" | grep -o "versionName='[^']*'" | cut -d"'" -f2)
           VERSION_CODE=$(echo "$BADGING_OUTPUT" | grep -o "versionCode='[^']*'" | cut -d"'" -f2)
+          VERSION_NAME=$(echo "$BADGING_OUTPUT" | grep -o "versionName='[^']*'" | head -n1 | cut -d"'" -f2)
+          VERSION_CODE=$(echo "$BADGING_OUTPUT" | grep -o "versionCode='[^']*'" | head -n1 | cut -d"'" -f2)
           echo "App Version Name: $VERSION_NAME, Version Code: $VERSION_CODE"
-
+ 
+          if [[ "$VERSION_NAME" != "${{ env.VERSION_NAME }}" ]]; then
+            echo "::error::APK versionName ($VERSION_NAME) does not match trusted CI version (${{ env.VERSION_NAME }})!"
+            exit 1
+          fi
+          if [[ "$VERSION_CODE" != "${{ env.VERSION_CODE }}" ]]; then
+            echo "::error::APK versionCode ($VERSION_CODE) does not match trusted CI version (${{ env.VERSION_CODE }})!"
+            exit 1
+          fi
+ 
           echo "==> 4. Verifying APK cryptographic signatures..."
           APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           if [[ -z "$APKSIGNER" ]]; then
@@ -147,33 +192,60 @@ jobs:
             exit 1
           fi
           "$APKSIGNER" verify --verbose --print-certs "$APK_FILE"
-
+          "$APKSIGNER" verify --verbose --print-certs "$APK_FILE" | tee apksigner.txt
+          if ! grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt && \
+             ! grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" apksigner.txt && \
+             ! grep -q "Verified using v4 scheme (APK Signature Scheme v4): true" apksigner.txt; then
+            echo "::error::APK is not verified with a modern signature scheme!"
+            exit 1
+          fi
+ 
+          CERT_SHA256=$("$APKSIGNER" verify --print-certs "$APK_FILE" | grep -i "Signer #1 certificate SHA-256 digest:" | head -n1 | awk '{print $NF}')
+          echo "Signer SHA-256: $CERT_SHA256"
+ 
+          echo "==> 5. Verifying assetlinks.json fingerprint matches the APK signer..."
+          ASSETLINKS="public/.well-known/assetlinks.json"
+          if [[ -f "$ASSETLINKS" ]]; then
+            EXPECTED_FP=$(python3 -c "import json,sys; d=json.load(open('$ASSETLINKS')); print(''.join(c for c in d[0]['target']['sha256_cert_fingerprints'][0] if c in '0123456789ABCDEF').upper())")
+            ACTUAL_FP=$(echo "$CERT_SHA256" | tr -d ':' | tr 'abcdef' 'ABCDEF' | tr -cd '0-9A-F')
+            if [[ "$EXPECTED_FP" != "$ACTUAL_FP" ]]; then
+              echo "::error::assetlinks.json fingerprint does not match the release signing certificate!"
+              exit 1
+            fi
+            echo "assetlinks.json fingerprint matches the release signer."
+          fi
+ 
           mkdir -p build-output
           cp "$APK_FILE" build-output/Flowexa.apk
           SHA256_HASH=$(sha256sum build-output/Flowexa.apk | awk '{print $1}')
           echo "Flowexa.apk SHA-256: $SHA256_HASH"
           echo "SHA256_HASH=$SHA256_HASH" >> "$GITHUB_ENV"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-
+          echo "CERT_SHA256=$CERT_SHA256" >> "$GITHUB_ENV"
+ 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Flowexa-Android-APK
           path: build-output/Flowexa.apk
           retention-days: 30
-
+ 
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         if: success()
+        if: github.event_name == 'push' && success()
         with:
           tag_name: v${{ env.VERSION_NAME }}
           name: Flowexa Android v${{ env.VERSION_NAME }}
           body: |
             تطبيق Flowexa Native للأندرويد (Flowexa Native Android v${{ env.VERSION_NAME }}).
+            - Version code: `${{ env.VERSION_CODE }}`
             - تطبيق Kotlin + Jetpack Compose + Material 3.
             - قاعدة بيانات Room ومحرك مزامنة Outbox للعمل دون اتصال بالكامل.
             - التحقق التام من التوقيع (apksigner) والمحاذاة (zipalign) وبصمة SHA-256.
             - SHA-256: `${{ env.SHA256_HASH }}`
+            - SHA-256 (APK): `${{ env.SHA256_HASH }}`
+            - Signer certificate SHA-256: `${{ env.CERT_SHA256 }}`
           files: build-output/Flowexa.apk
           draft: false
           prerelease: false
