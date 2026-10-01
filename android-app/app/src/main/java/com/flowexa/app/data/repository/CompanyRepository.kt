@@ -1,8 +1,10 @@
 package com.flowexa.app.data.repository
-
+ 
 import android.content.Context
+import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
+import com.flowexa.app.data.local.dao.OutboxOp
 import com.flowexa.app.data.local.entity.CompanyEntity
 import com.flowexa.app.data.local.entity.NotificationEntity
 import com.flowexa.app.data.local.entity.SyncOperationEntity
@@ -17,54 +19,12 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
-
+ 
 class CompanyRepository(
     private val database: FlowexaDatabase,
     private val context: Context
 ) {
     private val companyDao = database.companyDao()
-    private val syncDao = database.syncOperationDao()
-    private val firestore = FirebaseProvider.firestore
-
-    fun observeCompany(id: String): Flow<CompanyEntity?> {
-        return companyDao.observeCompany(id)
-    }
-
-    suspend fun getCompany(id: String): CompanyEntity? = withContext(Dispatchers.IO) {
-        val cached = companyDao.getCompany(id)
-        if (cached != null) return@withContext cached
-
-        try {
-            val doc = firestore.collection(AppConfig.COL_COMPANIES).document(id).get().await()
-            if (doc.exists()) {
-                val company = FirestoreMappers.docToCompany(doc)
-                companyDao.insert(company)
-                company
-            } else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    suspend fun createCompany(
-        name: String,
-        primaryCurrency: String,
-        ownerId: String,
-        ownerEmail: String,
-        ownerDisplayName: String
-    ): Result<CompanyEntity> = withContext(Dispatchers.IO) {
-        try {
-            val companyId = "comp_" + UUID.randomUUID().toString().replace("-", "").take(12)
-            val joinCode = (100000..999999).random().toString()
-            val clientJoinCode = (100000..999999).random().toString()
-            val nowMs = System.currentTimeMillis()
-
-            val company = CompanyEntity(
-                id = companyId,
-                name = name,
-                ownerId = ownerId,
-                joinCode = joinCode,
-                clientJoinCode = clientJoinCode,
                 logoUrl = null,
                 phone = null,
                 address = null,
@@ -84,9 +44,9 @@ class CompanyRepository(
                 isDeleted = false,
                 syncState = AppConfig.SYNC_STATE_PENDING
             )
-
+ 
             companyDao.insert(company)
-
+ 
             val companyPayload = JSONObject().apply {
                 put("name", company.name)
                 put("ownerId", ownerId)
@@ -102,7 +62,7 @@ class CompanyRepository(
                 put("createdBy", ownerId)
                 put("updatedBy", ownerId)
             }
-
+ 
             syncDao.insert(
                 SyncOperationEntity(
                     id = UUID.randomUUID().toString(),
@@ -110,9 +70,20 @@ class CompanyRepository(
                     documentId = companyId,
                     operation = "CREATE",
                     payloadJson = companyPayload.toString()
+            database.withTransaction {
+                companyDao.insert(company)
+                syncDao.insert(
+                    SyncOperationEntity(
+                        id = UUID.randomUUID().toString(),
+                        collectionName = AppConfig.COL_COMPANIES,
+                        documentId = companyId,
+                        operation = OutboxOp.CREATE,
+                        payloadJson = companyPayload.toString()
+                    )
                 )
             )
-
+            }
+ 
             val userProfileDao = database.userProfileDao()
             val existingProfile = userProfileDao.getProfile(ownerId)
             val updatedProfile = (existingProfile ?: UserProfileEntity(
@@ -147,7 +118,7 @@ class CompanyRepository(
                 syncState = AppConfig.SYNC_STATE_PENDING
             )
             userProfileDao.insert(updatedProfile)
-
+ 
             val profilePayload = JSONObject().apply {
                 put("email", updatedProfile.email)
                 put("displayName", updatedProfile.displayName)
@@ -158,7 +129,7 @@ class CompanyRepository(
                 put("createdBy", ownerId)
                 put("updatedBy", ownerId)
             }
-
+ 
             syncDao.insert(
                 SyncOperationEntity(
                     id = UUID.randomUUID().toString(),
@@ -166,16 +137,27 @@ class CompanyRepository(
                     documentId = ownerId,
                     operation = "UPDATE",
                     payloadJson = profilePayload.toString()
+            database.withTransaction {
+                userProfileDao.insert(updatedProfile)
+                syncDao.insert(
+                    SyncOperationEntity(
+                        id = UUID.randomUUID().toString(),
+                        collectionName = AppConfig.COL_USER_PROFILES,
+                        documentId = ownerId,
+                        operation = OutboxOp.UPDATE,
+                        payloadJson = profilePayload.toString()
+                    )
                 )
             )
-
+            }
+ 
             SyncScheduler.scheduleImmediateSync(context)
             Result.success(company)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-
+ 
     suspend fun joinAsEmployee(
         joinCode: String,
         userUid: String,
@@ -188,27 +170,6 @@ class CompanyRepository(
                 val query = firestore.collection(AppConfig.COL_COMPANIES)
                     .whereEqualTo("joinCode", joinCode)
                     .whereEqualTo("isDeleted", false)
-                    .limit(1)
-                    .get()
-                    .await()
-                if (!query.isEmpty) {
-                    val doc = query.documents.first()
-                    matchedCompany = FirestoreMappers.docToCompany(doc)
-                    companyDao.insert(matchedCompany)
-                }
-            }
-
-            if (matchedCompany == null) {
-                return@withContext Result.failure(Exception("كود الانضمام غير صحيح أو الشركة غير موجودة"))
-            }
-
-            val nowMs = System.currentTimeMillis()
-            val userProfileDao = database.userProfileDao()
-            val profile = UserProfileEntity(
-                id = userUid,
-                email = userEmail,
-                displayName = userDisplayName,
-                companyId = matchedCompany.id,
                 role = AppConfig.ROLE_PENDING_EMPLOYEE,
                 companyName = matchedCompany.name,
                 phone = null,
@@ -230,7 +191,7 @@ class CompanyRepository(
                 syncState = AppConfig.SYNC_STATE_PENDING
             )
             userProfileDao.insert(profile)
-
+ 
             val profilePayload = JSONObject().apply {
                 put("email", profile.email)
                 put("displayName", profile.displayName)
@@ -241,7 +202,7 @@ class CompanyRepository(
                 put("createdBy", userUid)
                 put("updatedBy", userUid)
             }
-
+ 
             syncDao.insert(
                 SyncOperationEntity(
                     id = UUID.randomUUID().toString(),
@@ -249,9 +210,20 @@ class CompanyRepository(
                     documentId = userUid,
                     operation = "UPDATE",
                     payloadJson = profilePayload.toString()
+            database.withTransaction {
+                userProfileDao.insert(profile)
+                syncDao.insert(
+                    SyncOperationEntity(
+                        id = UUID.randomUUID().toString(),
+                        collectionName = AppConfig.COL_USER_PROFILES,
+                        documentId = userUid,
+                        operation = OutboxOp.UPDATE,
+                        payloadJson = profilePayload.toString()
+                    )
                 )
             )
-
+            }
+ 
             val notifId = "notif_" + UUID.randomUUID().toString().replace("-", "").take(12)
             val notif = NotificationEntity(
                 id = notifId,
@@ -265,7 +237,7 @@ class CompanyRepository(
                 createdAtMs = nowMs
             )
             database.notificationDao().insertAll(listOf(notif))
-
+ 
             val notifPayload = JSONObject().apply {
                 put("companyId", matchedCompany.id)
                 put("title", notif.title)
@@ -282,16 +254,27 @@ class CompanyRepository(
                     documentId = notifId,
                     operation = "CREATE",
                     payloadJson = notifPayload.toString()
+            database.withTransaction {
+                database.notificationDao().insertAll(listOf(notif))
+                syncDao.insert(
+                    SyncOperationEntity(
+                        id = UUID.randomUUID().toString(),
+                        collectionName = AppConfig.COL_NOTIFICATIONS,
+                        documentId = notifId,
+                        operation = OutboxOp.CREATE,
+                        payloadJson = notifPayload.toString()
+                    )
                 )
             )
-
+            }
+ 
             SyncScheduler.scheduleImmediateSync(context)
             Result.success(matchedCompany.name)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-
+ 
     suspend fun joinAsClient(
         clientJoinCode: String,
         userUid: String,
@@ -304,84 +287,20 @@ class CompanyRepository(
                 val query = firestore.collection(AppConfig.COL_COMPANIES)
                     .whereEqualTo("clientJoinCode", clientJoinCode)
                     .whereEqualTo("isDeleted", false)
-                    .limit(1)
-                    .get()
-                    .await()
-                if (!query.isEmpty) {
-                    val doc = query.documents.first()
-                    matchedCompany = FirestoreMappers.docToCompany(doc)
-                    companyDao.insert(matchedCompany)
-                }
-            }
-
-            if (matchedCompany == null) {
-                return@withContext Result.failure(Exception("كود متجر الشركة غير صحيح أو غير متوفر"))
-            }
-
-            val nowMs = System.currentTimeMillis()
-            val userProfileDao = database.userProfileDao()
-            val existing = userProfileDao.getProfile(userUid)
-            val profile = (existing ?: UserProfileEntity(
-                id = userUid,
-                email = userEmail,
-                displayName = userDisplayName,
-                companyId = matchedCompany.id,
-                role = AppConfig.ROLE_CLIENT,
-                companyName = matchedCompany.name,
-                phone = null,
-                storeName = null,
-                address = null,
-                addressCountry = null,
-                addressGov = null,
-                addressCity = null,
-                addressNeighborhood = null,
-                logoUrl = null,
-                activityType = null,
-                activityTypeOther = null,
-                notes = null,
-                favoriteProductIdsJson = "[]",
-                permissionsJson = "{}",
-                createdAtMs = nowMs,
-                updatedAtMs = nowMs,
-                isDeleted = false,
-                syncState = AppConfig.SYNC_STATE_PENDING
-            )).copy(
-                companyId = matchedCompany.id,
-                role = AppConfig.ROLE_CLIENT,
-                companyName = matchedCompany.name,
-                updatedAtMs = nowMs,
-                syncState = AppConfig.SYNC_STATE_PENDING
-            )
-            userProfileDao.insert(profile)
-
-            val profilePayload = JSONObject().apply {
-                put("email", profile.email)
-                put("displayName", profile.displayName)
-                put("companyId", matchedCompany.id)
-                put("companyName", matchedCompany.name)
-                put("role", AppConfig.ROLE_CLIENT)
-                put("isDeleted", false)
-                put("createdBy", userUid)
-                put("updatedBy", userUid)
-            }
-
-            syncDao.insert(
-                SyncOperationEntity(
-                    id = UUID.randomUUID().toString(),
                     collectionName = AppConfig.COL_USER_PROFILES,
                     documentId = userUid,
                     operation = "UPDATE",
                     payloadJson = profilePayload.toString()
                 )
             )
-
+ 
             SyncScheduler.scheduleImmediateSync(context)
             Result.success(matchedCompany)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-
+ 
     suspend fun updateCompany(company: CompanyEntity, currentUserId: String = "") = withContext(Dispatchers.IO) {
         val nowMs = System.currentTimeMillis()
         val pendingCompany = company.copy(
@@ -389,7 +308,7 @@ class CompanyRepository(
             updatedAtMs = nowMs
         )
         companyDao.insert(pendingCompany)
-
+ 
         val payload = JSONObject().apply {
             put("name", pendingCompany.name)
             put("phone", pendingCompany.phone)
@@ -405,7 +324,7 @@ class CompanyRepository(
                 put("updatedBy", currentUserId)
             }
         }
-
+ 
         syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
@@ -413,9 +332,20 @@ class CompanyRepository(
                 documentId = pendingCompany.id,
                 operation = "UPDATE",
                 payloadJson = payload.toString()
+        database.withTransaction {
+            companyDao.insert(pendingCompany)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_COMPANIES,
+                    documentId = pendingCompany.id,
+                    operation = OutboxOp.UPDATE,
+                    payloadJson = payload.toString()
+                )
             )
         )
-
+        }
+ 
         SyncScheduler.scheduleImmediateSync(context)
     }
 }
