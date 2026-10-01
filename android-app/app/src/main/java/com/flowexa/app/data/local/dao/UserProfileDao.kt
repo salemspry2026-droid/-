@@ -16,7 +16,7 @@ interface UserProfileDao {
     @Query("SELECT * FROM user_profiles WHERE id = :id LIMIT 1")
     suspend fun getProfile(id: String): UserProfileEntity?
 
-    @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND role != 'pending_employee' AND isDeleted = 0")
+    @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND role IN ('owner', 'admin', 'sales') AND isDeleted = 0")
     fun observeStaff(companyId: String): Flow<List<UserProfileEntity>>
 
     @Query("SELECT * FROM user_profiles WHERE companyId = :companyId AND role = 'pending_employee' AND isDeleted = 0")
@@ -33,6 +33,9 @@ interface UserProfileDao {
 
     @Query("UPDATE user_profiles SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
     suspend fun softDelete(id: String)
+
+    @Query("UPDATE user_profiles SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
 
     @Query("DELETE FROM user_profiles WHERE id = :id")
     suspend fun delete(id: String)

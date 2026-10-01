@@ -1,6 +1,7 @@
 package com.flowexa.app.ui.staff
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,11 +12,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,11 +24,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.entity.UserProfileEntity
 import com.flowexa.app.ui.theme.FlowexaBg
 import com.flowexa.app.ui.theme.FlowexaBlue
 import com.flowexa.app.ui.theme.FlowexaGreen
 import com.flowexa.app.ui.theme.FlowexaSurface
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,16 +40,18 @@ fun StaffScreen(
     pendingEmployees: List<UserProfileEntity>,
     onBackClick: () -> Unit,
     onApproveEmployee: (UserProfileEntity) -> Unit,
-    onRejectEmployee: (UserProfileEntity) -> Unit
+    onRejectEmployee: (UserProfileEntity) -> Unit,
+    onUpdateStaffPermissions: ((staff: UserProfileEntity, newRole: String, permissionsJson: String) -> Unit)? = null
 ) {
     val clipboardManager = LocalClipboardManager.current
+    var editingStaff by remember { mutableStateOf<UserProfileEntity?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "إدارة فريق العمل",
+                        text = "إدارة فريق العمل والصلاحيات",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = FlowexaBlue
@@ -222,7 +226,11 @@ fun StaffScreen(
             } else {
                 items(staffList, key = { it.id }) { staff ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = staff.role != AppConfig.ROLE_OWNER && onUpdateStaffPermissions != null) {
+                                editingStaff = staff
+                            },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = FlowexaSurface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -263,27 +271,97 @@ fun StaffScreen(
                                     else -> Color(0xFFF1F5F9)
                                 }
                             ) {
-                                Text(
-                                    text = when (staff.role) {
-                                        "owner" -> "المالك"
-                                        "admin" -> "مدير"
-                                        "sales" -> "مندوب مبيعات"
-                                        else -> "موظف"
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = when (staff.role) {
-                                        "owner" -> Color(0xFFB45309)
-                                        "admin" -> Color(0xFF1D4ED8)
-                                        else -> Color(0xFF475569)
-                                    },
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                ) {
+                                    Text(
+                                        text = when (staff.role) {
+                                            "owner" -> "المالك"
+                                            "admin" -> "مدير"
+                                            "sales" -> "مندوب مبيعات"
+                                            else -> "موظف"
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when (staff.role) {
+                                            "owner" -> Color(0xFFB45309)
+                                            "admin" -> Color(0xFF1D4ED8)
+                                            else -> Color(0xFF475569)
+                                        }
+                                    )
+                                    if (staff.role != AppConfig.ROLE_OWNER && onUpdateStaffPermissions != null) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(Icons.Default.Tune, contentDescription = "تعديل الصلاحيات", modifier = Modifier.size(14.dp), tint = Color.Gray)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Permissions Dialog
+    editingStaff?.let { staff ->
+        var selectedRole by remember { mutableStateOf(staff.role ?: AppConfig.ROLE_SALES) }
+        var canCreateCustomers by remember { mutableStateOf(true) }
+        var canCreateOrders by remember { mutableStateOf(true) }
+
+        AlertDialog(
+            onDismissRequest = { editingStaff = null },
+            title = { Text("صلاحيات الموظف: ${staff.displayName}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = FlowexaBlue) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("الدور الوظيفي:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = selectedRole == AppConfig.ROLE_SALES,
+                            onClick = { selectedRole = AppConfig.ROLE_SALES },
+                            label = { Text("مندوب مبيعات") }
+                        )
+                        FilterChip(
+                            selected = selectedRole == AppConfig.ROLE_ADMIN,
+                            onClick = { selectedRole = AppConfig.ROLE_ADMIN },
+                            label = { Text("مدير نظام") }
+                        )
+                    }
+
+                    if (selectedRole == AppConfig.ROLE_SALES) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("الصلاحيات التفصيلية:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = canCreateCustomers, onCheckedChange = { canCreateCustomers = it })
+                            Text("إضافة وتعديل العملاء", fontSize = 13.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = canCreateOrders, onCheckedChange = { canCreateOrders = it })
+                            Text("إنشاء الطلبات الفورية", fontSize = 13.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val perms = JSONObject().apply {
+                            put("customers", JSONObject().put("create", canCreateCustomers).put("edit", canCreateCustomers))
+                            put("orders", JSONObject().put("create", canCreateOrders))
+                        }
+                        onUpdateStaffPermissions?.invoke(staff, selectedRole, perms.toString())
+                        editingStaff = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FlowexaBlue)
+                ) {
+                    Text("حفظ التغييرات")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingStaff = null }) {
+                    Text("إلغاء")
+                }
+            }
+        )
     }
 }

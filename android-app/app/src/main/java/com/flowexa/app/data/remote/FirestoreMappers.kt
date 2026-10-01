@@ -180,4 +180,83 @@ object FirestoreMappers {
             createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time
         )
     }
+
+    fun docToProductCategory(doc: DocumentSnapshot): ProductCategoryEntity {
+        val data = doc.data ?: emptyMap<String, Any?>()
+        return ProductCategoryEntity(
+            id = doc.id,
+            companyId = data["companyId"] as? String ?: "",
+            name = data["name"] as? String ?: "",
+            description = data["description"] as? String,
+            icon = data["icon"] as? String,
+            createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time,
+            updatedAtMs = (data["updatedAt"] as? Timestamp)?.toDate()?.time,
+            isDeleted = data["isDeleted"] as? Boolean ?: false,
+            syncState = "SYNCED"
+        )
+    }
+
+    fun docToProductBrand(doc: DocumentSnapshot): ProductBrandEntity {
+        val data = doc.data ?: emptyMap<String, Any?>()
+        return ProductBrandEntity(
+            id = doc.id,
+            companyId = data["companyId"] as? String ?: "",
+            name = data["name"] as? String ?: "",
+            logoUrl = data["logoUrl"] as? String,
+            createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time,
+            updatedAtMs = (data["updatedAt"] as? Timestamp)?.toDate()?.time,
+            isDeleted = data["isDeleted"] as? Boolean ?: false,
+            syncState = "SYNCED"
+        )
+    }
+
+    fun docToLocation(doc: DocumentSnapshot): LocationEntity {
+        val data = doc.data ?: emptyMap<String, Any?>()
+        return LocationEntity(
+            id = doc.id,
+            companyId = data["companyId"] as? String ?: "",
+            type = data["type"] as? String ?: "region",
+            name = data["name"] as? String ?: "",
+            parentId = data["parentId"] as? String,
+            address = data["address"] as? String,
+            createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time,
+            updatedAtMs = (data["updatedAt"] as? Timestamp)?.toDate()?.time,
+            isDeleted = data["isDeleted"] as? Boolean ?: false,
+            syncState = "SYNCED"
+        )
+    }
+
+    fun docToOrderStage(doc: DocumentSnapshot): OrderStageEntity {
+        val data = doc.data ?: emptyMap<String, Any?>()
+        val roles = (data["allowedRoles"] as? List<*>)?.let { JSONArray(it).toString() } ?: "[\"admin\",\"sales\"]"
+        return OrderStageEntity(
+            id = doc.id,
+            companyId = data["companyId"] as? String ?: "",
+            name = data["name"] as? String ?: "",
+            color = data["color"] as? String,
+            stageIndex = (data["index"] as? Number)?.toInt() ?: 0,
+            allowedRolesJson = roles,
+            createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time,
+            updatedAtMs = (data["updatedAt"] as? Timestamp)?.toDate()?.time,
+            isDeleted = data["isDeleted"] as? Boolean ?: false,
+            syncState = "SYNCED"
+        )
+    }
+
+    fun docToCustomerPhone(doc: DocumentSnapshot): CustomerPhoneEntity {
+        val data = doc.data ?: emptyMap<String, Any?>()
+        return CustomerPhoneEntity(
+            id = doc.id,
+            companyId = data["companyId"] as? String ?: "",
+            customerId = data["customerId"] as? String ?: "",
+            phoneRaw = data["phoneRaw"] as? String ?: "",
+            phoneNormalized = data["phoneNormalized"] as? String ?: "",
+            label = data["label"] as? String ?: "primary",
+            isPrimary = data["isPrimary"] as? Boolean ?: false,
+            createdAtMs = (data["createdAt"] as? Timestamp)?.toDate()?.time ?: System.currentTimeMillis(),
+            updatedAtMs = (data["updatedAt"] as? Timestamp)?.toDate()?.time ?: System.currentTimeMillis(),
+            isDeleted = data["isDeleted"] as? Boolean ?: false,
+            syncState = "SYNCED"
+        )
+    }
 }

@@ -33,7 +33,8 @@ fun CustomersScreen(
     onSearchChange: (String) -> Unit,
     onSaveCustomer: (CustomerEntity, isNew: Boolean) -> Unit,
     onDeleteCustomer: (String) -> Unit,
-    companyId: String
+    companyId: String,
+    onCustomerClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
@@ -89,6 +90,14 @@ fun CustomersScreen(
                     items(customers, key = { it.id }) { customer ->
                         CustomerCard(
                             customer = customer,
+                            onClick = {
+                                if (onCustomerClick != null) {
+                                    onCustomerClick(customer.id)
+                                } else {
+                                    editingCustomer = customer
+                                    showDialog = true
+                                }
+                            },
                             onEdit = {
                                 editingCustomer = customer
                                 showDialog = true
@@ -122,13 +131,14 @@ fun CustomersScreen(
 @Composable
 fun CustomerCard(
     customer: CustomerEntity,
+    onClick: () -> Unit = {},
     onEdit: () -> Unit,
     onCall: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEdit() },
+            .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
     ) {

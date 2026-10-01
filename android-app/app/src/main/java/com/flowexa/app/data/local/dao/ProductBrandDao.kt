@@ -12,6 +12,9 @@ interface ProductBrandDao {
     @Query("SELECT * FROM product_brands WHERE companyId = :companyId AND isDeleted = 0 ORDER BY name ASC")
     fun observeBrands(companyId: String): Flow<List<ProductBrandEntity>>
 
+    @Query("SELECT * FROM product_brands WHERE id = :id LIMIT 1")
+    suspend fun getBrand(id: String): ProductBrandEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(brand: ProductBrandEntity)
 
@@ -20,4 +23,7 @@ interface ProductBrandDao {
 
     @Query("UPDATE product_brands SET isDeleted = 1, syncState = 'PENDING' WHERE id = :id")
     suspend fun softDelete(id: String)
+
+    @Query("UPDATE product_brands SET syncState = :state WHERE id = :id")
+    suspend fun updateSyncState(id: String, state: String)
 }

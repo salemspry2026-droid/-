@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
   },
   productionBrowserSourceMaps: false,
   transpilePackages: ['motion'],
-  allowedDevOrigins: ['.monkeycode-ai.live'],
+  allowedDevOrigins: ['*.run.app', '*.europe-west2.run.app', '*.googleusercontent.com', '.monkeycode-ai.live'],
   async headers() {
     return [
       {

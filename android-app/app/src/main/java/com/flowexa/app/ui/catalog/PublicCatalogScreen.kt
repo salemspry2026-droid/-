@@ -25,7 +25,8 @@ import com.flowexa.app.ui.theme.*
 fun PublicCatalogScreen(
     company: CompanyEntity?,
     products: List<ProductEntity>,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onExportPdfClick: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
@@ -40,6 +41,13 @@ fun PublicCatalogScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowForward, contentDescription = "رجوع", tint = Color.White)
+                    }
+                },
+                actions = {
+                    if (onExportPdfClick != null && products.isNotEmpty()) {
+                        IconButton(onClick = onExportPdfClick) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = "تصدير PDF", tint = Color.White)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = FlowexaBlue)

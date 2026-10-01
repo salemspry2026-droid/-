@@ -8,6 +8,7 @@ import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.sync.SyncScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -32,11 +33,37 @@ class ProductRepository(
         productDao.getProduct(id)
     }
 
-    suspend fun saveProduct(product: ProductEntity, isNew: Boolean) = withContext(Dispatchers.IO) {
-        val finalProduct = product.copy(
+    suspend fun saveProduct(product: ProductEntity, isNew: Boolean, currentUserId: String = "") = withContext(Dispatchers.IO) {
+        val existing = if (!isNew) productDao.getProduct(product.id) else null
+        val finalProduct = (existing?.copy(
+            name = product.name,
+            scientificName = product.scientificName,
+            description = product.description,
+            price = product.price,
+            currency = product.currency,
+            categoryId = product.categoryId,
+            unit = product.unit,
+            brandId = product.brandId,
+            imageUrl = product.imageUrl ?: existing.imageUrl,
+            notes = product.notes ?: existing.notes,
+            inStock = product.inStock,
+            isNewProduct = product.isNewProduct,
+            isLowStock = product.isLowStock,
+            invoiceTypeRestriction = product.invoiceTypeRestriction,
+            currencyRestrictionType = product.currencyRestrictionType,
+            bonusType = product.bonusType,
+            bonusFixedPercent = product.bonusFixedPercent,
+            isActive = product.isActive,
+            specialOfferJson = product.specialOfferJson ?: existing.specialOfferJson,
+            specificCurrenciesJson = if (product.specificCurrenciesJson.isNotEmpty()) product.specificCurrenciesJson else existing.specificCurrenciesJson,
+            expiryDatesJson = if (product.expiryDatesJson.isNotEmpty()) product.expiryDatesJson else existing.expiryDatesJson,
+            bonusTiersJson = if (product.bonusTiersJson.isNotEmpty()) product.bonusTiersJson else existing.bonusTiersJson,
             syncState = AppConfig.SYNC_STATE_PENDING,
             updatedAtMs = System.currentTimeMillis()
-        )
+        ) ?: product.copy(
+            syncState = AppConfig.SYNC_STATE_PENDING,
+            updatedAtMs = System.currentTimeMillis()
+        ))
         productDao.insert(finalProduct)
 
         val payload = JSONObject().apply {
@@ -60,6 +87,11 @@ class ProductRepository(
             put("bonusFixedPercent", finalProduct.bonusFixedPercent)
             put("isActive", finalProduct.isActive)
             put("isDeleted", false)
+
+            if (currentUserId.isNotEmpty()) {
+                if (isNew) put("createdBy", currentUserId)
+                put("updatedBy", currentUserId)
+            }
 
             if (!finalProduct.specialOfferJson.isNullOrEmpty()) {
                 try {
@@ -96,15 +128,21 @@ class ProductRepository(
         SyncScheduler.scheduleImmediateSync(context)
     }
 
-    suspend fun deleteProduct(id: String) = withContext(Dispatchers.IO) {
+    suspend fun deleteProduct(id: String, currentUserId: String = "") = withContext(Dispatchers.IO) {
         productDao.softDelete(id)
+        val deletePayload = JSONObject().apply {
+            put("isDeleted", true)
+            if (currentUserId.isNotEmpty()) {
+                put("updatedBy", currentUserId)
+            }
+        }
         syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
                 collectionName = AppConfig.COL_PRODUCTS,
                 documentId = id,
                 operation = "DELETE",
-                payloadJson = "{}"
+                payloadJson = deletePayload.toString()
             )
         )
         SyncScheduler.scheduleImmediateSync(context)

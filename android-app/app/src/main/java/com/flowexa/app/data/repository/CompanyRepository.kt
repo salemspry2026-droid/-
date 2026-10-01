@@ -382,7 +382,7 @@ class CompanyRepository(
         }
     }
 
-    suspend fun updateCompany(company: CompanyEntity) = withContext(Dispatchers.IO) {
+    suspend fun updateCompany(company: CompanyEntity, currentUserId: String = "") = withContext(Dispatchers.IO) {
         val nowMs = System.currentTimeMillis()
         val pendingCompany = company.copy(
             syncState = AppConfig.SYNC_STATE_PENDING,
@@ -401,6 +401,9 @@ class CompanyRepository(
             put("workingHours", pendingCompany.workingHours)
             put("primaryCurrency", pendingCompany.primaryCurrency)
             put("isDeleted", false)
+            if (currentUserId.isNotEmpty()) {
+                put("updatedBy", currentUserId)
+            }
         }
 
         syncDao.enqueueWithCoalescing(

@@ -21,6 +21,8 @@ import com.flowexa.app.core.formatAmount
 import com.flowexa.app.data.local.entity.CustomerEntity
 import com.flowexa.app.data.local.entity.OrderItemEntity
 import com.flowexa.app.data.local.entity.ProductEntity
+import com.flowexa.app.domain.BonusCalculator
+import com.flowexa.app.domain.OrderRules
 import com.flowexa.app.ui.theme.*
 
 data class CartItem(
@@ -36,6 +38,10 @@ fun CreateOrderScreen(
     customers: List<CustomerEntity>,
     products: List<ProductEntity>,
     onBackClick: () -> Unit,
+    isClientMode: Boolean = false,
+    preselectedCustomer: CustomerEntity? = null,
+    initialProductId: String? = null,
+    primaryCurrency: String = "SAR",
     onConfirmOrder: (
         customerId: String,
         customerName: String,
@@ -47,46 +53,31 @@ fun CreateOrderScreen(
         totalsByCurrency: Map<String, Double>
     ) -> Unit
 ) {
-    var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
+    var selectedCustomer by remember { mutableStateOf<CustomerEntity?>(preselectedCustomer) }
     var customerQuery by remember { mutableStateOf("") }
     var productQuery by remember { mutableStateOf("") }
     var invoiceType by remember { mutableStateOf("cash") }
     var orderNotes by remember { mutableStateOf("") }
     var showProductPicker by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     val cart = remember { mutableStateListOf<CartItem>() }
 
-    // Bonus calculation logic
-    fun calculateBonus(product: ProductEntity, qty: Double): Double {
-        return when (product.bonusType) {
-            "fixed" -> {
-                val percent = product.bonusFixedPercent ?: 0.0
-                (qty * (percent / 100.0)).toInt().toDouble()
+    // Prepopulate initial product if passed from catalog
+    LaunchedEffect(initialProductId, products) {
+        if (!initialProductId.isNullOrEmpty() && cart.isEmpty()) {
+            val prod = products.find { it.id == initialProductId }
+            if (prod != null) {
+                val bonus = BonusCalculator.calculateBonus(prod, 1.0, invoiceType)
+                cart.add(CartItem(prod, 1.0, bonus))
             }
-            "tiered" -> {
-                var calculatedBonus = 0.0
-                if (!product.bonusTiersJson.isNullOrEmpty() && product.bonusTiersJson != "[]") {
-                    try {
-                        val tiers = org.json.JSONArray(product.bonusTiersJson)
-                        var bestMinQty = 0.0
-                        for (i in 0 until tiers.length()) {
-                            val tier = tiers.getJSONObject(i)
-                            val minQty = tier.optDouble("minQty", tier.optDouble("quantity", 0.0))
-                            val bonus = tier.optDouble("bonus", tier.optDouble("bonusQty", 0.0))
-                            if (qty >= minQty && minQty >= bestMinQty) {
-                                bestMinQty = minQty
-                                calculatedBonus = bonus
-                            }
-                        }
-                    } catch (_: Exception) {
-                        calculatedBonus = if (qty >= 50) 5.0 else if (qty >= 20) 2.0 else if (qty >= 10) 1.0 else 0.0
-                    }
-                } else {
-                    calculatedBonus = if (qty >= 50) 5.0 else if (qty >= 20) 2.0 else if (qty >= 10) 1.0 else 0.0
-                }
-                calculatedBonus
-            }
-            else -> 0.0
+        }
+    }
+
+    // When client mode updates customer
+    LaunchedEffect(preselectedCustomer) {
+        if (preselectedCustomer != null && selectedCustomer == null) {
+            selectedCustomer = preselectedCustomer
         }
     }
 
@@ -104,7 +95,7 @@ fun CreateOrderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("إنشاء طلب جديد (Offline)", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text(if (isClientMode) "طلب أصناف جديدة" else "إنشاء طلب جديد (Offline)", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowForward, contentDescription = "رجوع", tint = Color.White)
@@ -114,7 +105,7 @@ fun CreateOrderScreen(
             )
         },
         bottomBar = {
-            if (cart.isNotEmpty() && selectedCustomer != null) {
+            if (cart.isNotEmpty() && (selectedCustomer != null || isClientMode)) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -122,6 +113,16 @@ fun CreateOrderScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        if (validationError != null) {
+                            Text(
+                                text = validationError!!,
+                                color = Color.Red,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -143,6 +144,22 @@ fun CreateOrderScreen(
 
                         Button(
                             onClick = {
+                                validationError = null
+                                // Validate all cart items against business rules
+                                for (item in cart) {
+                                    val valRes = OrderRules.validateProductOrder(
+                                        product = item.product,
+                                        quantity = item.quantity,
+                                        invoiceType = invoiceType,
+                                        selectedCurrency = item.product.currency,
+                                        primaryCurrency = primaryCurrency
+                                    )
+                                    if (!valRes.isValid) {
+                                        validationError = valRes.errorMessage
+                                        return@Button
+                                    }
+                                }
+
                                 val orderItems = cart.map { item ->
                                     OrderItemEntity(
                                         orderId = "",
@@ -155,11 +172,18 @@ fun CreateOrderScreen(
                                         note = item.note.ifEmpty { null }
                                     )
                                 }
+
+                                val effectiveCustomer = selectedCustomer ?: preselectedCustomer
+                                val custId = effectiveCustomer?.id ?: "client_direct"
+                                val custName = effectiveCustomer?.name ?: "عميل"
+                                val custPhone = effectiveCustomer?.phone
+                                val custAddress = effectiveCustomer?.address
+
                                 onConfirmOrder(
-                                    selectedCustomer!!.id,
-                                    selectedCustomer!!.name,
-                                    selectedCustomer!!.phone,
-                                    selectedCustomer!!.address,
+                                    custId,
+                                    custName,
+                                    custPhone,
+                                    custAddress,
                                     invoiceType,
                                     orderNotes,
                                     orderItems,
@@ -172,7 +196,7 @@ fun CreateOrderScreen(
                         ) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("تأكيد وحفظ الطلب", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("تأكيد وإرسال الطلب", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -187,65 +211,87 @@ fun CreateOrderScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Section 1: Customer Selection
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("1. اختيار العميل", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FlowexaBlue)
-                        Spacer(modifier = Modifier.height(10.dp))
+            // Section 1: Customer Selection (Hidden for Clients)
+            if (!isClientMode) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("1. اختيار العميل", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FlowexaBlue)
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                        if (selectedCustomer != null) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(FlowexaBlueLight)
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(selectedCustomer!!.name, fontWeight = FontWeight.Bold, color = FlowexaBlue)
-                                    selectedCustomer!!.phone?.let { Text(it, fontSize = 12.sp, color = TextSecondary) }
+                            if (selectedCustomer != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(FlowexaBlueLight)
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(selectedCustomer!!.name, fontWeight = FontWeight.Bold, color = FlowexaBlue)
+                                        selectedCustomer!!.phone?.let { Text(it, fontSize = 12.sp, color = TextSecondary) }
+                                    }
+                                    TextButton(onClick = { selectedCustomer = null }) {
+                                        Text("تغيير", color = FlowexaBlue, fontWeight = FontWeight.Bold)
+                                    }
                                 }
-                                TextButton(onClick = { selectedCustomer = null }) {
-                                    Text("تغيير", color = FlowexaBlue, fontWeight = FontWeight.Bold)
+                            } else {
+                                OutlinedTextField(
+                                    value = customerQuery,
+                                    onValueChange = { customerQuery = it },
+                                    placeholder = { Text("ابحث عن العميل بالاسم أو الهاتف...") },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+
+                                val filteredCustomers = customers.filter {
+                                    it.name.contains(customerQuery, ignoreCase = true) ||
+                                    (it.phone?.contains(customerQuery) == true)
+                                }.take(5)
+
+                                Column(modifier = Modifier.padding(top = 8.dp)) {
+                                    filteredCustomers.forEach { cust ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { selectedCustomer = cust }
+                                                .padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(cust.name, fontWeight = FontWeight.Medium)
+                                            cust.phone?.let { Text(it, color = Color.Gray, fontSize = 12.sp) }
+                                        }
+                                        HorizontalDivider(color = FlowexaBorder)
+                                    }
                                 }
                             }
-                        } else {
-                            OutlinedTextField(
-                                value = customerQuery,
-                                onValueChange = { customerQuery = it },
-                                placeholder = { Text("ابحث عن العميل بالاسم أو الهاتف...") },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true
-                            )
-
-                            val filteredCustomers = customers.filter {
-                                it.name.contains(customerQuery, ignoreCase = true) ||
-                                (it.phone?.contains(customerQuery) == true)
-                            }.take(5)
-
-                            Column(modifier = Modifier.padding(top = 8.dp)) {
-                                filteredCustomers.forEach { cust ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { selectedCustomer = cust }
-                                            .padding(vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(cust.name, fontWeight = FontWeight.Medium)
-                                        cust.phone?.let { Text(it, color = Color.Gray, fontSize = 12.sp) }
-                                    }
-                                    HorizontalDivider(color = FlowexaBorder)
-                                }
+                        }
+                    }
+                }
+            } else if (preselectedCustomer != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.AccountCircle, contentDescription = null, tint = FlowexaBlue, modifier = Modifier.size(36.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("طلب باسم: ${preselectedCustomer.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FlowexaBlue)
+                                preselectedCustomer.phone?.let { Text("الهاتف: $it", fontSize = 12.sp, color = TextSecondary) }
                             }
                         }
                     }
@@ -317,7 +363,7 @@ fun CreateOrderScreen(
                                                     val newQty = item.quantity - 1
                                                     cart[index] = item.copy(
                                                         quantity = newQty,
-                                                        bonusQuantity = calculateBonus(item.product, newQty)
+                                                        bonusQuantity = BonusCalculator.calculateBonus(item.product, newQty, invoiceType)
                                                     )
                                                 } else {
                                                     cart.removeAt(index)
@@ -330,7 +376,7 @@ fun CreateOrderScreen(
                                                 val newQty = item.quantity + 1
                                                 cart[index] = item.copy(
                                                     quantity = newQty,
-                                                    bonusQuantity = calculateBonus(item.product, newQty)
+                                                    bonusQuantity = BonusCalculator.calculateBonus(item.product, newQty, invoiceType)
                                                 )
                                             }) {
                                                 Icon(Icons.Default.Add, contentDescription = "زيادة")
@@ -356,16 +402,37 @@ fun CreateOrderScreen(
                         Text("3. تفاصيل الفاتورة والملاحظات", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FlowexaBlue)
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(
                                 selected = invoiceType == "cash",
-                                onClick = { invoiceType = "cash" },
-                                label = { Text("فاتورة نقدية (Cash)") }
+                                onClick = {
+                                    invoiceType = "cash"
+                                    // Recalculate bonuses with updated invoice type
+                                    cart.forEachIndexed { i, itm ->
+                                        cart[i] = itm.copy(bonusQuantity = BonusCalculator.calculateBonus(itm.product, itm.quantity, "cash"))
+                                    }
+                                },
+                                label = { Text("نقدي (Cash)") }
+                            )
+                            FilterChip(
+                                selected = invoiceType == "pending_cash",
+                                onClick = {
+                                    invoiceType = "pending_cash"
+                                    cart.forEachIndexed { i, itm ->
+                                        cart[i] = itm.copy(bonusQuantity = BonusCalculator.calculateBonus(itm.product, itm.quantity, "pending_cash"))
+                                    }
+                                },
+                                label = { Text("نقدي مؤجل") }
                             )
                             FilterChip(
                                 selected = invoiceType == "credit",
-                                onClick = { invoiceType = "credit" },
-                                label = { Text("فاتورة آجلة (Credit)") }
+                                onClick = {
+                                    invoiceType = "credit"
+                                    cart.forEachIndexed { i, itm ->
+                                        cart[i] = itm.copy(bonusQuantity = BonusCalculator.calculateBonus(itm.product, itm.quantity, "credit"))
+                                    }
+                                },
+                                label = { Text("آجل (Credit)") }
                             )
                         }
 
@@ -403,8 +470,9 @@ fun CreateOrderScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     val filteredProducts = products.filter {
-                        it.name.contains(productQuery, ignoreCase = true) ||
-                        (it.scientificName?.contains(productQuery, ignoreCase = true) == true)
+                        (it.name.contains(productQuery, ignoreCase = true) ||
+                         (it.scientificName?.contains(productQuery, ignoreCase = true) == true)) &&
+                        it.inStock && !it.isDeleted
                     }
 
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -419,10 +487,10 @@ fun CreateOrderScreen(
                                             val newQty = current.quantity + 1
                                             cart[existingIndex] = current.copy(
                                                 quantity = newQty,
-                                                bonusQuantity = calculateBonus(prod, newQty)
+                                                bonusQuantity = BonusCalculator.calculateBonus(prod, newQty, invoiceType)
                                             )
                                         } else {
-                                            cart.add(CartItem(prod, 1.0, calculateBonus(prod, 1.0)))
+                                            cart.add(CartItem(prod, 1.0, BonusCalculator.calculateBonus(prod, 1.0, invoiceType)))
                                         }
                                         showProductPicker = false
                                     }

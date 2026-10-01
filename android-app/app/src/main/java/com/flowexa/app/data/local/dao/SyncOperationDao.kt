@@ -64,19 +64,36 @@ interface SyncOperationDao {
         when (existing.operation) {
             "CREATE" -> {
                 if (newOp.operation == "UPDATE") {
-                    update(existing.copy(payloadJson = newOp.payloadJson))
+                    val merged = mergePayloads(existing.payloadJson, newOp.payloadJson)
+                    update(existing.copy(payloadJson = merged))
                 } else if (newOp.operation == "DELETE") {
                     deleteById(existing.id)
                 }
             }
             "UPDATE" -> {
                 if (newOp.operation == "UPDATE") {
-                    update(existing.copy(payloadJson = newOp.payloadJson))
+                    val merged = mergePayloads(existing.payloadJson, newOp.payloadJson)
+                    update(existing.copy(payloadJson = merged))
                 } else if (newOp.operation == "DELETE") {
-                    update(existing.copy(operation = "DELETE", payloadJson = "{}"))
+                    update(existing.copy(operation = "DELETE", payloadJson = newOp.payloadJson))
                 }
             }
             else -> insert(newOp)
+        }
+    }
+
+    private fun mergePayloads(baseJson: String, overlayJson: String): String {
+        return try {
+            val base = if (baseJson.isBlank()) org.json.JSONObject() else org.json.JSONObject(baseJson)
+            val overlay = if (overlayJson.isBlank()) org.json.JSONObject() else org.json.JSONObject(overlayJson)
+            val keys = overlay.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                base.put(key, overlay.get(key))
+            }
+            base.toString()
+        } catch (_: Exception) {
+            overlayJson
         }
     }
 }

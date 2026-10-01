@@ -12,14 +12,28 @@ sealed class Routes(val route: String) {
     data object AdminHome : Routes("admin_home")
     data object Products : Routes("products")
     data object Customers : Routes("customers")
+    data object CustomerDetail : Routes("customer_detail/{customerId}") {
+        fun createRoute(customerId: String) = "customer_detail/$customerId"
+    }
     data object Orders : Routes("orders")
-    data object CreateOrder : Routes("create_order")
+    data object CreateOrder : Routes("create_order?productId={productId}") {
+        fun createRoute(productId: String? = null) = if (!productId.isNullOrEmpty()) "create_order?productId=$productId" else "create_order"
+    }
+    data object ClientCreateOrder : Routes("client_create_order?productId={productId}") {
+        fun createRoute(productId: String? = null) = if (!productId.isNullOrEmpty()) "client_create_order?productId=$productId" else "client_create_order"
+    }
+    data object SalesQuickOrder : Routes("sales_quick_order")
     data object OrderDetail : Routes("order_detail/{orderId}") {
         fun createRoute(orderId: String) = "order_detail/$orderId"
     }
     data object Staff : Routes("staff")
     data object Settings : Routes("settings")
     data object Notifications : Routes("notifications")
+
+    // Product Detail
+    data object ProductDetail : Routes("product_detail/{productId}") {
+        fun createRoute(productId: String) = "product_detail/$productId"
+    }
 
     // Client Routes
     data object ClientHome : Routes("client_home")

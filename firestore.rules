@@ -42,7 +42,7 @@ service cloud.firestore {
     }
 
     function isCompanyClient(companyId) {
-      return isAuthenticated() && getUserRole() == 'client';
+      return isAuthenticated() && getUserRole() == 'client' && getUserCompanyId() == companyId;
     }
 
     function isSystemAdmin() {
@@ -316,9 +316,10 @@ service cloud.firestore {
                   );
       
       allow create: if isAuthenticated() && 
+                    isValidOrder(request.resource.data) &&
                     isCreatedByCurrentUser() && 
                     isUpdatedByCurrentUser() && 
-                    (isCompanyMember(request.resource.data.companyId) || getUserRole() == 'client');
+                    (isCompanyMember(request.resource.data.companyId) || isCompanyClient(request.resource.data.companyId));
 
       allow update: if isAuthenticated() && 
                     isUpdatedByCurrentUser() && 
@@ -345,7 +346,7 @@ service cloud.firestore {
     }
 
     match /locations/{locationId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || isSystemAdmin());
       allow create: if isAuthenticated() && isValidLocation(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidLocation(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }
@@ -379,7 +380,7 @@ service cloud.firestore {
     }
 
     match /orderStages/{stageId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isCompanyMember(resource.data.companyId) || isSystemAdmin());
       allow create: if isAuthenticated() && isValidOrderStage(request.resource.data) && isCreatedByCurrentUser() && isUpdatedByCurrentUser() && isCompanyAdmin(request.resource.data.companyId);
       allow update: if isAuthenticated() && isValidOrderStage(request.resource.data) && isUpdatedByCurrentUser() && areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) && isCompanyAdmin(resource.data.companyId);
     }

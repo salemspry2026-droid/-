@@ -9,8 +9,14 @@ object AppConfig {
     const val COL_COMPANIES = "companies"
     const val COL_PRODUCTS = "products"
     const val COL_CUSTOMERS = "customers"
+    const val COL_CUSTOMER_PHONES = "customerPhones"
     const val COL_ORDERS = "orders"
     const val COL_NOTIFICATIONS = "notifications"
+    const val COL_PRODUCT_CATEGORIES = "productCategories"
+    const val COL_PRODUCT_BRANDS = "productBrands"
+    const val COL_LOCATIONS = "locations"
+    const val COL_ORDER_STAGES = "orderStages"
+    const val COL_AUDIT_LOGS = "auditLogs"
 
     // Roles
     const val ROLE_OWNER = "owner"

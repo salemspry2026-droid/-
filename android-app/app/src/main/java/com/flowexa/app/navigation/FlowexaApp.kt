@@ -34,12 +34,15 @@ import com.flowexa.app.ui.client.ClientHomeScreen
 import com.flowexa.app.ui.client.FavoritesScreen
 import com.flowexa.app.ui.components.FlowexaBottomBar
 import com.flowexa.app.ui.components.FlowexaTopBar
+import com.flowexa.app.ui.customers.CustomerDetailScreen
 import com.flowexa.app.ui.customers.CustomersScreen
 import com.flowexa.app.ui.notifications.NotificationsScreen
 import com.flowexa.app.ui.onboarding.OnboardingScreen
 import com.flowexa.app.ui.orders.CreateOrderScreen
 import com.flowexa.app.ui.orders.OrderDetailScreen
 import com.flowexa.app.ui.orders.OrdersScreen
+import com.flowexa.app.ui.orders.SalesQuickOrderScreen
+import com.flowexa.app.ui.products.ProductDetailScreen
 import com.flowexa.app.ui.products.ProductsScreen
 import com.flowexa.app.ui.settings.CompanySettingsScreen
 import com.flowexa.app.ui.staff.StaffScreen
@@ -464,15 +467,11 @@ fun FlowexaApp(
                 val todayOrders = orders.filter { (it.createdAtMs ?: 0L) >= startOfTodayMs }
                 val todayOrdersCount = todayOrders.size
 
+                val primaryCurr = company?.primaryCurrency ?: "SAR"
                 val totalSales = todayOrders.sumOf { order ->
                     try {
                         val json = JSONObject(order.totalAmountByCurrencyJson)
-                        var sum = 0.0
-                        val keys = json.keys()
-                        while (keys.hasNext()) {
-                            sum += json.optDouble(keys.next(), 0.0)
-                        }
-                        sum
+                        json.optDouble(primaryCurr, 0.0)
                     } catch (_: Exception) {
                         0.0
                     }
@@ -482,7 +481,7 @@ fun FlowexaApp(
                     companyName = company?.name ?: "Flowexa",
                     todayOrdersCount = todayOrdersCount,
                     totalSales = totalSales,
-                    currency = company?.primaryCurrency ?: "SAR",
+                    currency = primaryCurr,
                     productsCount = products.size,
                     customersCount = customers.size,
                     recentOrders = orders.take(5),
@@ -502,10 +501,10 @@ fun FlowexaApp(
                     searchQuery = query,
                     onSearchChange = { query = it },
                     onSaveProduct = { p, isNew ->
-                        coroutineScope.launch { productRepo.saveProduct(p, isNew) }
+                        coroutineScope.launch { productRepo.saveProduct(p, isNew, currentUserId = currentUser?.uid ?: "") }
                     },
                     onDeleteProduct = { id ->
-                        coroutineScope.launch { productRepo.deleteProduct(id) }
+                        coroutineScope.launch { productRepo.deleteProduct(id, currentUserId = currentUser?.uid ?: "") }
                     },
                     companyId = currentCompanyId,
                     primaryCurrency = company?.primaryCurrency ?: "SAR"
@@ -521,12 +520,106 @@ fun FlowexaApp(
                     searchQuery = query,
                     onSearchChange = { query = it },
                     onSaveCustomer = { c, isNew ->
-                        coroutineScope.launch { customerRepo.saveCustomer(c, isNew) }
+                        coroutineScope.launch { customerRepo.saveCustomer(c, isNew, currentUserId = currentUser?.uid ?: "") }
                     },
                     onDeleteCustomer = { id ->
-                        coroutineScope.launch { customerRepo.deleteCustomer(id) }
+                        coroutineScope.launch { customerRepo.deleteCustomer(id, currentUserId = currentUser?.uid ?: "") }
                     },
-                    companyId = currentCompanyId
+                    companyId = currentCompanyId,
+                    onCustomerClick = { custId ->
+                        navController.navigate(Routes.CustomerDetail.createRoute(custId))
+                    }
+                )
+            }
+
+            composable(
+                route = Routes.CustomerDetail.route,
+                arguments = listOf(navArgument("customerId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val customerId = backStackEntry.arguments?.getString("customerId") ?: ""
+                var customer by remember { mutableStateOf<com.flowexa.app.data.local.entity.CustomerEntity?>(null) }
+                val phones by customerRepo.observeCustomerPhones(customerId).collectAsState(initial = emptyList())
+                var insights by remember { mutableStateOf(com.flowexa.app.data.repository.CustomerInsights()) }
+                val customerOrders by orderRepo.observeOrders(currentCompanyId).collectAsState(initial = emptyList())
+                val filteredOrders = customerOrders.filter { it.customerId == customerId }
+
+                LaunchedEffect(customerId) {
+                    customer = customerRepo.getCustomer(customerId)
+                    insights = customerRepo.getCustomerInsights(customerId)
+                }
+
+                CustomerDetailScreen(
+                    customer = customer,
+                    phones = phones,
+                    insights = insights,
+                    orders = filteredOrders,
+                    onBackClick = { navController.popBackStack() },
+                    onCreateOrderClick = { navController.navigate(Routes.CreateOrder.route) },
+                    onOrderClick = { ordId -> navController.navigate(Routes.OrderDetail.createRoute(ordId)) },
+                    onEditCustomerClick = {},
+                    onMergeClick = {}
+                )
+            }
+
+            composable(Routes.SalesQuickOrder.route) {
+                val products by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
+
+                SalesQuickOrderScreen(
+                    products = products,
+                    onBackClick = { navController.popBackStack() },
+                    onLookupCustomerByPhone = { phone ->
+                        customerRepo.findCustomerByPhone(currentCompanyId, phone)
+                    },
+                    onLoadCustomerInsights = { custId ->
+                        customerRepo.getCustomerInsights(custId)
+                    },
+                    onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
+                        coroutineScope.launch {
+                            orderRepo.createOrder(
+                                companyId = currentCompanyId,
+                                customerId = custId,
+                                customerName = custName,
+                                customerPhone = custPhone,
+                                customerAddress = custAddress,
+                                invoiceType = invType,
+                                dueDate = null,
+                                notes = notes,
+                                source = "phone",
+                                clientUid = null,
+                                createdBy = currentUser?.uid ?: "",
+                                createdByName = userProfile?.displayName ?: "موظف المبيعات",
+                                items = items,
+                                totalAmountByCurrency = totals
+                            )
+                            navController.popBackStack()
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route = Routes.ProductDetail.route,
+                arguments = listOf(navArgument("productId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                var product by remember { mutableStateOf<com.flowexa.app.data.local.entity.ProductEntity?>(null) }
+                val favoriteIds by favoritesRepo.observeFavoriteProductIds(currentUser?.uid ?: "").collectAsState(initial = emptyList())
+                val isFav = favoriteIds.contains(productId)
+
+                LaunchedEffect(productId) {
+                    product = productRepo.getProduct(productId)
+                }
+
+                ProductDetailScreen(
+                    product = product,
+                    isFavorite = isFav,
+                    onBackClick = { navController.popBackStack() },
+                    onToggleFavorite = {
+                        coroutineScope.launch {
+                            currentUser?.uid?.let { uid -> favoritesRepo.toggleFavorite(uid, productId) }
+                        }
+                    },
+                    onOrderClick = { navController.navigate(Routes.CreateOrder.route) }
                 )
             }
 

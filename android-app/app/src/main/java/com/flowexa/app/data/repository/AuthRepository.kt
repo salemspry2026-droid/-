@@ -50,6 +50,9 @@ class AuthRepository(
                 "email" to email.trim(),
                 "displayName" to displayName.trim(),
                 "role" to AppConfig.ROLE_CLIENT,
+                "companyId" to "",
+                "createdBy" to user.uid,
+                "updatedBy" to user.uid,
                 "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                 "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                 "isDeleted" to false
@@ -70,10 +73,6 @@ class AuthRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    suspend fun getCachedProfile(uid: String): UserProfileEntity? = withContext(Dispatchers.IO) {
-        database.userProfileDao().getProfile(uid)
     }
 
     suspend fun refreshUserProfile(uid: String): Result<UserProfileEntity> = withContext(Dispatchers.IO) {
