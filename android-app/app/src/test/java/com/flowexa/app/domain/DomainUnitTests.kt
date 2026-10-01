@@ -162,4 +162,66 @@ class DomainUnitTests {
         assertFalse(PermissionManager.hasPermission(clientProfile, PermissionManager.Module.CUSTOMERS, PermissionManager.Action.VIEW))
         assertFalse(PermissionManager.hasPermission(clientProfile, PermissionManager.Module.STAFF, PermissionManager.Action.VIEW))
     }
+
+    @Test
+    fun testTieredBonusWithInvoiceType() {
+        val tiersJson = """
+            [
+                {"minQty": 10, "maxQty": 29, "percent": 10.0, "invoiceType": "cash"},
+                {"minQty": 30, "percent": 15.0, "invoiceType": "cash"},
+                {"minQty": 10, "percent": 5.0, "invoiceType": "credit"}
+            ]
+        """.trimIndent()
+
+        val product = ProductEntity(
+            id = "p_tier",
+            companyId = "c1",
+            name = "Antibiotic",
+            price = 50.0,
+            bonusType = "tiered",
+            bonusTiersJson = tiersJson
+        )
+
+        // 20 items cash -> 10% = 2 bonus
+        val bonusCash = BonusCalculator.calculateBonus(product, 20.0, "cash")
+        assertEquals(2.0, bonusCash, 0.001)
+
+        // 20 items credit -> 5% = 1 bonus
+        val bonusCredit = BonusCalculator.calculateBonus(product, 20.0, "credit")
+        assertEquals(1.0, bonusCredit, 0.001)
+
+        // 40 items cash -> 15% = 6 bonus
+        val bonusCashLarge = BonusCalculator.calculateBonus(product, 40.0, "cash")
+        assertEquals(6.0, bonusCashLarge, 0.001)
+    }
+
+    @Test
+    fun testCurrencyRestrictions() {
+        val primaryOnlyProduct = ProductEntity(
+            id = "p_curr1",
+            companyId = "c1",
+            name = "Imported Item",
+            price = 100.0,
+            currency = "USD",
+            currencyRestrictionType = "primary_only"
+        )
+
+        val validCurr = OrderRules.validateProductOrder(
+            product = primaryOnlyProduct,
+            quantity = 1.0,
+            invoiceType = "cash",
+            selectedCurrency = "SAR",
+            primaryCurrency = "SAR"
+        )
+        assertTrue(validCurr.isValid)
+
+        val invalidCurr = OrderRules.validateProductOrder(
+            product = primaryOnlyProduct,
+            quantity = 1.0,
+            invoiceType = "cash",
+            selectedCurrency = "USD",
+            primaryCurrency = "SAR"
+        )
+        assertFalse(invalidCurr.isValid)
+    }
 }

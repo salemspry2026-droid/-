@@ -158,7 +158,7 @@ fun FlowexaApp(
             if (showBars) {
                 FlowexaTopBar(
                     title = "Flowexa",
-                    companyName = company?.name ?: userProfile?.companyName,
+                    companyName = company?.name ?: userProfile?.storeName ?: "Flowexa",
                     isOnline = isOnline,
                     pendingSyncCount = pendingSyncCount,
                     onNotificationsClick = { navController.navigate(Routes.Notifications.route) },
@@ -619,7 +619,13 @@ fun FlowexaApp(
                             currentUser?.uid?.let { uid -> favoritesRepo.toggleFavorite(uid, productId) }
                         }
                     },
-                    onOrderClick = { navController.navigate(Routes.CreateOrder.route) }
+                    onOrderClick = { prodId ->
+                        if (isClient) {
+                            navController.navigate(Routes.ClientCreateOrder.createRoute(prodId))
+                        } else {
+                            navController.navigate(Routes.CreateOrder.createRoute(prodId))
+                        }
+                    }
                 )
             }
 
@@ -640,13 +646,23 @@ fun FlowexaApp(
                 )
             }
 
-            composable(Routes.CreateOrder.route) {
+            composable(
+                route = Routes.CreateOrder.route,
+                arguments = listOf(navArgument("productId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
+                val prodId = backStackEntry.arguments?.getString("productId")
                 val customers by customerRepo.observeCustomers(currentCompanyId).collectAsState(initial = emptyList())
                 val products by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
 
                 CreateOrderScreen(
                     customers = customers,
                     products = products,
+                    initialProductId = prodId,
+                    primaryCurrency = company?.primaryCurrency ?: "SAR",
                     onBackClick = { navController.popBackStack() },
                     onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
                         coroutineScope.launch {
@@ -659,10 +675,65 @@ fun FlowexaApp(
                                 invoiceType = invType,
                                 dueDate = null,
                                 notes = notes,
-                                source = "admin",
+                                source = if (userProfile?.role == AppConfig.ROLE_SALES) "sales" else "admin",
                                 clientUid = null,
                                 createdBy = currentUser?.uid ?: "",
                                 createdByName = userProfile?.displayName ?: "المدير",
+                                items = items,
+                                totalAmountByCurrency = totals
+                            )
+                            navController.popBackStack()
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route = Routes.ClientCreateOrder.route,
+                arguments = listOf(navArgument("productId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
+                val prodId = backStackEntry.arguments?.getString("productId")
+                val products by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
+                val customers by customerRepo.observeCustomers(currentCompanyId).collectAsState(initial = emptyList())
+
+                val clientUid = currentUser?.uid ?: ""
+                val clientCustomer = customers.find { it.appUserId == clientUid }
+                    ?: com.flowexa.app.data.local.entity.CustomerEntity(
+                        id = "crm_client_$clientUid",
+                        companyId = currentCompanyId,
+                        name = userProfile?.displayName ?: "عميل",
+                        phone = userProfile?.phone,
+                        address = userProfile?.address,
+                        appUserId = clientUid
+                    )
+
+                CreateOrderScreen(
+                    customers = listOf(clientCustomer),
+                    products = products,
+                    isClientMode = true,
+                    preselectedCustomer = clientCustomer,
+                    initialProductId = prodId,
+                    primaryCurrency = company?.primaryCurrency ?: "SAR",
+                    onBackClick = { navController.popBackStack() },
+                    onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
+                        coroutineScope.launch {
+                            orderRepo.createOrder(
+                                companyId = currentCompanyId,
+                                customerId = custId,
+                                customerName = custName,
+                                customerPhone = custPhone,
+                                customerAddress = custAddress,
+                                invoiceType = invType,
+                                dueDate = null,
+                                notes = notes,
+                                source = "client",
+                                clientUid = clientUid,
+                                createdBy = clientUid,
+                                createdByName = userProfile?.displayName ?: "العميل",
                                 items = items,
                                 totalAmountByCurrency = totals
                             )
@@ -741,6 +812,33 @@ fun FlowexaApp(
                             )
                             SyncScheduler.scheduleImmediateSync(context)
                         }
+                    },
+                    onUpdateStaffPermissions = { emp, newRole, permsJson ->
+                        coroutineScope.launch {
+                            val updatedEmp = emp.copy(
+                                role = newRole,
+                                permissionsJson = permsJson,
+                                updatedAtMs = System.currentTimeMillis(),
+                                syncState = AppConfig.SYNC_STATE_PENDING
+                            )
+                            db.userProfileDao().insert(updatedEmp)
+                            val syncDao = db.syncOperationDao()
+                            val payload = JSONObject().apply {
+                                put("role", newRole)
+                                put("permissions", JSONObject(permsJson))
+                                put("updatedBy", currentUser?.uid ?: "")
+                            }
+                            syncDao.enqueueWithCoalescing(
+                                SyncOperationEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    collectionName = AppConfig.COL_USER_PROFILES,
+                                    documentId = emp.id,
+                                    operation = "UPDATE",
+                                    payloadJson = payload.toString()
+                                )
+                            )
+                            SyncScheduler.scheduleImmediateSync(context)
+                        }
                     }
                 )
             }
@@ -774,7 +872,7 @@ fun FlowexaApp(
                     company = company,
                     pendingSyncCount = pendingSyncCount,
                     onSaveCompany = { updated ->
-                        coroutineScope.launch { companyRepo.updateCompany(updated) }
+                        coroutineScope.launch { companyRepo.updateCompany(updated, currentUser?.uid ?: "") }
                     },
                     onManualSync = {
                         coroutineScope.launch {
@@ -811,12 +909,24 @@ fun FlowexaApp(
             composable(Routes.ClientCatalog.route) {
                 var query by remember { mutableStateOf("") }
                 val products by productRepo.searchProducts(currentCompanyId, query).collectAsState(initial = emptyList())
+                val categories by remember { ProductCategoryRepository(db, context) }.observeCategories(currentCompanyId).collectAsState(initial = emptyList())
+                val favoriteIds by favoritesRepo.observeFavoriteProductIds(currentUser?.uid ?: "").collectAsState(initial = emptyList())
 
                 ClientCatalogScreen(
                     products = products,
+                    categories = categories,
+                    favoriteProductIds = favoriteIds,
                     searchQuery = query,
                     onSearchChange = { query = it },
-                    onOrderProduct = { navController.navigate(Routes.CreateOrder.route) }
+                    onProductClick = { prodId -> navController.navigate(Routes.ProductDetail.createRoute(prodId)) },
+                    onToggleFavorite = { prodId ->
+                        coroutineScope.launch {
+                            currentUser?.uid?.let { uid -> favoritesRepo.toggleFavorite(uid, prodId) }
+                        }
+                    },
+                    onOrderProduct = { prod ->
+                        navController.navigate(Routes.ClientCreateOrder.createRoute(prod.id))
+                    }
                 )
             }
 
@@ -826,7 +936,7 @@ fun FlowexaApp(
                     orders = clientOrders,
                     selectedStatus = "all",
                     onStatusSelected = {},
-                    onCreateOrderClick = { navController.navigate(Routes.CreateOrder.route) },
+                    onCreateOrderClick = { navController.navigate(Routes.ClientCreateOrder.createRoute(null)) },
                     onOrderClick = { orderId -> navController.navigate(Routes.OrderDetail.createRoute(orderId)) }
                 )
             }
@@ -839,7 +949,7 @@ fun FlowexaApp(
                 FavoritesScreen(
                     favoriteProducts = favoriteProducts,
                     onBackClick = { navController.popBackStack() },
-                    onOrderProduct = { navController.navigate(Routes.CreateOrder.route) },
+                    onOrderProduct = { navController.navigate(Routes.ClientCreateOrder.createRoute(null)) },
                     onToggleFavorite = { productId ->
                         coroutineScope.launch {
                             val uid = currentUser?.uid ?: ""
@@ -857,6 +967,7 @@ fun FlowexaApp(
                 val compId = backStackEntry.arguments?.getString("companyId") ?: ""
                 var publicCompany by remember { mutableStateOf<com.flowexa.app.data.local.entity.CompanyEntity?>(null) }
                 val products by productRepo.observeProducts(compId).collectAsState(initial = emptyList())
+                val pdfService = remember { com.flowexa.app.service.PriceListPdfService(context) }
 
                 LaunchedEffect(compId) {
                     publicCompany = companyRepo.getCompany(compId)
@@ -871,6 +982,24 @@ fun FlowexaApp(
                             navController.popBackStack()
                         } else {
                             navController.navigate(Routes.Login.route)
+                        }
+                    },
+                    onExportPdfClick = {
+                        coroutineScope.launch {
+                            val res = pdfService.generatePriceListPdf(publicCompany, products)
+                            res.onSuccess { pdfFile ->
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    pdfFile
+                                )
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    addFlags(android.content.Intent.EXTRA_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "مشاركة لائحة الأسعار"))
+                            }
                         }
                     }
                 )

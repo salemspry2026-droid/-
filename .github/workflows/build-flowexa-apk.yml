@@ -32,7 +32,7 @@ jobs:
         with:
           gradle-version: wrapper
 
-      - name: Restore release keystore
+      - name: Restore and Validate Keystore & Firebase Config
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.FLOWEXA_KEYSTORE_BASE64 }}
@@ -47,25 +47,43 @@ jobs:
           [[ -n "$KEYSTORE_PASSWORD" ]] || missing+=(FLOWEXA_KEYSTORE_PASSWORD)
           [[ -n "$KEY_ALIAS" ]] || missing+=(FLOWEXA_KEY_ALIAS)
           [[ -n "$KEY_PASSWORD" ]] || missing+=(FLOWEXA_KEY_PASSWORD)
+          [[ -n "$FIREBASE_CONFIG_BASE64" ]] || missing+=(FLOWEXA_GOOGLE_SERVICES_JSON_BASE64)
           if (( ${#missing[@]} > 0 )); then
             echo "::error::Missing required GitHub Secrets: ${missing[*]}"
             exit 1
           fi
+
           KEYSTORE_PATH=android-app/app/flowexa-release.keystore
           mkdir -p "$(dirname "$KEYSTORE_PATH")"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
           chmod 600 "$KEYSTORE_PATH"
           keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
-          if [[ -n "$FIREBASE_CONFIG_BASE64" ]]; then
-            printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > android-app/app/google-services.json
-            chmod 600 android-app/app/google-services.json
-          else
-            echo "::warning::FLOWEXA_GOOGLE_SERVICES_JSON_BASE64 is not set; Firebase runtime setup is incomplete."
-          fi
+
+          SERVICES_JSON_PATH=android-app/app/google-services.json
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > "$SERVICES_JSON_PATH"
+          chmod 600 "$SERVICES_JSON_PATH"
+
+          # Strict validation of google-services.json
+          python3 -c "
+          import json, sys
+          with open('$SERVICES_JSON_PATH') as f:
+              data = json.load(f)
+          project_id = data.get('project_info', {}).get('project_id')
+          if not project_id:
+              sys.exit('Missing project_id in google-services.json')
+          client_packages = [c.get('client_info', {}).get('android_client_info', {}).get('package_name') for c in data.get('client', [])]
+          if 'com.flowexa.app' not in client_packages:
+              sys.exit(f'Package com.flowexa.app not found in google-services.json clients: {client_packages}')
+          print(f'Firebase config validated successfully for project: {project_id}')
+          "
 
       - name: Ensure Gradle wrapper is executable
         working-directory: android-app
         run: chmod +x ./gradlew
+
+      - name: Run Unit Tests
+        working-directory: android-app
+        run: ./gradlew testReleaseUnitTest --no-daemon
 
       - name: Build Android Release APK
         working-directory: android-app
@@ -98,20 +116,29 @@ jobs:
           zip -T "$APK_FILE"
           unzip -tq "$APK_FILE" >/dev/null
 
-          echo "==> 2. Checking ZIP alignment (zipalign)..."
+          echo "==> 2. Checking ZIP alignment (zipalign strict)..."
           ZIPALIGN=$(find "${ANDROID_HOME}/build-tools" -type f -name zipalign | sort -V | tail -n 1)
-          if [[ -n "$ZIPALIGN" ]]; then
-            "$ZIPALIGN" -c -v 4 "$APK_FILE" || echo "zipalign check finished"
+          if [[ -z "$ZIPALIGN" ]]; then
+            echo "::error::Android build-tools zipalign was not found!"
+            exit 1
           fi
+          "$ZIPALIGN" -c -P 4 4 "$APK_FILE"
 
           echo "==> 3. Inspecting package metadata (aapt2)..."
           AAPT2=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt2 | sort -V | tail -n 1)
-          if [[ -n "$AAPT2" ]]; then
-            "$AAPT2" dump badging "$APK_FILE" | grep "package: name='com.flowexa.app'" || {
-              echo "::error::Package name is not com.flowexa.app!"
-              exit 1
-            }
+          if [[ -z "$AAPT2" ]]; then
+            echo "::error::Android build-tools aapt2 was not found!"
+            exit 1
           fi
+          BADGING_OUTPUT=$("$AAPT2" dump badging "$APK_FILE")
+          echo "$BADGING_OUTPUT" | grep "package: name='com.flowexa.app'" || {
+            echo "::error::Package name is not com.flowexa.app!"
+            exit 1
+          }
+
+          VERSION_NAME=$(echo "$BADGING_OUTPUT" | grep -o "versionName='[^']*'" | cut -d"'" -f2)
+          VERSION_CODE=$(echo "$BADGING_OUTPUT" | grep -o "versionCode='[^']*'" | cut -d"'" -f2)
+          echo "App Version Name: $VERSION_NAME, Version Code: $VERSION_CODE"
 
           echo "==> 4. Verifying APK cryptographic signatures..."
           APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)
@@ -126,6 +153,7 @@ jobs:
           SHA256_HASH=$(sha256sum build-output/Flowexa.apk | awk '{print $1}')
           echo "Flowexa.apk SHA-256: $SHA256_HASH"
           echo "SHA256_HASH=$SHA256_HASH" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -138,13 +166,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: success()
         with:
-          tag_name: v2.0.0
-          name: Flowexa Android v2.0.0
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Flowexa Android v${{ env.VERSION_NAME }}
           body: |
-            تطبيق Flowexa Native للأندرويد (Flowexa Native Android v2.0.0).
+            تطبيق Flowexa Native للأندرويد (Flowexa Native Android v${{ env.VERSION_NAME }}).
             - تطبيق Kotlin + Jetpack Compose + Material 3.
-            - قاعدة بيانات Room ومحرك مزامنة Outbox للعمل دون اتصال.
-            - الإصدار مبني من android-app وموقع بالمفتاح الدائم المحفوظ في GitHub Secrets.
+            - قاعدة بيانات Room ومحرك مزامنة Outbox للعمل دون اتصال بالكامل.
+            - التحقق التام من التوقيع (apksigner) والمحاذاة (zipalign) وبصمة SHA-256.
+            - SHA-256: `${{ env.SHA256_HASH }}`
           files: build-output/Flowexa.apk
           draft: false
           prerelease: false
