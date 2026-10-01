@@ -1,8 +1,10 @@
 package com.flowexa.app.data.repository
-
+ 
 import android.content.Context
+import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
+import com.flowexa.app.data.local.dao.OutboxOp
 import com.flowexa.app.data.local.entity.OrderStageEntity
 import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.sync.SyncScheduler
@@ -12,22 +14,22 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
-
+ 
 class OrderStageRepository(
     private val database: FlowexaDatabase,
     private val context: Context
 ) {
     private val stageDao = database.orderStageDao()
     private val syncDao = database.syncOperationDao()
-
+ 
     fun observeOrderStages(companyId: String): Flow<List<OrderStageEntity>> {
         return stageDao.observeOrderStages(companyId)
     }
-
+ 
     suspend fun getOrderStage(id: String): OrderStageEntity? = withContext(Dispatchers.IO) {
         stageDao.getOrderStage(id)
     }
-
+ 
     suspend fun saveOrderStage(
         stage: OrderStageEntity,
         isNew: Boolean,
@@ -39,7 +41,7 @@ class OrderStageRepository(
             updatedAtMs = nowMs
         )
         stageDao.insert(finalStage)
-
+ 
         val payload = JSONObject().apply {
             put("companyId", finalStage.companyId)
             put("name", finalStage.name)
@@ -53,7 +55,7 @@ class OrderStageRepository(
                 put("updatedBy", currentUserId)
             }
         }
-
+ 
         syncDao.enqueueWithCoalescing(
             SyncOperationEntity(
                 id = UUID.randomUUID().toString(),
@@ -61,12 +63,23 @@ class OrderStageRepository(
                 documentId = finalStage.id,
                 operation = if (isNew) "CREATE" else "UPDATE",
                 payloadJson = payload.toString()
+        database.withTransaction {
+            stageDao.insert(finalStage)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_ORDER_STAGES,
+                    documentId = finalStage.id,
+                    operation = if (isNew) OutboxOp.CREATE else OutboxOp.UPDATE,
+                    payloadJson = payload.toString()
+                )
             )
         )
-
+        }
+ 
         SyncScheduler.scheduleImmediateSync(context)
     }
-
+ 
     suspend fun deleteOrderStage(id: String, currentUserId: String = "") = withContext(Dispatchers.IO) {
         stageDao.softDelete(id)
         val deletePayload = JSONObject().apply {
@@ -82,8 +95,19 @@ class OrderStageRepository(
                 documentId = id,
                 operation = "DELETE",
                 payloadJson = deletePayload.toString()
+        database.withTransaction {
+            stageDao.softDelete(id)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_ORDER_STAGES,
+                    documentId = id,
+                    operation = OutboxOp.DELETE,
+                    payloadJson = deletePayload.toString()
+                )
             )
         )
+        }
         SyncScheduler.scheduleImmediateSync(context)
     }
 }
