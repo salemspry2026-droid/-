@@ -1,5 +1,5 @@
 package com.flowexa.app.data.repository
- 
+
 import android.content.Context
 import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
@@ -15,16 +15,68 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
- 
+
 class OrderRepository(
     private val database: FlowexaDatabase,
     private val context: Context
 ) {
     private val orderDao = database.orderDao()
     private val syncDao = database.syncOperationDao()
- 
+
     fun observeOrders(companyId: String): Flow<List<OrderEntity>> {
         return orderDao.observeOrders(companyId)
+    }
+
+    fun observeOrdersByStatus(companyId: String, status: String): Flow<List<OrderEntity>> {
+        return orderDao.observeOrdersByStatus(companyId, status)
+    }
+
+    fun observeClientOrders(clientUid: String): Flow<List<OrderEntity>> {
+        return orderDao.observeClientOrders(clientUid)
+    }
+
+    suspend fun getOrder(id: String): OrderEntity? = withContext(Dispatchers.IO) {
+        orderDao.getOrder(id)
+    }
+
+    fun observeOrderItems(orderId: String): Flow<List<OrderItemEntity>> {
+        return orderDao.observeOrderItems(orderId)
+    }
+
+    suspend fun getOrderItems(orderId: String): List<OrderItemEntity> = withContext(Dispatchers.IO) {
+        orderDao.getOrderItems(orderId)
+    }
+
+    /**
+     * Creates an order with full offline capability.
+     * Inserts into Room immediately, queues an Outbox sync operation, and triggers WorkManager.
+     */
+    suspend fun createOrder(
+        companyId: String,
+        customerId: String,
+        customerName: String,
+        customerPhone: String?,
+        customerAddress: String?,
+        invoiceType: String?,
+        dueDate: String?,
+        notes: String?,
+        source: String,
+        clientUid: String?,
+        createdBy: String,
+        createdByName: String?,
+        items: List<OrderItemEntity>,
+        totalAmountByCurrency: Map<String, Double>
+    ): OrderEntity = withContext(Dispatchers.IO) {
+        val orderId = "ord_${UUID.randomUUID()}"
+        val now = System.currentTimeMillis()
+
+        val totalsJson = JSONObject(totalAmountByCurrency).toString()
+
+        val order = OrderEntity(
+            id = orderId,
+            companyId = companyId,
+            customerId = customerId,
+            customerName = customerName,
             customerPhone = customerPhone,
             customerAddress = customerAddress,
             status = "pending",
@@ -42,12 +94,9 @@ class OrderRepository(
             isDeleted = false,
             syncState = AppConfig.SYNC_STATE_PENDING
         )
- 
+
         val updatedItems = items.map { it.copy(orderId = orderId) }
- 
-        // Save order & items to Room in a transaction
-        orderDao.saveOrderWithItems(order, updatedItems)
- 
+
         // Prepare JSON payload for Firestore outbox
         val itemsArray = JSONArray()
         for (item in updatedItems) {
@@ -63,7 +112,7 @@ class OrderRepository(
             }
             itemsArray.put(itemObj)
         }
- 
+
         val orderPayload = JSONObject().apply {
             put("companyId", companyId)
             put("customerId", customerId)
@@ -83,14 +132,7 @@ class OrderRepository(
             put("items", itemsArray)
             put("isDeleted", false)
         }
- 
-        syncDao.insert(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_ORDERS,
-                documentId = orderId,
-                operation = "CREATE",
-                payloadJson = orderPayload.toString()
+
         database.withTransaction {
             orderDao.saveOrderWithItems(order, updatedItems)
             syncDao.insert(
@@ -102,29 +144,20 @@ class OrderRepository(
                     payloadJson = orderPayload.toString()
                 )
             )
-        )
         }
- 
+
         SyncScheduler.scheduleImmediateSync(context)
         order
     }
- 
+
     suspend fun updateStatus(orderId: String, newStatus: String, updatedBy: String) = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        orderDao.updateOrderStatus(orderId, newStatus, now)
- 
+
         val payload = JSONObject().apply {
             put("status", newStatus)
             put("updatedBy", updatedBy)
         }
- 
-        syncDao.insert(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_ORDERS,
-                documentId = orderId,
-                operation = "UPDATE",
-                payloadJson = payload.toString()
+
         database.withTransaction {
             orderDao.updateOrderStatus(orderId, newStatus, now)
             syncDao.enqueueWithCoalescing(
@@ -136,9 +169,8 @@ class OrderRepository(
                     payloadJson = payload.toString()
                 )
             )
-        )
         }
- 
+
         SyncScheduler.scheduleImmediateSync(context)
     }
 }
