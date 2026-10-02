@@ -1,8 +1,10 @@
 package com.flowexa.app.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
+import com.flowexa.app.data.local.dao.OutboxOp
 import com.flowexa.app.data.local.entity.ProductEntity
 import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.sync.SyncScheduler
@@ -33,17 +35,21 @@ class ProductRepository(
         productDao.getProduct(id)
     }
 
+    /**
+     * Persists a product. On edit, fields not present in the UI model are preserved from the stored
+     * entity so an update can never wipe categoryId/brandId/imageUrl/notes/offer/tiers/etc.
+     */
     suspend fun saveProduct(product: ProductEntity, isNew: Boolean, currentUserId: String = "") = withContext(Dispatchers.IO) {
         val existing = if (!isNew) productDao.getProduct(product.id) else null
         val finalProduct = (existing?.copy(
             name = product.name,
-            scientificName = product.scientificName,
-            description = product.description,
+            scientificName = product.scientificName ?: existing.scientificName,
+            description = product.description ?: existing.description,
             price = product.price,
             currency = product.currency,
-            categoryId = product.categoryId,
-            unit = product.unit,
-            brandId = product.brandId,
+            categoryId = product.categoryId ?: existing.categoryId,
+            unit = product.unit ?: existing.unit,
+            brandId = product.brandId ?: existing.brandId,
             imageUrl = product.imageUrl ?: existing.imageUrl,
             notes = product.notes ?: existing.notes,
             inStock = product.inStock,
@@ -52,7 +58,7 @@ class ProductRepository(
             invoiceTypeRestriction = product.invoiceTypeRestriction,
             currencyRestrictionType = product.currencyRestrictionType,
             bonusType = product.bonusType,
-            bonusFixedPercent = product.bonusFixedPercent,
+            bonusFixedPercent = product.bonusFixedPercent ?: existing.bonusFixedPercent,
             isActive = product.isActive,
             specialOfferJson = product.specialOfferJson ?: existing.specialOfferJson,
             specificCurrenciesJson = if (product.specificCurrenciesJson.isNotEmpty()) product.specificCurrenciesJson else existing.specificCurrenciesJson,
@@ -64,7 +70,6 @@ class ProductRepository(
             syncState = AppConfig.SYNC_STATE_PENDING,
             updatedAtMs = System.currentTimeMillis()
         ))
-        productDao.insert(finalProduct)
 
         val payload = JSONObject().apply {
             put("companyId", finalProduct.companyId)
@@ -115,36 +120,41 @@ class ProductRepository(
             }
         }
 
-        syncDao.enqueueWithCoalescing(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_PRODUCTS,
-                documentId = finalProduct.id,
-                operation = if (isNew) "CREATE" else "UPDATE",
-                payloadJson = payload.toString()
+        database.withTransaction {
+            productDao.insert(finalProduct)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_PRODUCTS,
+                    documentId = finalProduct.id,
+                    operation = if (isNew) OutboxOp.CREATE else OutboxOp.UPDATE,
+                    payloadJson = payload.toString()
+                )
             )
-        )
+        }
 
         SyncScheduler.scheduleImmediateSync(context)
     }
 
     suspend fun deleteProduct(id: String, currentUserId: String = "") = withContext(Dispatchers.IO) {
-        productDao.softDelete(id)
         val deletePayload = JSONObject().apply {
             put("isDeleted", true)
             if (currentUserId.isNotEmpty()) {
                 put("updatedBy", currentUserId)
             }
         }
-        syncDao.enqueueWithCoalescing(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_PRODUCTS,
-                documentId = id,
-                operation = "DELETE",
-                payloadJson = deletePayload.toString()
+        database.withTransaction {
+            productDao.softDelete(id)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_PRODUCTS,
+                    documentId = id,
+                    operation = OutboxOp.DELETE,
+                    payloadJson = deletePayload.toString()
+                )
             )
-        )
+        }
         SyncScheduler.scheduleImmediateSync(context)
     }
 
