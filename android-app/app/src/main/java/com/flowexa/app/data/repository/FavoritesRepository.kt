@@ -1,5 +1,5 @@
 package com.flowexa.app.data.repository
- 
+
 import android.content.Context
 import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
@@ -14,34 +14,20 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
- 
+
 class FavoritesRepository(
     private val database: FlowexaDatabase,
     private val context: Context
 ) {
     private val userProfileDao = database.userProfileDao()
     private val syncDao = database.syncOperationDao()
- 
+
     fun observeFavoriteProductIds(uid: String): Flow<List<String>> {
         return userProfileDao.observeProfile(uid).map { profile ->
-            if (profile?.favoriteProductIdsJson.isNullOrBlank()) {
-                emptyList()
-            } else {
-                try {
-                    val arr = JSONArray(profile!!.favoriteProductIdsJson)
-                    val list = mutableListOf<String>()
-                    for (i in 0 until arr.length()) {
-                        list.add(arr.getString(i))
-                    }
-                    list
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
             parseIds(profile?.favoriteProductIdsJson)
         }
     }
- 
+
     /**
      * Toggles a favourite using operation-specific ARRAY_ADD / ARRAY_REMOVE instead of replacing the
      * whole Firestore array, which avoids clobbering concurrent changes made on other devices.
@@ -49,54 +35,15 @@ class FavoritesRepository(
     suspend fun toggleFavorite(uid: String, productId: String) = withContext(Dispatchers.IO) {
         if (uid.isEmpty() || productId.isEmpty()) return@withContext
         val profile = userProfileDao.getProfile(uid) ?: return@withContext
-        val currentFavorites = if (profile.favoriteProductIdsJson.isBlank()) {
-            mutableListOf()
-        } else {
-            try {
-                val arr = JSONArray(profile.favoriteProductIdsJson)
-                val list = mutableListOf<String>()
-                for (i in 0 until arr.length()) {
-                    list.add(arr.getString(i))
-                }
-                list
-            } catch (_: Exception) {
-                mutableListOf()
-            }
-        }
- 
-        if (currentFavorites.contains(productId)) {
-            currentFavorites.remove(productId)
-        } else {
-            currentFavorites.add(productId)
-        }
         val current = parseIds(profile.favoriteProductIdsJson).toMutableSet()
         val removing = current.contains(productId)
         if (removing) current.remove(productId) else current.add(productId)
- 
-        val updatedJson = JSONArray(currentFavorites).toString()
-        val updatedProfile = profile.copy(
-            favoriteProductIdsJson = updatedJson,
-            syncState = AppConfig.SYNC_STATE_PENDING,
-            updatedAtMs = System.currentTimeMillis()
-        )
-        userProfileDao.insert(updatedProfile)
+
         val nowMs = System.currentTimeMillis()
         val op = if (removing) OutboxOp.ARRAY_REMOVE else OutboxOp.ARRAY_ADD
         val payload = JSONObject(OutboxOp.buildArrayPayload("favoriteProductIds", listOf(productId)))
             .put("updatedBy", uid)
- 
-        val payload = JSONObject().apply {
-            put("favoriteProductIds", JSONArray(currentFavorites))
-            put("updatedBy", uid)
-        }
- 
-        syncDao.enqueueWithCoalescing(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_USER_PROFILES,
-                documentId = uid,
-                operation = "UPDATE",
-                payloadJson = payload.toString()
+
         database.withTransaction {
             userProfileDao.insert(
                 profile.copy(
@@ -105,8 +52,6 @@ class FavoritesRepository(
                     updatedAtMs = nowMs
                 )
             )
-        )
- 
             syncDao.enqueueWithCoalescing(
                 SyncOperationEntity(
                     id = UUID.randomUUID().toString(),
@@ -119,7 +64,7 @@ class FavoritesRepository(
         }
         SyncScheduler.scheduleImmediateSync(context)
     }
- 
+
     private fun parseIds(json: String?): List<String> {
         if (json.isNullOrBlank()) return emptyList()
         return try {
