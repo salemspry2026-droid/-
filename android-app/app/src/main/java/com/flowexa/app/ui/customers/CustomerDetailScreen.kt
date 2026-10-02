@@ -197,11 +197,23 @@ fun CustomerDetailScreen(
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("إجمالي المشتريات", fontSize = 12.sp, color = Color.Gray)
-                                Text("%.2f".format(insights.totalSales), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = FlowexaBlue)
+                                if (insights.totalsByCurrency.isEmpty()) {
+                                    Text("—", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = FlowexaBlue)
+                                } else {
+                                    insights.totalsByCurrency.forEach { (currency, total) ->
+                                        Text("%.2f %s".format(total, currency), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = FlowexaBlue)
+                                    }
+                                }
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("متوسط الطلب", fontSize = 12.sp, color = Color.Gray)
-                                Text("%.2f".format(insights.averageOrderValue), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = FlowexaBlue)
+                                if (insights.averageByCurrency.isEmpty()) {
+                                    Text("—", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = FlowexaBlue)
+                                } else {
+                                    insights.averageByCurrency.forEach { (currency, average) ->
+                                        Text("%.2f %s".format(average, currency), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = FlowexaBlue)
+                                    }
+                                }
                             }
                         }
 

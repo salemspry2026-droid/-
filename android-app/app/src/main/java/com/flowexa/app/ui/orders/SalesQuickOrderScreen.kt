@@ -159,8 +159,14 @@ fun SalesQuickOrderScreen(
                                     }
                                     if (customerInsights != null) {
                                         Spacer(modifier = Modifier.height(6.dp))
+                                        val avgSummary = if (customerInsights!!.averageByCurrency.isEmpty()) {
+                                            "لا توجد مشتريات سابقة"
+                                        } else {
+                                            customerInsights!!.averageByCurrency.entries
+                                                .joinToString(" • ") { (currency, average) -> "%.2f %s".format(average, currency) }
+                                        }
                                         Text(
-                                            "إجمالي الطلبات: ${customerInsights!!.totalOrders} • متوسط الشراء: %.2f".format(customerInsights!!.averageOrderValue),
+                                            "إجمالي الطلبات: ${customerInsights!!.totalOrders} • متوسط الشراء: $avgSummary",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color(0xFF0F766E)
