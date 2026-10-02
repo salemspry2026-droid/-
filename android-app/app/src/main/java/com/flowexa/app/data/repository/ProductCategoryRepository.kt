@@ -1,8 +1,10 @@
 package com.flowexa.app.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
+import com.flowexa.app.data.local.dao.OutboxOp
 import com.flowexa.app.data.local.entity.ProductCategoryEntity
 import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.sync.SyncScheduler
@@ -37,7 +39,6 @@ class ProductCategoryRepository(
             syncState = AppConfig.SYNC_STATE_PENDING,
             updatedAtMs = nowMs
         )
-        categoryDao.insert(finalCat)
 
         val payload = JSONObject().apply {
             put("companyId", finalCat.companyId)
@@ -51,36 +52,41 @@ class ProductCategoryRepository(
             }
         }
 
-        syncDao.enqueueWithCoalescing(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_PRODUCT_CATEGORIES,
-                documentId = finalCat.id,
-                operation = if (isNew) "CREATE" else "UPDATE",
-                payloadJson = payload.toString()
+        database.withTransaction {
+            categoryDao.insert(finalCat)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_PRODUCT_CATEGORIES,
+                    documentId = finalCat.id,
+                    operation = if (isNew) OutboxOp.CREATE else OutboxOp.UPDATE,
+                    payloadJson = payload.toString()
+                )
             )
-        )
+        }
 
         SyncScheduler.scheduleImmediateSync(context)
     }
 
     suspend fun deleteCategory(id: String, currentUserId: String = "") = withContext(Dispatchers.IO) {
-        categoryDao.softDelete(id)
         val deletePayload = JSONObject().apply {
             put("isDeleted", true)
             if (currentUserId.isNotEmpty()) {
                 put("updatedBy", currentUserId)
             }
         }
-        syncDao.enqueueWithCoalescing(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                collectionName = AppConfig.COL_PRODUCT_CATEGORIES,
-                documentId = id,
-                operation = "DELETE",
-                payloadJson = deletePayload.toString()
+        database.withTransaction {
+            categoryDao.softDelete(id)
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(),
+                    collectionName = AppConfig.COL_PRODUCT_CATEGORIES,
+                    documentId = id,
+                    operation = OutboxOp.DELETE,
+                    payloadJson = deletePayload.toString()
+                )
             )
-        )
+        }
         SyncScheduler.scheduleImmediateSync(context)
     }
 }
