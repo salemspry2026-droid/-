@@ -4,8 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.flowexa.app",
-      "sha256_cert_fingerprints": [
-        "14:6A:E7:5C:3A:42:0B:4F:9C:20:84:48:65:6C:54:19:9C:F6:A3:30:EF:38:6F:04:88:EC:3A:73:2E:EE:4B:87"
+      "sha256_cert_fingerprints": ["5A:08:6A:6C:F8:51:D7:1B:A2:1A:31:70:AE:A2:CA:11:6D:47:71:C0:68:2A:E9:AF:69:C2:8E:A7:AB:21:A8:B1"
       ]
     }
   }
