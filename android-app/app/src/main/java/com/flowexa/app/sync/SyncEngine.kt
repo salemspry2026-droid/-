@@ -52,7 +52,6 @@ class SyncEngine(
     private val database: FlowexaDatabase
 ) {
     companion object {
-        private const val MAX_RETRY_ATTEMPTS = 5
         private val singleFlightMutex = Mutex()
 
         @Volatile
@@ -101,12 +100,18 @@ class SyncEngine(
 
     private suspend fun runSync(): Result<SyncReport> {
         val syncDao = database.syncOperationDao()
-        // Give previously failed (non-permanent) operations another chance.
-        syncDao.retryFailedUnderAttempts(MAX_RETRY_ATTEMPTS)
+        // NOTE: FAILED operations are permanent (permission / validation errors). They are NOT
+        // retried automatically; the user retries them deliberately via retryFailedOperations().
 
         var totalSynced = 0
         var totalFailed = 0
         var transientError: Throwable? = null
+
+        // Without an authenticated user every write would be rejected by Firestore rules and be
+        // wrongly classified as a permanent failure. Keep the outbox untouched and retry later.
+        if (FirebaseProvider.auth.currentUser == null) {
+            return Result.failure(IOException("Not authenticated; outbox kept for later"))
+        }
 
         try {
             syncDao.resetProcessingOperations()
@@ -123,8 +128,13 @@ class SyncEngine(
                     if (isTransientSyncError(e)) {
                         syncDao.markPending(op.id, e.message)
                         transientError = transientError ?: e
+                        // Preserve ordering (e.g. customer CREATE before its phone CREATE): once the
+                        // network/backend is unavailable, later operations would fail as well.
+                        break
                     } else {
-                        syncDao.markFailed(op.id, e.message)
+                        // Permission / validation errors are PERMANENT: keep the reason visible
+                        // (lastError) and only retry again when the user does so deliberately.
+                        syncDao.markFailedPermanent(op.id, describeSyncError(e))
                         totalFailed++
                     }
                 }
@@ -152,8 +162,19 @@ class SyncEngine(
         }
     }
 
+    private fun describeSyncError(e: Throwable): String {
+        val code = (e as? FirebaseFirestoreException)?.code?.name
+        return if (code != null) "$code: ${e.message}" else (e.message ?: e.javaClass.simpleName)
+    }
+
     private suspend fun applyOperation(op: SyncOperationEntity) {
         val docRef = firestore.collection(op.collectionName).document(op.documentId)
+        // Firestore rules require createdBy/updatedBy == request.auth.uid. Individual repositories
+        // may omit them (default currentUserId = ""), so the engine guarantees them centrally.
+        // An operation that already carries ANOTHER user's id is left as-is and will be rejected
+        // by the rules (no impersonation).
+        val uid = FirebaseProvider.auth.currentUser?.uid
+            ?: throw IOException("Not authenticated")
 
         when (op.operation) {
             OutboxOp.CREATE, OutboxOp.UPDATE -> {
@@ -161,8 +182,10 @@ class SyncEngine(
                     .filterKeys { !it.startsWith("__") }
                     .toMutableMap()
                 payloadMap["updatedAt"] = FieldValue.serverTimestamp()
-                if (op.operation == OutboxOp.CREATE && !payloadMap.containsKey("createdAt")) {
-                    payloadMap["createdAt"] = FieldValue.serverTimestamp()
+                if ((payloadMap["updatedBy"] as? String).isNullOrEmpty()) payloadMap["updatedBy"] = uid
+                if (op.operation == OutboxOp.CREATE) {
+                    if (!payloadMap.containsKey("createdAt")) payloadMap["createdAt"] = FieldValue.serverTimestamp()
+                    if ((payloadMap["createdBy"] as? String).isNullOrEmpty()) payloadMap["createdBy"] = uid
                 }
                 docRef.set(payloadMap, SetOptions.merge()).await()
             }
@@ -177,7 +200,7 @@ class SyncEngine(
                     "isDeleted" to true,
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
-                (payloadMap["updatedBy"] as? String)?.takeIf { it.isNotEmpty() }?.let { updateMap["updatedBy"] = it }
+                updateMap["updatedBy"] = (payloadMap["updatedBy"] as? String)?.takeIf { it.isNotEmpty() } ?: uid
                 (payloadMap["mergedInto"] as? String)?.takeIf { it.isNotEmpty() }?.let { updateMap["mergedInto"] = it }
                 docRef.set(updateMap, SetOptions.merge()).await()
             }
@@ -190,9 +213,8 @@ class SyncEngine(
                         field to FieldValue.arrayUnion(*values.toTypedArray()),
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
-                    (jsonToMap(JSONObject(op.payloadJson))["updatedBy"] as? String)
-                        ?.takeIf { it.isNotEmpty() }
-                        ?.let { updateMap["updatedBy"] = it }
+                    updateMap["updatedBy"] = (jsonToMap(JSONObject(op.payloadJson))["updatedBy"] as? String)
+                        ?.takeIf { it.isNotEmpty() } ?: uid
                     docRef.set(updateMap, SetOptions.merge()).await()
                 }
             }
@@ -205,9 +227,8 @@ class SyncEngine(
                         field to FieldValue.arrayRemove(*values.toTypedArray()),
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
-                    (jsonToMap(JSONObject(op.payloadJson))["updatedBy"] as? String)
-                        ?.takeIf { it.isNotEmpty() }
-                        ?.let { updateMap["updatedBy"] = it }
+                    updateMap["updatedBy"] = (jsonToMap(JSONObject(op.payloadJson))["updatedBy"] as? String)
+                        ?.takeIf { it.isNotEmpty() } ?: uid
                     docRef.set(updateMap, SetOptions.merge()).await()
                 }
             }
@@ -307,16 +328,22 @@ class SyncEngine(
                 }
             }
 
-            // 8. Customer phones (never overwrite a locally PENDING phone)
-            for (doc in firestore.collection(AppConfig.COL_CUSTOMER_PHONES)
-                .whereEqualTo("companyId", companyId).get().await().documents) {
-                val phone = FirestoreMappers.docToCustomerPhone(doc)
-                val local = database.customerPhoneDao().getPhone(phone.id)
-                if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
-                    if (phone.isDeleted) {
-                        database.customerPhoneDao().softDelete(phone.id, System.currentTimeMillis())
-                    } else {
-                        database.customerPhoneDao().insert(phone)
+            // 8. Customer phones - staff only (matches firestore.rules). A client querying this
+            //    collection would be PERMISSION_DENIED and abort the whole pull.
+            //    Never overwrite a locally PENDING phone.
+            val role = database.userProfileDao().getProfile(uid)?.role
+            val isStaff = role == AppConfig.ROLE_OWNER || role == AppConfig.ROLE_ADMIN || role == AppConfig.ROLE_SALES
+            if (isStaff) {
+                for (doc in firestore.collection(AppConfig.COL_CUSTOMER_PHONES)
+                    .whereEqualTo("companyId", companyId).get().await().documents) {
+                    val phone = FirestoreMappers.docToCustomerPhone(doc)
+                    val local = database.customerPhoneDao().getPhone(phone.id)
+                    if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                        if (phone.isDeleted) {
+                            database.customerPhoneDao().softDelete(phone.id, System.currentTimeMillis())
+                        } else {
+                            database.customerPhoneDao().insert(phone)
+                        }
                     }
                 }
             }

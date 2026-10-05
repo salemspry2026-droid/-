@@ -64,6 +64,10 @@ interface SyncOperationDao {
     @Query("UPDATE sync_operations SET state = 'FAILED', lastError = :error, attempts = attempts + 1 WHERE id = :id")
     suspend fun markFailed(id: String, error: String?)
 
+    /** Permanent failure (permission / validation). Never retried automatically. */
+    @Query("UPDATE sync_operations SET state = 'FAILED', lastError = :error, attempts = attempts + 1 WHERE id = :id")
+    suspend fun markFailedPermanent(id: String, error: String?)
+
     @Query("UPDATE sync_operations SET state = 'PENDING', lastError = NULL WHERE id = :id AND state = 'FAILED'")
     suspend fun retryFailed(id: String)
 

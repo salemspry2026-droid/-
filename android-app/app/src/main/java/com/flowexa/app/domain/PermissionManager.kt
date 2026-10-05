@@ -22,6 +22,31 @@ object PermissionManager {
     }
 
     /**
+     * The CEILING enforced by firestore.rules (the real security boundary). The UI must never offer
+     * an action the backend will reject, whatever `permissionsJson` says:
+     *  - company document (SETTINGS): only the owner may update it
+     *  - products: only admin/owner may create/edit/delete
+     *  - customers: sales may view/create/edit but not delete
+     *  - orders: sales may view/create/edit but not delete
+     *  - staff management: admin/owner only
+     * Owner never reaches this function (handled earlier); clients/pending never reach it either.
+     */
+    internal fun backendAllows(role: String?, module: Module, action: Action): Boolean {
+        return when (role) {
+            AppConfig.ROLE_ADMIN -> when (module) {
+                Module.SETTINGS -> action == Action.VIEW
+                else -> true
+            }
+            AppConfig.ROLE_SALES -> when (module) {
+                Module.CUSTOMERS, Module.ORDERS -> action != Action.DELETE
+                Module.PRODUCTS -> action == Action.VIEW
+                Module.STAFF, Module.SETTINGS -> false
+            }
+            else -> false
+        }
+    }
+
+    /**
      * Checks if a user has permission to perform an action on a specific module.
      * Evaluates explicit profile permissions first, then falls back to role-based defaults.
      */
@@ -38,6 +63,9 @@ object PermissionManager {
 
         // Pending employees have no access until approved
         if (profile.role == AppConfig.ROLE_PENDING_EMPLOYEE) return false
+
+        // Explicit per-user permissions can never exceed what firestore.rules enforce.
+        if (!backendAllows(profile.role, module, action)) return false
 
         // 1. Check explicit permissions in profile if configured
         if (profile.permissionsJson.isNotBlank() && profile.permissionsJson != "{}") {

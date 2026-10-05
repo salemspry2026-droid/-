@@ -1,0 +1,5 @@
+# SHA-256 fingerprint (32 bytes, colon separated, uppercase) of the PRODUCTION release signing
+# certificate. This is a PUBLIC value (it is also published in public/.well-known/assetlinks.json).
+# CI refuses to publish an APK whose signer differs from the value below.
+# Replace the next line with the full 95-character fingerprint (64 hex digits + 31 colons).
+REPLACE_WITH_FULL_SHA256_FINGERPRINT

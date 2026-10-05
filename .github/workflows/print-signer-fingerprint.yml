@@ -1,0 +1,40 @@
+name: Print Release Signer Fingerprint
+
+# One-off helper. Prints the PUBLIC SHA-256 fingerprint of the production signing certificate so it
+# can be copied into:
+#   - android-app/signing/expected-signer-sha256.txt
+#   - public/.well-known/assetlinks.json
+# It never prints the keystore, passwords or any secret.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  print:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Print certificate SHA-256
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.FLOWEXA_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FLOWEXA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FLOWEXA_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS; do
+            [[ -n "${!v}" ]] || { echo "::error::Secret for $v is missing"; exit 1; }
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          keytool -list -v -keystore "$RUNNER_TEMP/release.keystore" \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null \
+            | grep -m1 "SHA256:" | sed 's/^ *//' | tee fingerprint.txt
+          FP=$(sed 's/^SHA256: *//' fingerprint.txt)
+          echo "::notice title=Release signer SHA-256 (public)::${FP}"
+          rm -f "$RUNNER_TEMP/release.keystore"

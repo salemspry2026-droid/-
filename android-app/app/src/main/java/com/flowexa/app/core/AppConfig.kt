@@ -3,6 +3,10 @@ package com.flowexa.app.core
 object AppConfig {
     const val FIRESTORE_DATABASE_ID = "ai-studio-c5fd0d2f-b8be-4e45-a37c-45e344ff21a9"
     const val WEB_BASE_URL = "https://orderflow-topaz.vercel.app"
+    const val WEB_HOST = "orderflow-topaz.vercel.app"
+
+    // Firebase email-link (passwordless) sign-in domain; must match the manifest intent filter.
+    const val FIREBASE_AUTH_LINK_HOST = "gen-lang-client-0196712383.firebaseapp.com"
 
     // Collections in Firestore
     const val COL_USER_PROFILES = "userProfiles"

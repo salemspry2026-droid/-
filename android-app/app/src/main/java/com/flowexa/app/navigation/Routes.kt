@@ -7,6 +7,7 @@ sealed class Routes(val route: String) {
     data object ForgotPassword : Routes("forgot_password")
     data object Onboarding : Routes("onboarding")
     data object PendingApproval : Routes("pending_approval")
+    data object ProfileRetry : Routes("profile_retry")
 
     // Admin / Staff Routes
     data object AdminHome : Routes("admin_home")

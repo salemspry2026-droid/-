@@ -41,6 +41,11 @@ service cloud.firestore {
       return isCompanyMember(companyId) && getUserRole() == 'sales';
     }
 
+    // Back-office staff only. Clients and pending employees are NOT staff.
+    function isCompanyStaff(companyId) {
+      return isCompanyAdmin(companyId) || isCompanySales(companyId);
+    }
+
     function isCompanyClient(companyId) {
       return isAuthenticated() && getUserRole() == 'client' && getUserCompanyId() == companyId;
     }
@@ -156,6 +161,23 @@ service cloud.firestore {
              isValidOptionalString('customerType', 0, 100) &&
              isValidOptionalString('appUserId', 0, 100) &&
              isValidOptionalString('customerTypeOther', 0, 100);
+    }
+
+    function isValidCustomerPhone(data) {
+      return hasRequiredFields(['companyId', 'customerId', 'phoneRaw', 'phoneNormalized', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted']) &&
+             isValidString(data.companyId, 1, 100) &&
+             isValidString(data.customerId, 1, 200) &&
+             isValidString(data.phoneRaw, 1, 50) &&
+             isValidString(data.phoneNormalized, 1, 30) &&
+             data.isDeleted is bool &&
+             isValidOptionalString('label', 0, 50) &&
+             (!('isPrimary' in data) || data.isPrimary is bool);
+    }
+
+    // The referenced customer must exist and belong to the SAME company as the phone record.
+    function customerBelongsToCompany(customerId, companyId) {
+      return exists(/databases/$(database)/documents/customers/$(customerId)) &&
+             get(/databases/$(database)/documents/customers/$(customerId)).data.companyId == companyId;
     }
 
     function isValidOrder(data) {
@@ -305,6 +327,38 @@ service cloud.firestore {
                       isCompanyAdmin(resource.data.companyId) || 
                       (isCompanySales(resource.data.companyId) && areImmutableFieldsUnchanged(['isDeleted']))
                     );
+    }
+
+    // Customer phone numbers (native Android: Room `customer_phones` <-> Firestore `customerPhones`).
+    // - Staff only (owner/admin/sales). Clients and pending employees get NO access.
+    // - Company isolation: every read/write is checked against the company stored ON THE RECORD
+    //   and the caller's own company; the record's customer must belong to the same company.
+    // - No hard deletes: removal is a soft delete (isDeleted = true), still subject to isolation.
+    //   Sales may soft-delete a phone because removing a number is an edit of the customer's
+    //   contacts (the web app lets sales edit `contactNumbers`); only admin/owner may delete a customer.
+    // - companyId / createdAt / createdBy are immutable. customerId may change only to another
+    //   customer of the SAME company (customer merge moves phones to the primary customer).
+    match /customerPhones/{phoneId} {
+      allow read: if isAuthenticated() && (isCompanyStaff(resource.data.companyId) || isSystemAdmin());
+
+      allow create: if isAuthenticated() &&
+                    isValidCustomerPhone(request.resource.data) &&
+                    isCreatedByCurrentUser() &&
+                    isUpdatedByCurrentUser() &&
+                    isCompanyStaff(request.resource.data.companyId) &&
+                    customerBelongsToCompany(request.resource.data.customerId, request.resource.data.companyId);
+
+      allow update: if isAuthenticated() &&
+                    isValidCustomerPhone(request.resource.data) &&
+                    isUpdatedByCurrentUser() &&
+                    areImmutableFieldsUnchanged(['createdAt', 'createdBy', 'companyId']) &&
+                    isCompanyStaff(resource.data.companyId) &&
+                    (
+                      request.resource.data.customerId == resource.data.customerId ||
+                      customerBelongsToCompany(request.resource.data.customerId, resource.data.companyId)
+                    );
+
+      allow delete: if false;
     }
 
     match /orders/{orderId} {

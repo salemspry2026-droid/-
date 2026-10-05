@@ -28,7 +28,7 @@
 | **Compose BOM** | 2024.09.02 |
 | **Room Database** | 2.6.1 |
 | **WorkManager** | 2.9.1 |
-| **Firebase BoM** | 34.19.0 (حزم أساسية غير KTX) |
+| **Firebase BoM** | 33.6.0 (مثبّت في `android-app/gradle/libs.versions.toml`) |
 | **Compile SDK / Target SDK** | 35 |
 | **Min SDK** | 24 (Android 7.0+) |
 

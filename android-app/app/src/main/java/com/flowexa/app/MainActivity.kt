@@ -9,24 +9,30 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.flowexa.app.core.AppConfig
+import com.flowexa.app.navigation.DeepLink
+import com.flowexa.app.navigation.DeepLinkParser
 import com.flowexa.app.navigation.FlowexaApp
 import com.flowexa.app.ui.theme.FlowexaTheme
 
 class MainActivity : ComponentActivity() {
 
-    private var initialCompanyId by mutableStateOf<String?>(null)
+    private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_Flowexa)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        handleIntent(intent)
+        // Only parse a launch intent once; after a configuration change / process restore the
+        // same intent would otherwise be replayed.
+        if (savedInstanceState == null) handleIntent(intent)
 
         setContent {
             FlowexaTheme {
                 FlowexaApp(
-                    initialCompanyId = initialCompanyId
+                    deepLink = pendingDeepLink,
+                    onDeepLinkHandled = { pendingDeepLink = null }
                 )
             }
         }
@@ -39,16 +45,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val data: Uri? = intent?.data
-        if (data != null) {
-            val path = data.path ?: ""
-            // Format: /c/{companyId}
-            if (path.startsWith("/c/")) {
-                val compId = path.removePrefix("/c/").trim()
-                if (compId.isNotEmpty()) {
-                    initialCompanyId = compId
-                }
-            }
+        val data: Uri = intent?.data ?: return
+        val link = DeepLinkParser.parse(
+            scheme = data.scheme,
+            host = data.host,
+            decodedPath = data.path,
+            fullUrl = data.toString(),
+            webHost = AppConfig.WEB_HOST,
+            firebaseAuthHost = AppConfig.FIREBASE_AUTH_LINK_HOST
+        )
+        if (link != null) {
+            pendingDeepLink = link
+            // Consume the data so the same URI is not re-processed on re-creation.
+            intent.data = null
         }
     }
 }

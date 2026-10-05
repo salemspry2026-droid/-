@@ -1,68 +1,67 @@
 package com.flowexa.app.domain
 
 import com.flowexa.app.data.local.entity.ProductEntity
-import org.json.JSONArray
 import kotlin.math.floor
 
 object BonusCalculator {
 
     /**
+     * Observability hook for malformed tier data. The application installs a logger in
+     * [com.flowexa.app.FlowexaApplication]; tests may install a collector.
+     * The default is a no-op so the domain layer has no Android dependency.
+     */
+    @Volatile
+    var parseErrorReporter: (productId: String, reason: String, cause: Throwable?) -> Unit =
+        { _, _, _ -> }
+
+    /**
      * Calculates the bonus quantity for a product given ordered quantity and invoiceType.
      * Supports:
      * - "fixed": percentage bonus (e.g. 10% bonus on 20 = 2)
-     * - "tiered": dynamic tiers from product.bonusTiersJson with minQty, maxQty, percent or bonusQty
+     * - "tiered": tiers from product.bonusTiersJson with minQty, maxQty, percent or bonus/bonusQty
      * - "none": zero bonus
+     *
+     * Malformed tier JSON yields 0.0 AND is reported through [parseErrorReporter].
      */
     fun calculateBonus(product: ProductEntity, quantity: Double, invoiceType: String = "cash"): Double {
         if (quantity <= 0.0) return 0.0
 
         return when (product.bonusType) {
-            "fixed" -> {
-                val percent = product.bonusFixedPercent ?: 0.0
-                if (percent > 0.0) {
-                    floor(quantity * (percent / 100.0))
-                } else 0.0
-            }
+            "fixed" -> fixedBonus(product.bonusFixedPercent, quantity)
             "tiered" -> {
-                if (product.bonusTiersJson.isNullOrBlank() || product.bonusTiersJson == "[]") {
-                    return 0.0
-                }
-                try {
-                    val tiers = JSONArray(product.bonusTiersJson)
-                    var bestBonus = 0.0
-                    var bestMinQty = -1.0
-
-                    for (i in 0 until tiers.length()) {
-                        val tier = tiers.getJSONObject(i)
-                        val minQty = tier.optDouble("minQty", tier.optDouble("quantity", 0.0))
-                        val maxQty = if (tier.has("maxQty") && !tier.isNull("maxQty")) {
-                            tier.optDouble("maxQty", Double.MAX_VALUE)
-                        } else {
-                            Double.MAX_VALUE
-                        }
-                        val tierInvoiceType = tier.optString("invoiceType", "all")
-                        val invoiceMatches = tierInvoiceType == "all" || tierInvoiceType.equals(invoiceType, ignoreCase = true)
-
-                        if (quantity >= minQty && quantity <= maxQty && invoiceMatches) {
-                            if (minQty >= bestMinQty) {
-                                bestMinQty = minQty
-                                val percent = tier.optDouble("percent", 0.0)
-                                val fixedBonus = tier.optDouble("bonus", tier.optDouble("bonusQty", 0.0))
-
-                                bestBonus = if (percent > 0.0) {
-                                    floor(quantity * (percent / 100.0))
-                                } else {
-                                    fixedBonus
-                                }
-                            }
-                        }
+                when (val parsed = BonusTierParser.parse(product.bonusTiersJson)) {
+                    is TierParseResult.Success -> calculateTieredBonus(parsed.tiers, quantity, invoiceType)
+                    is TierParseResult.Failure -> {
+                        parseErrorReporter(product.id, parsed.reason, parsed.cause)
+                        0.0
                     }
-                    bestBonus
-                } catch (_: Exception) {
-                    0.0
                 }
             }
             else -> 0.0
         }
+    }
+
+    /** Pure calculation over typed tiers. No JSON, no Android. */
+    fun calculateTieredBonus(tiers: List<BonusTier>, quantity: Double, invoiceType: String = "cash"): Double {
+        if (quantity <= 0.0) return 0.0
+
+        var best: BonusTier? = null
+        for (tier in tiers) {
+            if (!tier.appliesTo(quantity, invoiceType)) continue
+            // The tier with the highest minQty wins; on a tie the later tier wins.
+            if (best == null || tier.minQty >= best.minQty) best = tier
+        }
+        val chosen = best ?: return 0.0
+
+        return if (chosen.percent > 0.0) {
+            floor(quantity * (chosen.percent / 100.0))
+        } else {
+            chosen.fixedBonus
+        }
+    }
+
+    private fun fixedBonus(percent: Double?, quantity: Double): Double {
+        val p = percent ?: 0.0
+        return if (p > 0.0) floor(quantity * (p / 100.0)) else 0.0
     }
 }

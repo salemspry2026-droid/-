@@ -69,9 +69,17 @@ interface OrderDao {
     @Query("UPDATE orders SET syncState = :state WHERE id = :id")
     suspend fun updateSyncState(id: String, state: String)
 
+    @Query("DELETE FROM order_items WHERE orderId = :orderId")
+    suspend fun deleteOrderItems(orderId: String)
+
+    /**
+     * Replaces ONE order and its items atomically: the order's existing local items are removed
+     * first, so items that no longer exist remotely do not linger. Only [order].id is touched.
+     */
     @Transaction
     suspend fun saveOrderWithItems(order: OrderEntity, items: List<OrderItemEntity>) {
         insertOrder(order)
+        deleteOrderItems(order.id)
         insertOrderItems(items)
     }
 }

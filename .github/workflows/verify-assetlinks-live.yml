@@ -1,0 +1,31 @@
+name: Verify Live assetlinks.json
+
+# Separate from the Android build on purpose: Vercel and GitHub Actions deploy at different
+# times, so the Android build must not fail because of a deployment race.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/.well-known/assetlinks.json'
+      - 'android-app/signing/expected-signer-sha256.txt'
+      - 'scripts/ci/**'
+      - '.github/workflows/verify-assetlinks-live.yml'
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrying live check
+        run: bash scripts/ci/verify-assetlinks-live.sh
+        env:
+          SITE_URL: https://orderflow-topaz.vercel.app
+          MAX_ATTEMPTS: '30'
+          SLEEP_SECONDS: '30'

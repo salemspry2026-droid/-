@@ -7,8 +7,11 @@ import android.net.NetworkRequest
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,7 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
+import com.flowexa.app.ui.auth.EmailLinkDialog
+import com.flowexa.app.ui.auth.ProfileRetryScreen
 import com.flowexa.app.auth.GoogleAuthManager
 import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
@@ -54,7 +60,8 @@ import java.util.UUID
 
 @Composable
 fun FlowexaApp(
-    initialCompanyId: String? = null
+    deepLink: DeepLink? = null,
+    onDeepLinkHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -123,20 +130,110 @@ fun FlowexaApp(
         }
     }
 
-    // Deep link redirect
-    LaunchedEffect(initialCompanyId) {
-        if (!initialCompanyId.isNullOrEmpty()) {
-            navController.navigate(Routes.PublicCatalog.createRoute(initialCompanyId))
-        }
-    }
-
     // Auth state loading
     var isAuthLoading by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
     var resetSuccess by remember { mutableStateOf(false) }
+    var isProfileRetrying by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: ""
+
+    /**
+     * Single place that routes a signed-in user. A network failure is NEVER interpreted as
+     * "user has no profile": that case goes to ProfileRetry, not Onboarding.
+     */
+    suspend fun routeAfterAuth(uid: String) {
+        val target: String = when (val r = authRepo.loadProfile(uid)) {
+            is ProfileLoadResult.Found -> {
+                val profile = r.profile
+                when {
+                    profile.role == AppConfig.ROLE_PENDING_EMPLOYEE -> Routes.PendingApproval.route
+                    profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT -> Routes.Onboarding.route
+                    profile.role == AppConfig.ROLE_CLIENT -> Routes.ClientHome.route
+                    else -> Routes.AdminHome.route
+                }
+            }
+            ProfileLoadResult.NotFound -> Routes.Onboarding.route
+            is ProfileLoadResult.Unavailable -> Routes.ProfileRetry.route
+        }
+        navController.navigate(target) {
+            // Clear Splash / Login / Register / retry from the back stack without a redirect loop.
+            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    // ---- Deep links ---------------------------------------------------------------------
+    // Public catalog: wait until the start-up routing left Splash, otherwise Splash's own
+    // popUpTo(inclusive) would also remove the catalog destination.
+    LaunchedEffect(deepLink, currentRoute) {
+        val link = deepLink
+        if (link is DeepLink.PublicCatalog && currentRoute.isNotEmpty() && currentRoute != Routes.Splash.route) {
+            navController.navigate(Routes.PublicCatalog.createRoute(link.companyId)) {
+                launchSingleTop = true
+            }
+            onDeepLinkHandled()
+        }
+    }
+
+    // Firebase email-link sign-in (kept separate from catalog links).
+    var emailLinkPending by remember { mutableStateOf<String?>(null) }
+    var emailLinkError by remember { mutableStateOf<String?>(null) }
+    var emailLinkLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(deepLink) {
+        val link = deepLink
+        if (link is DeepLink.EmailSignIn) {
+            if (authRepo.isEmailSignInLink(link.link)) {
+                emailLinkPending = link.link
+                emailLinkError = null
+            } else {
+                emailLinkPending = ""   // shows the dialog in an error state (invalid/expired link)
+                emailLinkError = "رابط تسجيل الدخول غير صالح أو منتهي الصلاحية."
+            }
+            onDeepLinkHandled()
+        }
+    }
+    if (emailLinkPending != null) {
+        val link = emailLinkPending!!
+        if (link.isEmpty()) {
+            AlertDialog(
+                onDismissRequest = { emailLinkPending = null; emailLinkError = null },
+                title = { Text("تعذر تسجيل الدخول") },
+                text = { Text(emailLinkError ?: "رابط غير صالح") },
+                confirmButton = {
+                    TextButton(onClick = { emailLinkPending = null; emailLinkError = null }) { Text("حسنًا") }
+                }
+            )
+        } else {
+            EmailLinkDialog(
+                isLoading = emailLinkLoading,
+                errorMessage = emailLinkError,
+                onConfirm = { email ->
+                    coroutineScope.launch {
+                        emailLinkLoading = true
+                        emailLinkError = null
+                        val res = authRepo.completeEmailLinkSignIn(email, link)
+                        emailLinkLoading = false
+                        res.onSuccess {
+                            emailLinkPending = null
+                            authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
+                        }.onFailure { err ->
+                            emailLinkError = when (err) {
+                                is com.google.firebase.auth.FirebaseAuthActionCodeException ->
+                                    "الرابط منتهي الصلاحية أو سبق استخدامه. اطلب رابطًا جديدًا."
+                                is com.google.firebase.auth.FirebaseAuthInvalidUserException,
+                                is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
+                                    "البريد الإلكتروني لا يطابق الرابط."
+                                else -> "تعذر إكمال تسجيل الدخول. تحقق من الاتصال وحاول مجددًا."
+                            }
+                        }
+                    }
+                },
+                onDismiss = { emailLinkPending = null; emailLinkError = null }
+            )
+        }
+    }
 
     val showBars = currentRoute in listOf(
         Routes.AdminHome.route,
@@ -205,49 +302,44 @@ fun FlowexaApp(
                             popUpTo(Routes.Splash.route) { inclusive = true }
                         }
                     } else {
-                        var profile = authRepo.getCachedProfile(user.uid)
-                        if (profile == null) {
-                            val remoteRes = authRepo.refreshUserProfile(user.uid)
-                            profile = remoteRes.getOrNull()
-                        } else {
-                            coroutineScope.launch {
-                                authRepo.refreshUserProfile(user.uid)
-                            }
+                        // Refresh in the background when a cached profile exists (offline-first).
+                        if (authRepo.getCachedProfile(user.uid) != null) {
+                            coroutineScope.launch { authRepo.refreshUserProfile(user.uid) }
                         }
-
-                        if (profile != null) {
-                            when {
-                                profile.role == AppConfig.ROLE_PENDING_EMPLOYEE -> {
-                                    navController.navigate(Routes.PendingApproval.route) {
-                                        popUpTo(Routes.Splash.route) { inclusive = true }
-                                    }
-                                }
-                                profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT -> {
-                                    navController.navigate(Routes.Onboarding.route) {
-                                        popUpTo(Routes.Splash.route) { inclusive = true }
-                                    }
-                                }
-                                profile.role == AppConfig.ROLE_CLIENT -> {
-                                    navController.navigate(Routes.ClientHome.route) {
-                                        popUpTo(Routes.Splash.route) { inclusive = true }
-                                    }
-                                }
-                                else -> {
-                                    navController.navigate(Routes.AdminHome.route) {
-                                        popUpTo(Routes.Splash.route) { inclusive = true }
-                                    }
-                                }
-                            }
-                        } else {
-                            navController.navigate(Routes.Onboarding.route) {
-                                popUpTo(Routes.Splash.route) { inclusive = true }
-                            }
-                        }
+                        routeAfterAuth(user.uid)
                     }
                 }
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = FlowexaBlue)
                 }
+            }
+
+            composable(Routes.ProfileRetry.route) {
+                ProfileRetryScreen(
+                    isRetrying = isProfileRetrying,
+                    onRetry = {
+                        coroutineScope.launch {
+                            val uid = authRepo.currentUser?.uid
+                            if (uid == null) {
+                                navController.navigate(Routes.Login.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                }
+                            } else {
+                                isProfileRetrying = true
+                                routeAfterAuth(uid)
+                                isProfileRetrying = false
+                            }
+                        }
+                    },
+                    onLogout = {
+                        coroutineScope.launch {
+                            authRepo.logout()
+                            navController.navigate(Routes.Login.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            }
+                        }
+                    }
+                )
             }
 
             composable(Routes.Login.route) {
@@ -259,29 +351,19 @@ fun FlowexaApp(
                             val res = authRepo.login(email, pass)
                             isAuthLoading = false
                             res.onSuccess {
-                                val user = authRepo.currentUser
-                                if (user != null) {
-                                    val profile = authRepo.fetchAndCacheUserProfile(user.uid)
-                                    if (profile.role == AppConfig.ROLE_PENDING_EMPLOYEE) {
-                                        navController.navigate(Routes.PendingApproval.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    } else if (profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT) {
-                                        navController.navigate(Routes.Onboarding.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    } else if (profile.role == AppConfig.ROLE_CLIENT) {
-                                        navController.navigate(Routes.ClientHome.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    } else {
-                                        navController.navigate(Routes.AdminHome.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    }
-                                }
+                                authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
                             }.onFailure { err ->
-                                authError = err.message ?: "فشل تسجيل الدخول"
+                                if (err is ProfileUnavailableException) {
+                                    navController.navigate(Routes.ProfileRetry.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                    }
+                                } else if (err is ProfileNotFoundException) {
+                                    navController.navigate(Routes.Onboarding.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                    }
+                                } else {
+                                    authError = err.message ?: "فشل تسجيل الدخول"
+                                }
                             }
                         }
                     },
@@ -292,23 +374,7 @@ fun FlowexaApp(
                             val res = googleAuthManager.signInWithGoogle()
                             isAuthLoading = false
                             res.onSuccess {
-                                val user = authRepo.currentUser
-                                if (user != null) {
-                                    val profile = authRepo.fetchAndCacheUserProfile(user.uid)
-                                    if (profile.companyId.isNullOrEmpty() && profile.role != AppConfig.ROLE_CLIENT) {
-                                        navController.navigate(Routes.Onboarding.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    } else if (profile.role == AppConfig.ROLE_CLIENT) {
-                                        navController.navigate(Routes.ClientHome.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    } else {
-                                        navController.navigate(Routes.AdminHome.route) {
-                                            popUpTo(Routes.Login.route) { inclusive = true }
-                                        }
-                                    }
-                                }
+                                authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
                             }.onFailure { err ->
                                 authError = err.message ?: "فشل تسجيل الدخول عبر Google"
                             }
@@ -334,7 +400,12 @@ fun FlowexaApp(
                                     popUpTo(Routes.Register.route) { inclusive = true }
                                 }
                             }.onFailure { err ->
-                                authError = err.message ?: "فشل إنشاء الحساب"
+                                if (err is ProfileUnavailableException || err is ProfileNotFoundException) {
+                                    // Account + profile document were just created; only the local read failed.
+                                    authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
+                                } else {
+                                    authError = err.message ?: "فشل إنشاء الحساب"
+                                }
                             }
                         }
                     },

@@ -1,39 +1,49 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# =============================================================================
+#  Flowexa Android - local helper
+# =============================================================================
+#  The OFFICIAL Android build is GitHub Actions (.github/workflows/build-flowexa-apk.yml).
+#  Reasons:
+#    - it injects the production keystore and google-services.json from GitHub Secrets,
+#    - it derives versionName/versionCode from the tag / run number,
+#    - it validates ZIP, zipalign, apksigner, the expected production signer and assetlinks,
+#    - it installs and launches the exact APK on an Android 35 emulator before publishing.
+#
+#  A local release build cannot reproduce that (and on ARM64/Termux the x86-64 AAPT2 shipped by
+#  AGP does not run at all), so this script deliberately does NOT build a release APK.
+#
+#  Usage:
+#    scripts/build-apk.sh            -> prints how to build/download the official APK
+#    scripts/build-apk.sh --check    -> static checks only (no Gradle, no packaging)
+# =============================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ANDROID_APP_DIR="$ROOT_DIR/android-app"
-SDK_DIR="${ANDROID_HOME:-/opt/android-sdk}"
-OUT_DIR="$ROOT_DIR/public/downloads"
-OUT_APK="$OUT_DIR/flowexa.apk"
+REPO_SLUG="salemspry2026-droid/-"
 
-export ANDROID_HOME="$SDK_DIR"
-export ANDROID_SDK_ROOT="$SDK_DIR"
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
-export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-
-mkdir -p "$OUT_DIR"
-
-if [ ! -d "$ANDROID_APP_DIR" ]; then
-  echo "ERROR: Official Android application directory 'android-app' does not exist." >&2
-  exit 1
+if [[ "${1:-}" == "--check" ]]; then
+  fail=0
+  [[ -d "$ROOT_DIR/android-app" ]] || { echo "ERROR: android-app/ is missing" >&2; fail=1; }
+  grep -q 'applicationId = "com.flowexa.app"' "$ROOT_DIR/android-app/app/build.gradle.kts" \
+    || { echo "ERROR: applicationId must stay com.flowexa.app" >&2; fail=1; }
+  if grep -q 'fallbackToDestructiveMigration' -r "$ROOT_DIR/android-app/app/src/main"; then
+    echo "ERROR: destructive Room migration must not be used" >&2; fail=1
+  fi
+  if git -C "$ROOT_DIR" ls-files --error-unmatch android-app/app/google-services.json >/dev/null 2>&1; then
+    echo "ERROR: google-services.json must not be tracked by Git" >&2; fail=1
+  fi
+  [[ $fail -eq 0 ]] && echo "Static checks passed."
+  exit $fail
 fi
 
-chmod +x "$ANDROID_APP_DIR/gradlew"
-cd "$ANDROID_APP_DIR"
+cat <<MSG
+Official Flowexa Android builds are produced by GitHub Actions, not locally.
 
-echo "Building official Native Android App from android-app/..."
-./gradlew assembleRelease --no-daemon
+  1) Push to main (changes under android-app/ trigger the workflow) or run it manually:
+       https://github.com/${REPO_SLUG}/actions/workflows/build-flowexa-apk.yml
+  2) When all jobs are green the APK is published as:
+       https://github.com/${REPO_SLUG}/releases/latest/download/Flowexa.apk
+     (the website route /api/download-apk redirects there).
 
-SRC_APK=$(find "$ANDROID_APP_DIR/app/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
-
-if [ -z "$SRC_APK" ] || [ ! -f "$SRC_APK" ]; then
-  echo "ERROR: Release APK was not found in $ANDROID_APP_DIR/app/build/outputs/apk/release" >&2
-  exit 1
-fi
-
-cp "$SRC_APK" "$OUT_APK"
-cp "$SRC_APK" "$OUT_DIR/Flowexa.apk"
-
-echo "SUCCESS: Official Native APK generated at: $OUT_APK"
-ls -lh "$OUT_APK"
+Nothing was built. Use "$0 --check" for lightweight static checks.
+MSG

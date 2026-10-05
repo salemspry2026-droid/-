@@ -158,6 +158,16 @@ dependencies {
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
+    // The Android stub jar used by JVM unit tests throws "Method ... not mocked" for org.json.
+    // BonusTierParser is the only domain class that uses org.json, so tests get a real, pinned
+    // implementation. It is test-only and never ships in the APK.
+    testImplementation("org.json:json:20240303")
+
+    // Instrumented tests (emulator): migration test
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.sqlite:sqlite-framework:2.4.0")
 }
 
 ksp {
