@@ -1,18 +1,66 @@
 {
-"$schema": "https://opencode.ai/config.json",
-"provider": {
-"unorouter": {
-"name": "UnoRouter",
-"npm": "@ai-sdk/openai-compatible",
-"options": {
-"baseURL": "https://api.unorouter.com/v1",
-"apiKey": "{env:OPENAI_API_KEY}"
-},
-"models": {
-"deepseek-v4.1-flash:free": {
-"name": "deepseek4.1"
-}
-}
-}
-}
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "unorouter-live": {
+      "name": "UnoRouter",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://api.unorouter.com/v1",
+        "apiKey": "{env:OPENAI_API_KEY}"
+      },
+      "models": {
+        "gpt-oss-120b:free": {
+          "name": "GPT-OSS 120B Free"
+        },
+        "gpt-oss-20b:free": {
+          "name": "GPT-OSS 20B Free"
+        },
+        "deepseek-v4-pro:free": {
+          "name": "DeepSeek V4 Pro Free"
+        },
+        "deepseek-v4.1-flash:free": {
+          "name": "DeepSeek V4.1 Flash Free"
+        },
+        "deepseek-v4-flash:free": {
+          "name": "DeepSeek V4 Flash Free"
+        },
+        "mimo-v2.6-pro:free": {
+          "name": "Mimo V2.6 Pro Free"
+        },
+        "mimo-v2.6-flash:free": {
+          "name": "Mimo V2.6 Flash Free"
+        },
+        "axon-1.8-pro:free": {
+          "name": "Axon 1.8 Pro Free"
+        },
+        "axon-1.8-flash:free": {
+          "name": "Axon 1.8 Flash Free"
+        },
+        "axon-1.8-lightning:free": {
+          "name": "Axon 1.8 Lightning Free"
+        },
+        "qwen3.8-flash-next:free": {
+          "name": "Qwen 3.8 Flash Next Free"
+        },
+        "qwen3.6-plus:free": {
+          "name": "Qwen 3.6 Plus Free"
+        },
+        "qwen2.5-coder-32b:free": {
+          "name": "Qwen 2.5 Coder 32B Free"
+        },
+        "kimi-k3:free": {
+          "name": "Kimi K3 Free"
+        },
+        "intern-s2:free": {
+          "name": "Intern S2 Free"
+        },
+        "space-bunny-alpha:free": {
+          "name": "Space Bunny Alpha Free"
+        },
+        "atria-dawn-preview:free": {
+          "name": "Atria Dawn Preview Free"
+        }
+      }
+    }
+  }
 }
