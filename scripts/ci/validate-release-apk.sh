@@ -74,10 +74,9 @@ if ! grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigne
   exit 1
 fi
 
-RAW_SIGNER=$(grep -i "Signer #1 certificate SHA-256 digest:" apksigner.txt | head -n1 | awk '{print $NF}')
-SIGNER=$($FP normalize "$RAW_SIGNER")
+SIGNER=$($FP certs apksigner.txt)
 # Public value: printed on purpose so it can be copied into the expected-signer file / assetlinks.
-echo "Release signer SHA-256: $($FP pretty "$RAW_SIGNER")"
+echo "Release signer SHA-256: $($FP pretty "$SIGNER")"
 
 echo "==> 5. Signer == expected production signer"
 EXPECTED=$($FP expected "$ROOT/android-app/signing/expected-signer-sha256.txt") || {

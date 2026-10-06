@@ -6,6 +6,12 @@ import sys
 
 HEX_RE = re.compile(r"^[0-9A-F]{64}$")
 
+# Marker used by every apksigner/build-tools version for the signer certificate digest.
+# Both the modern format ("Signer #1 certificate SHA-256 digest: <hex>") and the older
+# scheme format ("V2 Signer: certificate SHA-256 digest: <hex>" / "V3 Signer: ...") share
+# this exact context marker. We parse based on this context, never on a bare hex regex.
+CERT_DIGEST_MARKER = "certificate sha-256 digest:"
+
 
 def normalize(value: str) -> str:
     """'ab:cd:..' / 'ABCD..' -> 64 upper-case hex digits (no colons). Raises on bad input."""
@@ -41,6 +47,34 @@ def assetlinks_fingerprints(raw: str, package: str) -> list:
     return found
 
 
+def extract_cert_digests(apksigner_output: str) -> list:
+    """All unique signer certificate SHA-256 digests in raw apksigner output.
+
+    Parses every line containing the certificate-digest context marker and normalizes the
+    value. Ignores the public-key digest and the source-stamp signer (that is not the APK
+    signer identity). If apksigner output has multiple certificate digests that normalize
+    to the same fingerprint they are deduplicated safely; different values are all kept so
+    the caller can reject the conflict (fail closed) instead of silently picking one.
+    """
+    found = []
+    for line in apksigner_output.splitlines():
+        low = line.lower()
+        idx = low.find(CERT_DIGEST_MARKER)
+        if idx < 0:
+            continue  # not a certificate-digest context line (public keys etc. are excluded)
+        prefix = low[:idx].strip()
+        if "stamp" in prefix:
+            continue  # source-stamp signer is not the APK signer
+        value = line[idx + len(CERT_DIGEST_MARKER):].strip()
+        try:
+            norm = normalize(value)
+        except ValueError:
+            continue  # malformed candidate; if nothing valid remains the caller fails closed
+        if norm not in found:
+            found.append(norm)
+    return found
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1]
     try:
@@ -56,6 +90,24 @@ if __name__ == "__main__":
             raw = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
             for fp in assetlinks_fingerprints(raw, sys.argv[3]):
                 print(fp)
+        elif cmd == "certs":
+            # usage: certs <file-or-'-'> ; reads apksigner output and prints the single
+            # normalized signer certificate SHA-256 digest. Fails closed on no digest,
+            # malformed digest, or conflicting digests.
+            src = sys.argv[2]
+            raw = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+            found = extract_cert_digests(raw)
+            if not found:
+                raise ValueError(
+                    "no signer certificate SHA-256 digest found in apksigner output: "
+                    "certificate context missing; refusing to continue"
+                )
+            if len(found) > 1:
+                raise ValueError(
+                    "multiple conflicting signer certificate SHA-256 digests found in "
+                    "apksigner output: %s; refusing to pick one" % ", ".join(found)
+                )
+            print(found[0])
         else:
             sys.exit("unknown command " + cmd)
     except (ValueError, json.JSONDecodeError, OSError) as exc:
