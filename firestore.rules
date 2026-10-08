@@ -50,6 +50,16 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == 'client' && getUserCompanyId() == companyId;
     }
 
+    // T01: A user may create their own profile only as a `client`, a `pending_employee`,
+    // or as the `owner` of a company they actually own (`ownerId == uid`). This blocks
+    // self-escalation to owner/admin/sales and cross-tenant takeover (KI-001).
+    function isSafeSelfProfileCreate(data) {
+      return data.role in ['client', 'pending_employee'] ||
+             (data.role == 'owner' && data.companyId is string &&
+              exists(/databases/$(database)/documents/companies/$(data.companyId)) &&
+              get(/databases/$(database)/documents/companies/$(data.companyId)).data.ownerId == request.auth.uid);
+    }
+
     function isSystemAdmin() {
       return isAuthenticated() && request.auth.token.email == "salemspry2026@gmail.com" && request.auth.token.email_verified == true;
     }
@@ -271,22 +281,41 @@ service cloud.firestore {
                     (resource != null && ('companyId' in resource.data) && isCompanyAdmin(resource.data.companyId))
                   );
       
-      allow create: if isAuthenticated() && 
+      // T01 (KI-001): create is limited to `client`/`pending_employee` profiles, or an
+      // `owner` profile for a company the caller actually owns (ownerId == uid).
+      // Previously any authenticated user could self-create as `owner`/`admin`/`sales`
+      // of any company (cross-tenant takeover). Legitimate Web onboarding
+      // (joinAsEmployee/joinAsClient/createCompany) still passes.
+      allow create: if isAuthenticated() &&
                     request.auth.uid == userId &&
-                    isValidUserProfile(request.resource.data) && 
-                    isCreatedByCurrentUser() && 
+                    isValidUserProfile(request.resource.data) &&
+                    isSafeSelfProfileCreate(request.resource.data) &&
+                    isCreatedByCurrentUser() &&
                     isUpdatedByCurrentUser();
 
-      allow update: if isAuthenticated() && 
-                    isValidUserProfile(request.resource.data) && 
-                    isUpdatedByCurrentUser() && 
+      // T01 (KI-002): self-update may not change `role` or `permissions`, and may change
+      // `companyId` only while the current role is `client`/`pending_employee` (the Web
+      // client model uses companyId ''; Android clients/pending users have a companyId).
+      // Admin/owner updates are limited to non-owner members, cannot set `role: owner`,
+      // cannot move a member to another company, and still cover the pending-approval
+      // (companyId = pendingCompanyId) and rejection (companyId == '') flows.
+      // System admin is unaffected.
+      // NOTE: The employee-removal extension proposed in the T01 amendment is
+      // intentionally NOT implemented (blocked by OPEN-008); see DECISIONS.md.
+      allow update: if isAuthenticated() &&
+                    isValidUserProfile(request.resource.data) &&
+                    isUpdatedByCurrentUser() &&
                     areImmutableFieldsUnchanged(['createdAt', 'createdBy']) &&
                     (
-                      (request.auth.uid == userId && areImmutableFieldsUnchanged(['role'])) || 
-                      (resource != null && (
-                        isCompanyAdmin(resource.data.companyId) || 
-                        (('pendingCompanyId' in resource.data) && resource.data.pendingCompanyId != null && isCompanyAdmin(resource.data.pendingCompanyId))
-                      )) || 
+                      (request.auth.uid == userId &&
+                       areImmutableFieldsUnchanged(['role', 'permissions']) &&
+                       (resource.data.role in ['client', 'pending_employee'] || areImmutableFieldsUnchanged(['companyId']))) ||
+                      (resource != null && resource.data.role != 'owner' && request.resource.data.role != 'owner' && (
+                        (isCompanyAdmin(resource.data.companyId) && request.resource.data.companyId == resource.data.companyId) ||
+                        (('pendingCompanyId' in resource.data) && resource.data.pendingCompanyId != null &&
+                         isCompanyAdmin(resource.data.pendingCompanyId) &&
+                         (request.resource.data.companyId == resource.data.pendingCompanyId || request.resource.data.companyId == ''))
+                      )) ||
                       isSystemAdmin()
                     );
     }
