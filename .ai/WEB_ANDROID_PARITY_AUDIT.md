@@ -101,17 +101,31 @@ Static analysis of both codebases completed. 38 parity items documented.
 ### Stage 2 — Evidence-Based Gap Analysis ✅ COMPLETE
 All P0/P1/P2 items verified against source code. No runtime testing performed (per constraints).
 
-### Stage 3 — Implementation (this session)
-Fixes are applied in order of severity. Each fix is commit-separable.
+### Stage 3 — Implementation (this session) ✅ COMPLETE
+Fixes applied in severity order across commits `4067bf4` (core fixes) and `3541ad3` (compilation fix).
+- **C-09** (P0): `AuthRepository.register()` — removed pre-created client profile; Onboarding now creates profile.
+- **C-04** (P1): `OrderStageRepository` — added `getFirstStageName()`; `FlowexaApp` passes it as `initialStatus` to `createOrder()`.
+- **KI-007** (P1): `FlowexaApp` logout — both call sites now call `db.clearAllTables()` + `WorkManager.cancelAllWork()`.
+- **KI-010** (P1): `CompanyRepository.joinAsEmployee()` — notification type → `"join_request"`; added `userId`/`userEmail`/`userName`/`isDeleted=false`.
+- **KI-014** (P1): `FlowexaApp` — client order source changed from `"client"` to `"customer"`.
+- **KI-011** (P2): `SyncEngine.syncCompanyData()` — step 11 syncs userProfiles for owner/admin roles.
+- **KI-016** (P2): `AuthRepository` — added `sendSignInLinkToEmail()`; `LoginScreen` — added send-link button.
+- **Compilation fix** (commit `3541ad3`): Added `import androidx.work.WorkManager`; extended `NotificationEntity` with `userId`/`userEmail`/`userName`.
 
-### Stage 4 — Commit & Push
-All changes committed to `main` branch.
+### Stage 4 — Commit & Push ✅ COMPLETE
+All changes committed to `main`: `4067bf4`, `3541ad3`.
 
-### Stage 5 — GitHub Actions Verification
-CI build triggered; results documented.
+### Stage 5 — GitHub Actions Verification ✅ COMPLETE
+CI run `38339290232` — all 4 jobs PASSED:
+- Build and Validate Flowexa Native APK ✅ (2m13s)
+- Instrumented Room migration test ✅ (4m59s)
+- Runtime Smoke Test (Android 35 emulator) ✅ (2m13s)
+- Publish GitHub Release ✅ (10s)
 
-### Stage 6 — Documentation Update
-`.ai/PROJECT_STATE.md`, `.ai/CHANGELOG.md`, `.ai/WEB_ANDROID_PARITY.md` updated.
+### Stage 6 — Documentation Update ✅ COMPLETE
+`.ai/PROJECT_STATE.md` — C-04 and C-09 marked RESOLVED.
+`.ai/KNOWN_ISSUES.md` — KI-007, KI-010, KI-011, KI-014, KI-016 marked FIXED.
+`.ai/CHANGELOG.md` — entry added for 2026-10-13 batch.
 
 ---
 
@@ -142,7 +156,7 @@ CI build triggered; results documented.
 
 ## Remaining Work (Post-Implementation)
 
-1. **P2 items**: KI-011 (staff sync), KI-016 (email-link send UI), C-06 (PermissionManager integration)
+1. **P2 items**: C-06 (PermissionManager integration — still OPEN)
 2. **Feature gaps**: P-28 (Gemini AI), P-32 (client home enhancements), P-33 (call recordings), P-35 (product form depth)
 3. **Runtime verification**: P-05 (Google OAuth), P-18 (special offers cart), P-20 (deep links live), P-26 (visual parity)
-4. **EXTERNAL VERIFICATION REQUIRED**: V1 (deployed rules), V2 (Google Sign-In/OAuth), V3 (app links), V4 (CI run)
+4. **EXTERNAL VERIFICATION REQUIRED**: V1 (deployed rules), V2 (Google Sign-In/OAuth), V3 (app links), V4 (CI run ✅ complete)

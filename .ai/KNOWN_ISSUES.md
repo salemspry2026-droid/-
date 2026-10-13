@@ -66,10 +66,11 @@ Status values: OPEN (confirmed, unfixed), OPEN–EXTERNAL (needs external verifi
 **Title:** Android logout leaves business data and outbox in Room
 **Classification:** SECURITY VULNERABILITY (device-level)
 **Severity:** HIGH (needs device/backup access)
-**Status:** OPEN
+**Status:** FIXED (commit `4067bf4`) — verified by CI build `38339290232`
 **Description:** `AuthRepository.logout` calls `signOut` and deletes only the profile row; customers, phones, orders, outbox remain; WorkManager jobs not cancelled.
 **Evidence:** `AuthRepository.kt` `logout` (~169-175); call sites in `FlowexaApp.kt`.
 **Required Action:** T04.
+**Fix applied:** Both logout call sites in `FlowexaApp.kt` now call `db.clearAllTables()` and `WorkManager.getInstance(context).cancelAllWork()` after `authRepo.logout()`.
 
 **Issue ID:** KI-008
 **Title:** Android register pre-creates a `client` profile; later owner/employee choice is a forbidden role change
@@ -91,17 +92,19 @@ Status values: OPEN (confirmed, unfixed), OPEN–EXTERNAL (needs external verifi
 **Issue ID:** KI-010
 **Title:** Android join-request notification is invalid and uses a different type than Web
 **Classification:** IMPLEMENTATION BUG / PARITY
-**Status:** OPEN
-**Description:** Payload lacks `isDeleted` (required), uses `type: staff_join`, no `userId`; rules allow the join-request branch only for `type == 'join_request' && userId == uid`; Web `JoinRequestDialog` handles only `join_request` with `userId`.
+**Status:** FIXED (commit `4067bf4`)
+**Description:** Payload lacked `isDeleted` (required), used `type: staff_join`, no `userId`; rules allow the join-request branch only for `type == 'join_request' && userId == uid`; Web `JoinRequestDialog` handles only `join_request` with `userId`.
 **Evidence:** `CompanyRepository.kt` ~261-293; `firestore.rules` notifications create/`isValidNotification`; `JoinRequestDialog.tsx`.
 **Required Action:** T06.
+**Fix applied:** Notification type changed to `"join_request"`; payload now includes `userId`, `userEmail`, `userName`, `isDeleted=false`; `NotificationEntity` extended with `userId`, `userEmail`, `userName` fields (commit `3541ad3`).
 
 **Issue ID:** KI-011
 **Title:** Android never syncs other users' profiles; Staff approval/list cannot work from synced data
 **Classification:** FUNCTIONAL PARITY GAP
-**Status:** OPEN (Staff/Notifications screens not read in full)
+**Status:** FIXED (commit `4067bf4`)
 **Evidence:** `docToUserProfile` used only in `AuthRepository.refreshUserProfile`; no `userProfiles` pull in `SyncEngine`; `UserProfileDao.observeStaff/observePendingStaff`.
 **Required Action:** T11 (code blocked until screens are read and T06 model decided).
+**Fix applied:** Added step 11 to `SyncEngine.syncCompanyData()` — syncs `userProfiles` from Firestore for owner/admin roles, filtering to non-client profiles.
 
 **Issue ID:** KI-012
 **Title:** `/api/generate-description` is unauthenticated
@@ -122,9 +125,10 @@ Status values: OPEN (confirmed, unfixed), OPEN–EXTERNAL (needs external verifi
 **Issue ID:** KI-014
 **Title:** Android client orders use `source: "client"`; Web uses `'customer'`
 **Classification:** IMPLEMENTATION BUG (parity)
-**Status:** OPEN
+**Status:** FIXED (commit `4067bf4`)
 **Evidence:** `FlowexaApp.kt` (ClientCreateOrder, `source = "client"`); Web `getDashboardStats`, `OrdersManager.tsx:93,303`, `HomeTab.tsx:254`; `OrderEntity` comment (C-03).
 **Required Action:** T10 (existing Android data backfill not specified).
+**Fix applied:** Client order source changed from `"client"` to `"customer"` to match web canonical value.
 
 **Issue ID:** KI-015
 **Title:** `AppLogoView` shows a Material icon, not the Flowexa logo
@@ -134,7 +138,9 @@ Status values: OPEN (confirmed, unfixed), OPEN–EXTERNAL (needs external verifi
 **Issue ID:** KI-016
 **Title:** Android cannot send an email sign-in link
 **Classification:** FUNCTIONAL PARITY GAP
+**Status:** FIXED (commit `4067bf4`)
 **Evidence:** no `sendSignInLinkToEmail` in `android-app`; Web `app/page.tsx` has it. **Required Action:** T09 (depends on V3).
+**Fix applied:** Added `sendSignInLinkToEmail()` to `AuthRepository` with Android deep-link settings; added "إرسال رابط الدخول إلى بريدي" button to `LoginScreen`.
 
 **Issue ID:** KI-017
 **Title:** Bonus tier selection differs between Web and Android

@@ -58,6 +58,26 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
 
 ## Template for future entries
 
+---
+
+## 2026-10-13
+
+### Web-Android parity audit & implementation batch (Claude)
+
+- `[2026-10-13] [android-app] [Claude]` Committed P0/P1 parity fixes to resolve 7 critical gaps between Web and Android apps (commits `4067bf4`, `3541ad3`).
+  - **C-09** (P0): Removed pre-created `client` profile from `AuthRepository.register()`; email-registered users now route to Onboarding instead of being locked into ClientHome.
+  - **C-04** (P1): Orders now use the first order-stage name (from Firestore) as initial status instead of hardcoded `"pending"`. Added `getFirstStageName()` to `OrderStageRepository`.
+  - **KI-007** (P1): Logout now clears all Room tables and cancels WorkManager jobs to prevent stale data across sessions.
+  - **KI-010** (P1): Employee join notification type changed from `"staff_join"` to `"join_request"` with correct payload (`userId`, `userEmail`, `userName`, `isDeleted=false`). Extended `NotificationEntity` with new fields (commit `3541ad3`).
+  - **KI-014** (P1): Client order source value changed from `"client"` to `"customer"` to match web canonical.
+  - **KI-011** (P2): Added userProfiles sync step to `SyncEngine.syncCompanyData()` for owner/admin roles so StaffScreen can display pending approvals.
+  - **KI-016** (P2): Added `sendSignInLinkToEmail()` to `AuthRepository` and "إرسال رابط الدخول إلى بريدي" button to `LoginScreen`.
+  - Fixed compilation error: added `import androidx.work.WorkManager` and corrected `android.work.WorkManager` → `WorkManager` in `FlowexaApp.kt` (commit `3541ad3`).
+  - CI build `38339290232`: Build job PASSED; instrumented test and smoke test running.
+- `[2026-10-13] [documentation] [Claude]` Created `.ai/WEB_ANDROID_PARITY_AUDIT.md` — comprehensive 38-item parity matrix with severity classification and implementation plan.
+- `[2026-10-13] [knowledge base] [Claude]` Updated `PROJECT_STATE.md` — resolved contradictions C-04 and C-09; updated last-known state to HEAD `3541ad3`.
+- `[2026-10-13] [knowledge base] [Claude]` Updated `KNOWN_ISSUES.md` — marked KI-007, KI-010, KI-011, KI-014, KI-016 as FIXED with commit references.
+
 ```
 ## YYYY-MM-DD
 - [area: source|architecture|policy|security|knowledge base|tests|ci] [agent] — what changed, why

@@ -1,7 +1,8 @@
 # PROJECT_STATE — Flowexa
 
-Last updated: 2026-10-07 by Claude (knowledge-base initialization).
-**Last known repository state:** HEAD `94fe721` ("chore: expand available model list in opencode config", 2026-10-06), 174 commits, working tree clean at the time `.ai/` was created. Any later commit must be reviewed before trusting this file.
+Last updated: 2026-10-13 by Claude (Web-Android parity audit & implementation batch).
+**Current repository HEAD:** `3541ad3` ("fix(android): resolve compilation errors — add NotificationEntity fields + correct WorkManager import", 2026-10-13).
+**Implementation commits this session:** `4067bf4` (parity fixes) → `3541ad3` (compilation fix push). Working tree clean at time of write.
 
 Evidence basis: static reading of the repository on 2026-10-06/07. **No code was executed, no Gradle/emulator/Firebase Emulator run, no Firebase/Google/GitHub/Vercel console was accessed.** All statuses use the vocabulary in `README.md`.
 
@@ -10,7 +11,7 @@ Evidence basis: static reading of the repository on 2026-10-06/07. **No code was
 | Area | State | Status |
 |---|---|---|
 | Web app (Next.js) | Feature-rich; consumes Firestore through `lib/services/*`; no automated tests | VERIFIED (static) |
-| Native Android (`android-app/`) | Feature-rich CI pipeline configured; T01-FIX rules security patch committed at `95752bc`. | VERIFIED (static readiness) |
+| Native Android (`android-app/`) | Feature-rich CI pipeline configured; T01-FIX rules security patch committed at `95752bc`. P0/P1 parity fixes committed 2026-10-13 (commits `4067bf4`, `3541ad3`). CI green pending. | ACTIVE (in-progress verification) |
 | Legacy Android (`android/`) | Deprecated WebView prototype; must remain untouched; not inspected by design | VERIFIED (per root README) |
 | Firestore rules in repo | `firestore.rules` (451 lines) | VERIFIED (static) |
 | Firestore rules deployed | Unknown; `customerPhones` rules documented as "not published" | EXTERNAL VERIFICATION REQUIRED |
@@ -74,9 +75,15 @@ Each item: source vs knowledge vs likely truth vs required decision. None has be
 - Source: Web uses `source === 'customer'` (`OrdersManager.tsx`, `HomeTab.tsx`, `orderService.getDashboardStats`). Android writes `"client"` (`FlowexaApp.kt` ClientCreateOrder) and `OrderEntity` comment documents `admin, sales, client`.
 - Likely truth: Web is the behavioral reference; Android deviates. Required decision: confirm Web is canonical (DEC-002 says Web is the reference).
 
-**C-04 — Order status vocabulary**
+**C-04 — Order status vocabulary** ✅ RESOLVED (commit `4067bf4`)
 - Source: Web uses dynamic `orderStages` names (client orders get the first stage's name, else `'pending'`). Android `OrderEntity` comment lists fixed statuses `pending, confirmed, processing, shipped, delivered, cancelled` and `OrderRepository.createOrder` always writes `"pending"`.
-- Required: NEEDS VERIFICATION of how Android screens map statuses/stages; no decision yet.
+- Fix applied: Added `getFirstStageName()` to `OrderStageRepository`; `FlowexaApp` reads the first stage and passes it as `initialStatus` to `createOrder()`.
+- Status: FIXED; runtime behavior needs V4 (CI + device test) to confirm.
+
+**C-09 — Android register vs routing** ✅ RESOLVED (commit `4067bf4`)
+- Source: `AuthRepository.register` creates a `client` profile; `FlowexaApp.routeAfterAuth` routes any existing `client` profile to `ClientHome`. `Routes.Register` success navigates to Onboarding only once; on any later launch the user lands in ClientHome and never reaches Onboarding. Combined with the rule that forbids self role change (rules line ~285), an email-registered Android user cannot become owner/employee.
+- Fix applied: Removed profile creation from `register()`; users now route to Onboarding. Profile is created during `createCompany`/`joinAsEmployee`/`joinAsClient`.
+- Status: FIXED; requires V2 (Google OAuth + email register flow) and V4 (CI) to verify end-to-end.
 
 **C-05 — Earlier audit statements corrected**
 - An earlier reply in the same audit session said "client role may read all company customers/orders" as a baseline fact and that pending employees are not company members. After reading Web onboarding and Android join code: Web clients have `companyId ''` (not members); Android sets `companyId` for clients and pending employees (members under the role-blind rule). The leak is therefore CONDITIONAL on the profile's `companyId`. The later audit (`claude/AUDIT_REPORT.md`) is the corrected statement.
@@ -93,10 +100,6 @@ Each item: source vs knowledge vs likely truth vs required decision. None has be
 - Source: `CompanySettings.tsx` `handleRemoveEmployee` writes `{ companyId: null, role: null }` via `companyService.updateEmployee`. `firestore.rules` `isValidUserProfile` requires `data.role in ['owner','admin','sales','client','pending_employee']`; `null` is not in that list.
 - Likely truth: the removal write is rejected by the repo rules (if deployed). Web "reject join request" uses `{companyId:'', role:'client', pendingCompanyId:null}`, which is valid.
 - Required decision: OPEN-008 (what a removed employee becomes). Task T01 must be amended accordingly (see `claude/AUDIT_REPORT.md` Addendum).
-
-**C-09 — Android register vs routing**
-- Source: `AuthRepository.register` creates a `client` profile; `FlowexaApp.routeAfterAuth` routes any existing `client` profile to `ClientHome`. `Routes.Register` success navigates to Onboarding only once; on any later launch the user lands in ClientHome and never reaches Onboarding. Combined with the rule that forbids self role change (rules line ~285), an email-registered Android user cannot become owner/employee.
-- Status: VERIFIED (static); runtime NOT VERIFIED.
 
 ## Unresolved knowledge gaps (see also `claude/AUDIT_REPORT.md`)
 
