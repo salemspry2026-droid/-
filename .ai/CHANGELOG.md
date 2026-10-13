@@ -89,3 +89,11 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   Files: android-app/app/src/main/java/com/flowexa/app/navigation/FlowexaApp.kt, android-app/app/src/main/java/com/flowexa/app/navigation/Routes.kt, android-app/app/src/main/java/com/flowexa/app/ui/components/AppLogoView.kt, android-app/app/src/main/java/com/flowexa/app/ui/auth/LandingScreen.kt (new).
   Tests: Static inspection only.
   KB files updated: .ai/CHANGELOG.md.
+
+## 2026-10-13 (fix)
+
+- [2026-10-13] [ui/navigation/auth] [Claude] Fixed compilation error in AppLogoView due to missing imports.
+  Refs: KI-?? (auto-generated fix).
+  Files: android-app/app/src/main/java/com/flowexa/app/ui/components/AppLogoView.kt.
+  Tests: Static inspection; CI build in progress.
+  KB files updated: .ai/CHANGELOG.md.
