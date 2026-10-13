@@ -31,6 +31,7 @@ fun LoginScreen(
     onGoogleClick: () -> Unit,
     onRegisterNavigate: () -> Unit,
     onForgotPasswordNavigate: () -> Unit,
+    onSendEmailLinkClick: (email: String) -> Unit,
     isLoading: Boolean,
     errorMessage: String? = null
 ) {
@@ -156,6 +157,19 @@ fun LoginScreen(
                     enabled = !isLoading
                 ) {
                     Text("الدخول السريع عبر Google", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = FlowexaBlue)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = { if (!isLoading) onSendEmailLinkClick(email) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    enabled = !isLoading && email.isNotBlank() && email.contains("@")
+                ) {
+                    Text("إرسال رابط الدخول إلى بريدي", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = FlowexaBlue)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))

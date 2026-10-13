@@ -66,20 +66,12 @@ class AuthRepository(
         try {
             val authResult = auth.createUserWithEmailAndPassword(email.trim(), pass).await()
             val user = authResult.user ?: throw Exception("فشل إنشاء الحساب")
-            
-            // Create user profile in Firestore
-            val profileMap = hashMapOf(
-                "email" to email.trim(),
-                "displayName" to displayName.trim(),
-                "role" to AppConfig.ROLE_CLIENT,
-                "companyId" to "",
-                "createdBy" to user.uid,
-                "updatedBy" to user.uid,
-                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                "isDeleted" to false
-            )
-            firestore.collection(AppConfig.COL_USER_PROFILES).document(user.uid).set(profileMap).await()
+
+            // NOTE: We intentionally do NOT create a user profile here.
+            // The profile is created during onboarding (createCompany / joinAsEmployee / joinAsClient).
+            // Pre-creating a client profile caused new email-registered users to route to ClientHome
+            // instead of Onboarding, and the self-role-change Firestore rule made that role permanent.
+            // See: C-09, KI-008.
 
             when (val r = loadProfile(user.uid)) {
                 is ProfileLoadResult.Found -> Result.success(r.profile)
@@ -164,6 +156,28 @@ class AuthRepository(
         auth.isSignInWithEmailLink(link)
     } catch (_: Exception) {
         false
+    }
+
+    /**
+     * Sends a passwordless sign-in link to [email] with Android deep-link settings
+     * so the app can handle the link when opened.
+     */
+    suspend fun sendSignInLinkToEmail(email: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val actionCodeSettings = com.google.firebase.auth.ActionCodeSettings.newBuilder()
+                .setUrl("https://orderflow-topaz.vercel.app/")
+                .setHandleCodeInApp(true)
+                .setAndroidPackageName(
+                    "com.flowexa.app",
+                    true,   // installIfNotAvailable
+                    "1"     // minimumVersion
+                )
+                .build()
+            auth.sendSignInLinkToEmail(email.trim(), actionCodeSettings).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun logout(): Unit = withContext(Dispatchers.IO) {

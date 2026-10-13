@@ -26,4 +26,7 @@ interface OrderStageDao {
 
     @Query("UPDATE order_stages SET syncState = :state WHERE id = :id")
     suspend fun updateSyncState(id: String, state: String)
+
+    @Query("SELECT * FROM order_stages WHERE companyId = :companyId AND isDeleted = 0 ORDER BY stageIndex ASC LIMIT 1")
+    suspend fun getFirstStage(companyId: String): OrderStageEntity?
 }

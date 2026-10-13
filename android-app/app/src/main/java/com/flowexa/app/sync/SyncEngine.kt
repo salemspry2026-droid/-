@@ -368,6 +368,25 @@ class SyncEngine(
                 .map { FirestoreMappers.docToNotification(it, uid) }
             database.notificationDao().insertAll(notifications)
 
+            // 11. User profiles — for staff join approval workflow (P-10).
+            //     Only pull profiles where role matches pending/staff roles.
+            //     Clients don't need this; they only see their own profile.
+            if (role == AppConfig.ROLE_OWNER || role == AppConfig.ROLE_ADMIN) {
+                for (doc in firestore.collection(AppConfig.COL_USER_PROFILES)
+                    .whereEqualTo("companyId", companyId)
+                    .whereNotEqualTo("role", AppConfig.ROLE_CLIENT)
+                    .get()
+                    .await().documents) {
+                    try {
+                        val p = FirestoreMappers.docToUserProfile(doc)
+                        val local = database.userProfileDao().getProfile(p.id)
+                        if (local == null || local.syncState == AppConfig.SYNC_STATE_SYNCED) {
+                            database.userProfileDao().insert(p)
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

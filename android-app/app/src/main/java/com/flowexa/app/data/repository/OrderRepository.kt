@@ -65,7 +65,8 @@ class OrderRepository(
         createdBy: String,
         createdByName: String?,
         items: List<OrderItemEntity>,
-        totalAmountByCurrency: Map<String, Double>
+        totalAmountByCurrency: Map<String, Double>,
+        initialStatus: String = "pending"
     ): OrderEntity = withContext(Dispatchers.IO) {
         val orderId = "ord_${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
@@ -79,7 +80,7 @@ class OrderRepository(
             customerName = customerName,
             customerPhone = customerPhone,
             customerAddress = customerAddress,
-            status = "pending",
+            status = initialStatus,
             invoiceType = invoiceType,
             dueDate = dueDate,
             source = source,
@@ -119,7 +120,7 @@ class OrderRepository(
             put("customerName", customerName)
             put("customerPhone", customerPhone)
             put("customerAddress", customerAddress)
-            put("status", "pending")
+            put("status", initialStatus)
             put("invoiceType", invoiceType)
             put("dueDate", dueDate)
             put("source", source)

@@ -264,9 +264,12 @@ class CompanyRepository(
                 companyId = matchedCompany.id,
                 title = "طلب انضمام موظف جديد",
                 message = "قدم $userDisplayName ($userEmail) طلب انضمام كفرد في فريق العمل.",
-                type = "staff_join",
+                type = "join_request",
                 orderId = null,
-                clientUid = userUid,
+                clientUid = null,
+                userId = userUid,
+                userEmail = userEmail,
+                userName = userDisplayName,
                 isRead = false,
                 createdAtMs = nowMs
             )
@@ -275,9 +278,12 @@ class CompanyRepository(
                 put("title", notif.title)
                 put("message", notif.message)
                 put("type", notif.type)
-                put("clientUid", userUid)
+                put("userId", userUid)
+                put("userEmail", userEmail)
+                put("userName", userDisplayName)
                 put("readBy", JSONArray())
                 put("createdBy", userUid)
+                put("isDeleted", false)
             }
             database.withTransaction {
                 database.notificationDao().insertAll(listOf(notif))

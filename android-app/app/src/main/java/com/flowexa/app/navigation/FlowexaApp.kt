@@ -75,6 +75,7 @@ fun FlowexaApp(
     val productRepo = remember { ProductRepository(db, context) }
     val customerRepo = remember { CustomerRepository(db, context) }
     val orderRepo = remember { OrderRepository(db, context) }
+    val stageRepo = remember { OrderStageRepository(db, context) }
     val notificationRepo = remember { NotificationRepository(db, context) }
     val favoritesRepo = remember { FavoritesRepository(db, context) }
     val syncEngine = remember { SyncEngine(db) }
@@ -135,6 +136,7 @@ fun FlowexaApp(
     var isAuthLoading by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
     var resetSuccess by remember { mutableStateOf(false) }
+    var emailLinkSent by remember { mutableStateOf(false) }
     var isProfileRetrying by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -343,6 +345,12 @@ fun FlowexaApp(
                     onLogout = {
                         coroutineScope.launch {
                             authRepo.logout()
+                            // Clear all local Room data so the next login starts fresh (no stale tenant data).
+                            db.clearAllTables()
+                            // Cancel any pending WorkManager sync jobs.
+                            try {
+                                android.work.WorkManager.getInstance(context).cancelAllWork()
+                            } catch (_: Exception) {}
                             navController.navigate(Routes.Login.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                             }
@@ -391,9 +399,34 @@ fun FlowexaApp(
                     },
                     onRegisterNavigate = { navController.navigate(Routes.Register.route) },
                     onForgotPasswordNavigate = { navController.navigate(Routes.ForgotPassword.route) },
+                    onSendEmailLinkClick = { email ->
+                        coroutineScope.launch {
+                            isAuthLoading = true
+                            authError = null
+                            val res = authRepo.sendSignInLinkToEmail(email)
+                            isAuthLoading = false
+                            res.onSuccess {
+                                emailLinkSent = true
+                            }.onFailure { err ->
+                                authError = err.message ?: "فشل إرسال رابط الدخول"
+                            }
+                        }
+                    },
                     isLoading = isAuthLoading,
                     errorMessage = authError
                 )
+                if (emailLinkSent) {
+                    AlertDialog(
+                        onDismissRequest = { emailLinkSent = false },
+                        title = { Text("تم إرسال الرابط") },
+                        text = { Text("تم إرسال رابط الدخول إلى بريدك الإلكتروني. افتح الرابط في تطبيق Flowexa لإكمال الدخول.") },
+                        confirmButton = {
+                            TextButton(onClick = { emailLinkSent = false }) {
+                                Text("حسنًا")
+                            }
+                        }
+                    )
+                }
             }
 
             composable(Routes.Register.route) {
@@ -655,6 +688,7 @@ fun FlowexaApp(
                     },
                     onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
                         coroutineScope.launch {
+                            val initialStatus = stageRepo.getFirstStageName(currentCompanyId) ?: "pending"
                             orderRepo.createOrder(
                                 companyId = currentCompanyId,
                                 customerId = custId,
@@ -669,7 +703,8 @@ fun FlowexaApp(
                                 createdBy = currentUser?.uid ?: "",
                                 createdByName = userProfile?.displayName ?: "موظف المبيعات",
                                 items = items,
-                                totalAmountByCurrency = totals
+                                totalAmountByCurrency = totals,
+                                initialStatus = initialStatus
                             )
                             navController.popBackStack()
                         }
@@ -746,6 +781,7 @@ fun FlowexaApp(
                     onBackClick = { navController.popBackStack() },
                     onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
                         coroutineScope.launch {
+                            val initialStatus = stageRepo.getFirstStageName(currentCompanyId) ?: "pending"
                             orderRepo.createOrder(
                                 companyId = currentCompanyId,
                                 customerId = custId,
@@ -760,7 +796,8 @@ fun FlowexaApp(
                                 createdBy = currentUser?.uid ?: "",
                                 createdByName = userProfile?.displayName ?: "المدير",
                                 items = items,
-                                totalAmountByCurrency = totals
+                                totalAmountByCurrency = totals,
+                                initialStatus = initialStatus
                             )
                             navController.popBackStack()
                         }
@@ -801,6 +838,7 @@ fun FlowexaApp(
                     onBackClick = { navController.popBackStack() },
                     onConfirmOrder = { custId, custName, custPhone, custAddress, invType, notes, items, totals ->
                         coroutineScope.launch {
+                            val initialStatus = stageRepo.getFirstStageName(currentCompanyId) ?: "pending"
                             orderRepo.createOrder(
                                 companyId = currentCompanyId,
                                 customerId = custId,
@@ -810,12 +848,13 @@ fun FlowexaApp(
                                 invoiceType = invType,
                                 dueDate = null,
                                 notes = notes,
-                                source = "client",
+                                source = "customer",
                                 clientUid = clientUid,
                                 createdBy = clientUid,
                                 createdByName = userProfile?.displayName ?: "العميل",
                                 items = items,
-                                totalAmountByCurrency = totals
+                                totalAmountByCurrency = totals,
+                                initialStatus = initialStatus
                             )
                             navController.popBackStack()
                         }
@@ -965,6 +1004,12 @@ fun FlowexaApp(
                     onLogout = {
                         coroutineScope.launch {
                             authRepo.logout()
+                            // Clear all local Room data so the next login starts fresh (no stale tenant data).
+                            db.clearAllTables()
+                            // Cancel any pending WorkManager sync jobs.
+                            try {
+                                android.work.WorkManager.getInstance(context).cancelAllWork()
+                            } catch (_: Exception) {}
                             navController.navigate(Routes.Login.route) {
                                 popUpTo(0) { inclusive = true }
                             }

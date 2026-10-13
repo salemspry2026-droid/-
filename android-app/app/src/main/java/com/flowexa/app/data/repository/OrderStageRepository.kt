@@ -92,4 +92,9 @@ class OrderStageRepository(
         }
         SyncScheduler.scheduleImmediateSync(context)
     }
+
+    /** Returns the first (lowest stageIndex) active stage name, or null if none. */
+    suspend fun getFirstStageName(companyId: String): String? = withContext(Dispatchers.IO) {
+        stageDao.getFirstStage(companyId)?.name
+    }
 }
