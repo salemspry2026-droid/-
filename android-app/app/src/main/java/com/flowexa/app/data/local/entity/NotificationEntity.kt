@@ -20,6 +20,9 @@ data class NotificationEntity(
     val type: String = "general",
     val orderId: String? = null,
     val clientUid: String? = null,
+    val userId: String? = null,
+    val userEmail: String? = null,
+    val userName: String? = null,
     val isRead: Boolean = false,
     val createdAtMs: Long? = null
 )

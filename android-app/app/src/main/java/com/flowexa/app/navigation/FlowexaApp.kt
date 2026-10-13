@@ -21,6 +21,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
+import androidx.work.WorkManager
 import com.flowexa.app.ui.auth.EmailLinkDialog
 import com.flowexa.app.ui.auth.ProfileRetryScreen
 import com.flowexa.app.auth.GoogleAuthManager
@@ -349,7 +350,7 @@ fun FlowexaApp(
                             db.clearAllTables()
                             // Cancel any pending WorkManager sync jobs.
                             try {
-                                android.work.WorkManager.getInstance(context).cancelAllWork()
+                                WorkManager.getInstance(context).cancelAllWork()
                             } catch (_: Exception) {}
                             navController.navigate(Routes.Login.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
@@ -1008,7 +1009,7 @@ fun FlowexaApp(
                             db.clearAllTables()
                             // Cancel any pending WorkManager sync jobs.
                             try {
-                                android.work.WorkManager.getInstance(context).cancelAllWork()
+                                WorkManager.getInstance(context).cancelAllWork()
                             } catch (_: Exception) {}
                             navController.navigate(Routes.Login.route) {
                                 popUpTo(0) { inclusive = true }
