@@ -73,3 +73,11 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   Refs: T01, KI-001, KI-002, VER-001, REV-001, FA-010, DFI-001. Commit: NO COMMIT RECORDED.
   Files: `.ai/claude/VERIFICATION_REPORT.md`, `.ai/claude/REVIEW_REPORT.md`, `.ai/claude/evidence/T01-review-rules-test.js` (new), `.ai/TESTING_STATUS.md`, `.ai/IMPLEMENTATION_HISTORY.md`, `.ai/FAILED_ATTEMPTS.md`, `.ai/KNOWN_ISSUES.md`, `.ai/PROJECT_STATE.md`, `.ai/CHANGELOG.md`, `.ai/claude/AUDIT_REPORT.md`, `.ai/deepseek/IMPLEMENTATION_REPORT.md`, `.ai/deepseek/FAILED_IMPLEMENTATIONS.md`.
   Tests: see `TESTING_STATUS.md`.
+
+## 2026-10-13
+
+- [2026-10-13] [ci/android/knowledge base] [Claude] Completed Android build-readiness audit. Verified project structure, CI pipeline integrity, and APK-delivery mechanism. Updated project knowledge base.
+  Refs: KI-001, KI-002, T01-FIX (95752bc). Commit: [hash to be added]
+  Files: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.
+  Tests: Static inspection only.
+  KB files updated: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.

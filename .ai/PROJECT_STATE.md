@@ -10,7 +10,7 @@ Evidence basis: static reading of the repository on 2026-10-06/07. **No code was
 | Area | State | Status |
 |---|---|---|
 | Web app (Next.js) | Feature-rich; consumes Firestore through `lib/services/*`; no automated tests | VERIFIED (static) |
-| Native Android (`android-app/`) | Kotlin/Compose/Room/WorkManager/Firebase; offline outbox sync; unit tests exist | VERIFIED (static) |
+| Native Android (`android-app/`) | Feature-rich CI pipeline configured; T01-FIX rules security patch committed at `95752bc`. | VERIFIED (static readiness) |
 | Legacy Android (`android/`) | Deprecated WebView prototype; must remain untouched; not inspected by design | VERIFIED (per root README) |
 | Firestore rules in repo | `firestore.rules` (451 lines) | VERIFIED (static) |
 | Firestore rules deployed | Unknown; `customerPhones` rules documented as "not published" | EXTERNAL VERIFICATION REQUIRED |
@@ -48,7 +48,7 @@ Evidence basis: static reading of the repository on 2026-10-06/07. **No code was
 
 ## Currently active implementation tasks
 
-**T01 is in review limbo (updated 2026-10-07):** uncommitted working-tree changes to `firestore.rules` and `package.json` exist (attributed to DeepSeek; DeepSeek filed no report). Reviewer verdict: **FAIL** (VER-001) — rules logic independently verified correct (83/83 Emulator tests), but the repo test suite is missing, `test:rules` is unusable, and `package.json` breaks `npm ci`/`npm install` (ERESOLVE). Nothing committed, pushed or deployed; HEAD is still `94fe721`. Other proposed tasks (T02–T15, in `claude/AUDIT_REPORT.md`) are NOT started.
+**T01 is COMMITTED (2026-10-08):** Firestore rules security patch and testing state committed at `95752bc`. Other proposed tasks (T02–T15, in `claude/AUDIT_REPORT.md`) are NOT started.
 
 ## Latest verified changes
 
