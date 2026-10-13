@@ -32,6 +32,7 @@ import com.flowexa.app.sync.SyncEngine
 import com.flowexa.app.sync.SyncScheduler
 import com.flowexa.app.ui.admin.AdminHomeScreen
 import com.flowexa.app.ui.auth.ForgotPasswordScreen
+import com.flowexa.app.ui.auth.LandingScreen
 import com.flowexa.app.ui.auth.LoginScreen
 import com.flowexa.app.ui.auth.RegisterScreen
 import com.flowexa.app.ui.catalog.PublicCatalogScreen
@@ -298,7 +299,7 @@ fun FlowexaApp(
                 LaunchedEffect(Unit) {
                     val user = authRepo.currentUser
                     if (user == null) {
-                        navController.navigate(Routes.Login.route) {
+                        navController.navigate(Routes.Landing.route) {
                             popUpTo(Routes.Splash.route) { inclusive = true }
                         }
                     } else {
@@ -313,6 +314,14 @@ fun FlowexaApp(
                     CircularProgressIndicator(color = FlowexaBlue)
                 }
             }
+
+            composable(Routes.Landing.route) {
+                LandingScreen(
+                    onLoginClick = { navController.navigate(Routes.Login.route) },
+                    onRegisterClick = { navController.navigate(Routes.Register.route) }
+                )
+            }
+
 
             composable(Routes.ProfileRetry.route) {
                 ProfileRetryScreen(

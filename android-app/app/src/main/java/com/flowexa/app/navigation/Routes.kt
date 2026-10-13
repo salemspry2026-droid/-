@@ -2,6 +2,7 @@ package com.flowexa.app.navigation
 
 sealed class Routes(val route: String) {
     data object Splash : Routes("splash")
+    data object Landing : Routes("landing")
     data object Login : Routes("login")
     data object Register : Routes("register")
     data object ForgotPassword : Routes("forgot_password")

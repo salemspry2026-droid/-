@@ -81,3 +81,11 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   Files: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.
   Tests: Static inspection only.
   KB files updated: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.
+
+## 2026-10-13
+
+- [2026-10-13] [ui/navigation/auth] [Claude] Implemented Android UX parity with the web landing page; fixed AppLogoView to use local resource; updated Auth nav flow.
+  Refs: Android UX parity requirement.
+  Files: android-app/app/src/main/java/com/flowexa/app/navigation/FlowexaApp.kt, android-app/app/src/main/java/com/flowexa/app/navigation/Routes.kt, android-app/app/src/main/java/com/flowexa/app/ui/components/AppLogoView.kt, android-app/app/src/main/java/com/flowexa/app/ui/auth/LandingScreen.kt (new).
+  Tests: Static inspection only.
+  KB files updated: .ai/CHANGELOG.md.

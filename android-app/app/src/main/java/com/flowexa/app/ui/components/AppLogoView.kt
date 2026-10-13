@@ -3,21 +3,9 @@ package com.flowexa.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoGraph
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.flowexa.app.ui.theme.FlowexaBlue
-import com.flowexa.app.ui.theme.FlowexaGreen
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.flowexa.app.R
 
 @Composable
 fun AppLogoView(
@@ -33,15 +21,13 @@ fun AppLogoView(
         Box(
             modifier = Modifier
                 .size(size.dp)
-                .clip(RoundedCornerShape((size / 4).dp))
-                .background(FlowexaBlue),
+                .clip(RoundedCornerShape((size / 4).dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.AutoGraph,
+            Image(
+                painter = painterResource(id = R.drawable.flowexa_logo),
                 contentDescription = "Flowexa Logo",
-                tint = FlowexaGreen,
-                modifier = Modifier.size((size * 0.6).dp)
+                modifier = Modifier.size(size.dp)
             )
         }
 
