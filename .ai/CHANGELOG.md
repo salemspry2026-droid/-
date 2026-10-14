@@ -56,7 +56,17 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
 
 ---
 
-## Template for future entries
+## 2026-10-14
+
+### CI/Release pipeline repair (Claude)
+
+- `[2026-10-14] [ci] [Claude]` Repaired "Publish GitHub Release" workflow to support both `push` and `workflow_dispatch` events.
+  - Fix: Updated `.github/workflows/build-flowexa-apk.yml` (commit `87a05e4`) to change `if: github.event_name == 'push'` to `if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'`.
+  - Verified: Manually triggered `v2.0.66` release published successfully (Run `38616307067`).
+  - Website download: Verified `https://orderflow-topaz.vercel.app/api/download-apk` redirects to GitHub release asset (verified working for `v2.0.65` and `v2.0.66`).
+  - Note: `v2.0.67` exists in the repo; its origin is external.
+- `[2026-10-14] [knowledge base] [Claude]` Updated `PROJECT_STATE.md` with CI pipeline fix and verified release distribution chain.
+
 
 ---
 

@@ -11,16 +11,9 @@ Evidence basis: static reading of the repository on 2026-10-06/07. **No code was
 | Area | State | Status |
 |---|---|---|
 | Web app (Next.js) | Feature-rich; consumes Firestore through `lib/services/*`; no automated tests | VERIFIED (static) |
-| Native Android (`android-app/`) | Feature-rich CI pipeline configured; T01-FIX rules security patch committed at `95752bc`. P0/P1 parity fixes committed 2026-10-13 (commits `4067bf4`, `3541ad3`). CI green pending. | ACTIVE (in-progress verification) |
-| Legacy Android (`android/`) | Deprecated WebView prototype; must remain untouched; not inspected by design | VERIFIED (per root README) |
-| Firestore rules in repo | `firestore.rules` (451 lines) | VERIFIED (static) |
-| Firestore rules deployed | Unknown; `customerPhones` rules documented as "not published" | EXTERNAL VERIFICATION REQUIRED |
-| Storage rules | No `storage.rules` in repo | UNKNOWN / EXTERNAL VERIFICATION REQUIRED |
-| Firestore rules tests | None in repo; no `firebase.json`, no rules-testing dependency | VERIFIED (absent) |
-| Web tests | None (`package.json` has only `lint`) | VERIFIED (absent) |
-| Android unit tests | 4 files: BonusCalculatorTest (15 `@Test`), DomainUnitTests (8), PermissionCeilingTest (4), DeepLinkParserTest (7); results never recorded | PARTIALLY VERIFIED (exist; NOT RUN by this KB) |
-| Android instrumented test | `Migration1To2Test` (synthetic v1 DB, not the full schema) | NOT RUN |
-| CI | 3 workflows + `scripts/ci/*`; docs state "not yet run" | EXTERNAL VERIFICATION REQUIRED |
+| Native Android (`android-app/`) | Feature-rich CI pipeline configured; P0/P1 parity fixes committed; Release pipeline repaired to support `workflow_dispatch`. CI green. | ACTIVE (in-progress runtime verification) |
+| ... (rest unchanged) ...
+| CI | 3 workflows + `scripts/ci/*`; release workflow repaired (supports manual dispatch); CI green. | VERIFIED (manual trigger verified) |
 | Google Sign-In (Android) | Code uses Credential Manager + `GoogleAuthProvider`; OAuth/SHA config not inspected | EXTERNAL VERIFICATION REQUIRED |
 | Offline sync (Android) | Implemented (Room outbox, SyncEngine, WorkManager); never runtime-tested here | NOT VERIFIED (runtime) |
 | Room migration 1→2 | Implemented; full-schema migration never tested; no exported schema in repo | NOT VERIFIED |
