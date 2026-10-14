@@ -1,8 +1,8 @@
 # PROJECT_STATE — Flowexa
 
-Last updated: 2026-10-13 by Claude (Web-Android parity audit & implementation batch).
-**Current repository HEAD:** `3541ad3` ("fix(android): resolve compilation errors — add NotificationEntity fields + correct WorkManager import", 2026-10-13).
-**Implementation commits this session:** `4067bf4` (parity fixes) → `3541ad3` (compilation fix push). Working tree clean at time of write.
+Last updated: 2026-10-14 by Claude (Release workflow fix).
+**Current repository HEAD:** `87a05e4c` ("fix(workflow): allow publish-release to run on workflow_dispatch", 2026-10-14).
+**Implementation commits this session:** `4067bf4` (parity fixes) → `3541ad3` (compilation fix push) → `87a05e4c` (workflow fix push). Working tree clean at time of write.
 
 Evidence basis: static reading of the repository on 2026-10-06/07. **No code was executed, no Gradle/emulator/Firebase Emulator run, no Firebase/Google/GitHub/Vercel console was accessed.** All statuses use the vocabulary in `README.md`.
 

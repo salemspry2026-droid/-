@@ -87,6 +87,20 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   KB files updated: ...
 ```
 
+## 2026-10-14
+
+### Release workflow fix (Claude)
+
+- `[2026-10-14] [ci/knowledge base] [Claude]` Fixed release workflow to allow `publish-release` job to run on both `push` and `workflow_dispatch` events.
+  - **Issue:** `publish-release` job had `if: github.event_name == 'push'` condition (line 307), causing manual (workflow_dispatch) releases to skip publishing to GitHub Releases. This left users with an outdated APK from the website download (`https://orderflow-topaz.vercel.app/Flowexa.apk`).
+  - **Fix:** Changed condition to `if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'`.
+  - **Commit:** `87a05e4c`
+  - **Verification:** v2.0.65 release exists (published 2026-10-13T03:01:08Z) with `Flowexa.apk` asset, built from commit `4067bf4/3541ad3`. Website download chain: `/api/download-apk` → GitHub release asset via `GITHUB_RELEASE_APK_URL`.
+  - **Startup crash investigation:** UNCONFIRMED - app crashes ~2 seconds after launch. No runtime logs available. Crash requires ADB/device logs to diagnose. Fixing release workflow does NOT diagnose or fix this crash.
+  Refs: workflow fix, release v2.0.65.
+  Files: .github/workflows/build-flowexa-apk.yml.
+  KB files updated: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.
+
 ## 2026-10-07 (later) — T01 review
 
 - `[2026-10-07] [security/tests/knowledge base] [Claude]` Reviewed the uncommitted T01 working-tree change (`firestore.rules`, `package.json`). Rules logic verified correct by independent Emulator tests (83/83 PASS; 24 attack cases fail against HEAD rules). Release gate: **FAIL** because the required repo test suite is missing, `test:rules` is unusable, and `package.json` breaks `npm ci`/`npm install` (ERESOLVE, lockfile unchanged); DeepSeek filed no `.ai` records. No commit, push or deploy performed. T02 not started.
