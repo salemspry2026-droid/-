@@ -56,20 +56,6 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
 
 ---
 
-## 2026-10-14
-
-### CI/Release pipeline repair (Claude)
-
-- `[2026-10-14] [ci] [Claude]` Repaired "Publish GitHub Release" workflow to support both `push` and `workflow_dispatch` events.
-  - Fix: Updated `.github/workflows/build-flowexa-apk.yml` (commit `87a05e4`) to change `if: github.event_name == 'push'` to `if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'`.
-  - Verified: Manually triggered `v2.0.66` release published successfully (Run `38616307067`).
-  - Website download: Verified `https://orderflow-topaz.vercel.app/api/download-apk` redirects to GitHub release asset (verified working for `v2.0.65` and `v2.0.66`).
-  - Note: `v2.0.67` exists in the repo; its origin is external.
-- `[2026-10-14] [knowledge base] [Claude]` Updated `PROJECT_STATE.md` with CI pipeline fix and verified release distribution chain.
-
-
----
-
 ## 2026-10-13
 
 ### Web-Android parity audit & implementation batch (Claude)
@@ -88,28 +74,22 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
 - `[2026-10-13] [knowledge base] [Claude]` Updated `PROJECT_STATE.md` — resolved contradictions C-04 and C-09; updated last-known state to HEAD `3541ad3`.
 - `[2026-10-13] [knowledge base] [Claude]` Updated `KNOWN_ISSUES.md` — marked KI-007, KI-010, KI-011, KI-014, KI-016 as FIXED with commit references.
 
-```
-## YYYY-MM-DD
-- [area: source|architecture|policy|security|knowledge base|tests|ci] [agent] — what changed, why
-  Refs: Task ID(s), KI-/DEC-/OPEN-/C- IDs, commit hash (or NO COMMIT RECORDED)
-  Files: ...
-  Tests: command + result (or NOT RUN)
-  KB files updated: ...
-```
+---
 
 ## 2026-10-14
 
-### Release workflow fix (Claude)
+### CI/Release pipeline repair (Claude)
 
-- `[2026-10-14] [ci/knowledge base] [Claude]` Fixed release workflow to allow `publish-release` job to run on both `push` and `workflow_dispatch` events.
+- `[2026-10-14] [ci] [Claude]` Repaired "Publish GitHub Release" workflow to support both `push` and `workflow_dispatch` events.
   - **Issue:** `publish-release` job had `if: github.event_name == 'push'` condition (line 307), causing manual (workflow_dispatch) releases to skip publishing to GitHub Releases. This left users with an outdated APK from the website download (`https://orderflow-topaz.vercel.app/Flowexa.apk`).
-  - **Fix:** Changed condition to `if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'`.
-  - **Commit:** `87a05e4c`
-  - **Verification:** v2.0.65 release exists (published 2026-10-13T03:01:08Z) with `Flowexa.apk` asset, built from commit `4067bf4/3541ad3`. Website download chain: `/api/download-apk` → GitHub release asset via `GITHUB_RELEASE_APK_URL`.
+  - **Fix:** Updated `.github/workflows/build-flowexa-apk.yml` (commit `87a05e4`) to change condition to `if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'`.
+  - **Verification:** v2.0.66 release published successfully (Run `38616307067`, 2026-10-14T18:39:36Z). All 4 jobs passed: Build and Validate, Instrumented Room migration test, Runtime Smoke Test, Publish GitHub Release.
+  - **Website download chain verified:** `/api/download-apk` → GitHub release asset via `GITHUB_RELEASE_APK_URL` (confirmed working for v2.0.65 and v2.0.66).
+  - **Note:** v2.0.67 release exists; its origin was external to this repair effort.
   - **Startup crash investigation:** UNCONFIRMED - app crashes ~2 seconds after launch. No runtime logs available. Crash requires ADB/device logs to diagnose. Fixing release workflow does NOT diagnose or fix this crash.
-  Refs: workflow fix, release v2.0.65.
-  Files: .github/workflows/build-flowexa-apk.yml.
-  KB files updated: .ai/PROJECT_STATE.md, .ai/CHANGELOG.md.
+- `[2026-10-14] [knowledge base] [Claude]` Updated `PROJECT_STATE.md` — HEAD updated to `5dfcc0e`; CI section marked "CI green, manual trigger verified".
+
+---
 
 ## 2026-10-07 (later) — T01 review
 
@@ -141,3 +121,12 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   Files: android-app/app/src/main/java/com/flowexa/app/ui/components/AppLogoView.kt.
   Tests: Static inspection; CI build in progress.
   KB files updated: .ai/CHANGELOG.md.
+
+```
+## YYYY-MM-DD
+- [area: source|architecture|policy|security|knowledge base|tests|ci] [agent] — what changed, why
+  Refs: Task ID(s), KI-/DEC-/OPEN-/C- IDs, commit hash (or NO COMMIT RECORDED)
+  Files: ...
+  Tests: command + result (or NOT RUN)
+  KB files updated: ...
+```
