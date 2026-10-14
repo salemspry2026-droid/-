@@ -304,7 +304,7 @@ jobs:
     name: Publish GitHub Release
     # The release is published ONLY after build, validation AND runtime smoke test passed.
     needs: [build-and-validate, runtime-smoke]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
