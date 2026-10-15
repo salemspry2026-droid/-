@@ -20,7 +20,8 @@ class MainActivity : ComponentActivity() {
     private var pendingDeepLink by mutableStateOf<DeepLink?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setTheme(R.style.Theme_Flowexa)
+        // Keep the splash theme for smoother startup; avoid potential theme inflation issues
+        // setTheme(R.style.Theme_Flowexa) // Removed: let manifest theme handle splash screen
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 

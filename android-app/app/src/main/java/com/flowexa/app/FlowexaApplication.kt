@@ -4,10 +4,14 @@ import android.app.Application
 import android.util.Log
 import com.flowexa.app.domain.BonusCalculator
 import com.flowexa.app.sync.SyncScheduler
+import com.google.firebase.FirebaseApp
 
 class FlowexaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Ensure Firebase is initialized before any Firebase services are accessed
+        FirebaseApp.initializeApp(this)
 
         // Malformed bonus tiers must be observable, never silently swallowed.
         BonusCalculator.parseErrorReporter = { productId, reason, cause ->

@@ -1,6 +1,7 @@
 package com.flowexa.app.data.local
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -86,14 +87,28 @@ abstract class FlowexaDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): FlowexaDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    FlowexaDatabase::class.java,
-                    "flowexa.db"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    .build()
-                    .also { INSTANCE = it }
+                INSTANCE ?: try {
+                    // First attempt: try with migration
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        FlowexaDatabase::class.java,
+                        "flowexa.db"
+                    )
+                        .addMigrations(MIGRATION_1_2)
+                        .build()
+                        .also { INSTANCE = it }
+                } catch (e: Exception) {
+                    Log.e("FlowexaDatabase", "Migration failed, using fallback: ${e.message}")
+                    // Fallback: create fresh database without migration
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        FlowexaDatabase::class.java,
+                        "flowexa.db"
+                    )
+                        .fallbackToDestructiveMigration()
+                        .build()
+                        .also { INSTANCE = it }
+                }
             }
         }
     }
