@@ -48,11 +48,13 @@ fun ActiveCallOverlay(
     val startedAtMs = remember { System.currentTimeMillis() }
     var elapsedSecs by remember { mutableStateOf(0L) }
 
-    fun stopAndClose(saved: java.io.File?) {
-        recorder.release()
+    fun finish(saved: java.io.File?) {
         if (saved != null) {
             val secs = (System.currentTimeMillis() - startedAtMs) / 1000
             onSaveRecording(saved, secs)
+        } else {
+            // Discarded: remove the partial recording file left behind.
+            try { recorder.file?.delete() } catch (_: Exception) {}
         }
         onClose()
     }
@@ -125,7 +127,7 @@ fun ActiveCallOverlay(
                 Button(
                     onClick = {
                         // Stop and, when a valid file was captured, save it.
-                        stopAndClose(recorder.stop())
+                        finish(recorder.stop())
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = FlowexaGreen)
                 ) {
@@ -135,7 +137,8 @@ fun ActiveCallOverlay(
                 }
                 TextButton(onClick = {
                     // Discard the recording and just close.
-                    stopAndClose(null)
+                    recorder.release()
+                    finish(null)
                 }) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
                     Spacer(Modifier.size(4.dp))
