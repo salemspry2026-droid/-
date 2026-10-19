@@ -8,8 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.flowexa.app.core.AppConfig
+import com.flowexa.app.core.CrashReporter
+import com.flowexa.app.ui.diagnostics.CrashReportScreen
+import com.flowexa.app.ui.diagnostics.FirebaseNotConfiguredScreen
 import com.flowexa.app.navigation.DeepLink
 import com.flowexa.app.navigation.DeepLinkParser
 import com.flowexa.app.navigation.FlowexaApp
@@ -29,12 +33,21 @@ class MainActivity : ComponentActivity() {
         // same intent would otherwise be replayed.
         if (savedInstanceState == null) handleIntent(intent)
 
+        val firebaseReady = com.google.firebase.FirebaseApp.getApps(this).isNotEmpty()
         setContent {
             FlowexaTheme {
-                FlowexaApp(
-                    deepLink = pendingDeepLink,
-                    onDeepLinkHandled = { pendingDeepLink = null }
-                )
+                var crashReport by remember { mutableStateOf(CrashReporter.pending(this@MainActivity)) }
+                when {
+                    crashReport != null -> CrashReportScreen(
+                        report = crashReport!!,
+                        onContinue = { CrashReporter.clear(this@MainActivity); crashReport = null }
+                    )
+                    !firebaseReady -> FirebaseNotConfiguredScreen()
+                    else -> FlowexaApp(
+                        deepLink = pendingDeepLink,
+                        onDeepLinkHandled = { pendingDeepLink = null }
+                    )
+                }
             }
         }
     }

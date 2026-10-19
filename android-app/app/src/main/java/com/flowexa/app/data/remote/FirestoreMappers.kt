@@ -55,6 +55,8 @@ object FirestoreMappers {
             notes = data["notes"] as? String,
             workingHours = data["workingHours"] as? String,
             companyType = data["companyType"] as? String,
+            companyTypeOther = data["companyTypeOther"] as? String,
+            isVisibleToClients = data["isVisibleToClients"] as? Boolean ?: false,
             primaryCurrency = data["primaryCurrency"] as? String ?: "SAR",
             secondaryCurrenciesJson = (data["secondaryCurrencies"] as? List<*>)?.let { JSONArray(it).toString() } ?: "[]",
             exchangeRatesJson = (data["exchangeRates"] as? Map<*, *>)?.let { JSONObject(it).toString() } ?: "{}",

@@ -30,6 +30,8 @@ sealed class Routes(val route: String) {
     }
     data object Staff : Routes("staff")
     data object Settings : Routes("settings")
+    data object Administration : Routes("administration")
+    data object CallRecordings : Routes("call_recordings")
     data object Notifications : Routes("notifications")
 
     // Product Detail
@@ -42,6 +44,7 @@ sealed class Routes(val route: String) {
     data object ClientCatalog : Routes("client_catalog")
     data object ClientOrders : Routes("client_orders")
     data object ClientFavorites : Routes("client_favorites")
+    data object ClientProfile : Routes("client_profile")
 
     // Public Catalog
     data object PublicCatalog : Routes("public_catalog/{companyId}") {

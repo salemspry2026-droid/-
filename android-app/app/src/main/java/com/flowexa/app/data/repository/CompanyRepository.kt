@@ -411,7 +411,14 @@ class CompanyRepository(
             put("email", pendingCompany.email)
             put("notes", pendingCompany.notes)
             put("workingHours", pendingCompany.workingHours)
+            put("companyType", pendingCompany.companyType)
+            put("companyTypeOther", pendingCompany.companyTypeOther ?: "")
+            put("contactNumbers", try { JSONArray(pendingCompany.contactNumbersJson) } catch (_: Exception) { JSONArray() })
+            put("isVisibleToClients", pendingCompany.isVisibleToClients)
+            pendingCompany.logoUrl?.let { put("logoUrl", it) }
             put("primaryCurrency", pendingCompany.primaryCurrency)
+            put("secondaryCurrencies", try { JSONArray(pendingCompany.secondaryCurrenciesJson) } catch (_: Exception) { JSONArray() })
+            put("exchangeRates", try { JSONObject(pendingCompany.exchangeRatesJson) } catch (_: Exception) { JSONObject() })
             put("isDeleted", false)
             if (currentUserId.isNotEmpty()) {
                 put("updatedBy", currentUserId)

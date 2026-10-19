@@ -174,4 +174,69 @@ class OrderRepository(
 
         SyncScheduler.scheduleImmediateSync(context)
     }
+
+    /**
+     * Web parity (OrderDetailsDialog.handleExcludeItems): removes the selected items from [order]
+     * (recomputing its totals) and creates a NEW order with them at the first stage.
+     * Returns false when every item would be excluded.
+     */
+    suspend fun excludeItems(
+        order: OrderEntity,
+        items: List<OrderItemEntity>,
+        excludedIndexes: Set<Int>,
+        firstStageName: String,
+        userId: String,
+        userName: String?
+    ): Boolean = withContext(Dispatchers.IO) {
+        val excluded = items.filterIndexed { i, _ -> i in excludedIndexes }
+        val remaining = items.filterIndexed { i, _ -> i !in excludedIndexes }
+        if (excluded.isEmpty() || remaining.isEmpty()) return@withContext false
+
+        fun totals(list: List<OrderItemEntity>): Map<String, Double> {
+            val m = linkedMapOf<String, Double>()
+            list.forEach { m[it.currency] = (m[it.currency] ?: 0.0) + it.price * it.quantity }
+            return m
+        }
+        val remainingTotals = totals(remaining)
+        val now = System.currentTimeMillis()
+
+        val itemsArray = JSONArray()
+        remaining.forEach { item ->
+            itemsArray.put(JSONObject().apply {
+                put("productId", item.productId); put("productName", item.productName)
+                put("quantity", item.quantity); put("bonusQuantity", item.bonusQuantity)
+                put("price", item.price); put("currency", item.currency)
+                put("note", item.note); put("isManualBonus", item.isManualBonus)
+            })
+        }
+        val payload = JSONObject().apply {
+            put("items", itemsArray)
+            put("totalAmountByCurrency", JSONObject(remainingTotals))
+            put("updatedBy", userId)
+        }
+        database.withTransaction {
+            orderDao.saveOrderWithItems(
+                order.copy(
+                    totalAmountByCurrencyJson = JSONObject(remainingTotals).toString(),
+                    syncState = AppConfig.SYNC_STATE_PENDING, updatedAtMs = now
+                ),
+                remaining
+            )
+            syncDao.enqueueWithCoalescing(
+                SyncOperationEntity(
+                    id = UUID.randomUUID().toString(), collectionName = AppConfig.COL_ORDERS,
+                    documentId = order.id, operation = OutboxOp.UPDATE, payloadJson = payload.toString()
+                )
+            )
+        }
+        createOrder(
+            companyId = order.companyId, customerId = order.customerId, customerName = order.customerName,
+            customerPhone = order.customerPhone, customerAddress = order.customerAddress,
+            invoiceType = order.invoiceType, dueDate = order.dueDate, notes = order.notes,
+            source = order.source, clientUid = order.clientUid, createdBy = userId,
+            createdByName = userName, items = excluded, totalAmountByCurrency = totals(excluded),
+            initialStatus = firstStageName
+        )
+        true
+    }
 }

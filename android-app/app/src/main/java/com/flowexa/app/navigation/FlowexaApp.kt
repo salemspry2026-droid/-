@@ -29,6 +29,7 @@ import com.flowexa.app.core.AppConfig
 import com.flowexa.app.data.local.FlowexaDatabase
 import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.data.repository.*
+import com.flowexa.app.domain.PermissionManager
 import com.flowexa.app.sync.SyncEngine
 import com.flowexa.app.sync.SyncScheduler
 import com.flowexa.app.ui.admin.AdminHomeScreen
@@ -40,6 +41,12 @@ import com.flowexa.app.ui.catalog.PublicCatalogScreen
 import com.flowexa.app.ui.client.ClientCatalogScreen
 import com.flowexa.app.ui.client.ClientHomeScreen
 import com.flowexa.app.ui.client.FavoritesScreen
+import com.flowexa.app.ui.client.ClientProfileScreen
+import com.flowexa.app.ui.admin.AdministrationScreen
+import com.flowexa.app.ui.calls.ActiveCallOverlay
+import com.flowexa.app.ui.calls.CallContact
+import com.flowexa.app.ui.calls.CallRecordingsScreen
+import com.flowexa.app.data.local.entity.*
 import com.flowexa.app.ui.components.FlowexaBottomBar
 import com.flowexa.app.ui.components.FlowexaTopBar
 import com.flowexa.app.ui.customers.CustomerDetailScreen
@@ -245,14 +252,41 @@ fun FlowexaApp(
         Routes.Customers.route,
         Routes.Orders.route,
         Routes.Settings.route,
+        Routes.Administration.route,
+        Routes.CallRecordings.route,
         Routes.ClientHome.route,
         Routes.ClientCatalog.route,
         Routes.ClientOrders.route,
+        Routes.ClientFavorites.route,
+        Routes.ClientProfile.route,
         Routes.Staff.route,
         Routes.Notifications.route
     )
 
     val isClient = userProfile?.role == AppConfig.ROLE_CLIENT
+
+    // Active / incoming call overlay (web: ActiveCallOverlay, mounted globally)
+    var incomingCall by remember { mutableStateOf<CallContact?>(null) }
+    incomingCall?.let { c ->
+        ActiveCallOverlay(
+            contact = c,
+            onSaveRecording = { file, secs ->
+                coroutineScope.launch {
+                    db.callRecordingDao().insert(
+                        CallRecordingEntity(
+                            id = "rec_${System.currentTimeMillis()}",
+                            companyId = currentCompanyId,
+                            contactName = c.name,
+                            phone = c.tel,
+                            filePath = file.absolutePath,
+                            durationSeconds = secs
+                        )
+                    )
+                }
+            },
+            onClose = { incomingCall = null }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -275,7 +309,7 @@ fun FlowexaApp(
             }
         },
         bottomBar = {
-            if (showBars && currentRoute != Routes.Notifications.route && currentRoute != Routes.Staff.route) {
+            if (showBars && currentRoute != Routes.Notifications.route) {
                 FlowexaBottomBar(
                     currentRoute = currentRoute,
                     onNavigate = { targetRoute ->
@@ -287,7 +321,11 @@ fun FlowexaApp(
                             restoreState = true
                         }
                     },
-                    isClient = isClient
+                    isClient = isClient,
+                    canViewOrders = PermissionManager.hasPermission(userProfile, PermissionManager.Module.ORDERS, PermissionManager.Action.VIEW),
+                    canViewProducts = PermissionManager.hasPermission(userProfile, PermissionManager.Module.PRODUCTS, PermissionManager.Action.VIEW),
+                    canViewCustomers = PermissionManager.hasPermission(userProfile, PermissionManager.Module.CUSTOMERS, PermissionManager.Action.VIEW),
+                    canViewStaff = userProfile?.role == AppConfig.ROLE_OWNER || userProfile?.role == AppConfig.ROLE_ADMIN
                 )
             }
         }
@@ -380,7 +418,7 @@ fun FlowexaApp(
                                         popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                                     }
                                 } else {
-                                    authError = err.message ?: "فشل تسجيل الدخول"
+                                    authError = authErrorMessage(err, "فشل تسجيل الدخول")
                                 }
                             }
                         }
@@ -409,7 +447,7 @@ fun FlowexaApp(
                             res.onSuccess {
                                 emailLinkSent = true
                             }.onFailure { err ->
-                                authError = err.message ?: "فشل إرسال رابط الدخول"
+                                authError = authErrorMessage(err, "فشل إرسال رابط الدخول")
                             }
                         }
                     },
@@ -447,7 +485,7 @@ fun FlowexaApp(
                                     // Account + profile document were just created; only the local read failed.
                                     authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
                                 } else {
-                                    authError = err.message ?: "فشل إنشاء الحساب"
+                                    authError = authErrorMessage(err, "فشل إنشاء الحساب")
                                 }
                             }
                         }
@@ -591,7 +629,17 @@ fun FlowexaApp(
                     }
                 }
 
+                val stages by stageRepo.observeOrderStages(currentCompanyId).collectAsState(initial = emptyList())
+                val stageCounts = orders.groupingBy { it.status }.eachCount()
+                val notifs by notificationRepo.observeNotifications(currentCompanyId).collectAsState(initial = emptyList())
+                val unread = notifs.count { !it.isRead }
+
                 AdminHomeScreen(
+                    stages = stages,
+                    stageCounts = stageCounts,
+                    delegateCount = todayOrders.count { it.source != "customer" },
+                    customerCount = todayOrders.count { it.source == "customer" },
+                    unreadNotifications = unread,
                     companyName = company?.name ?: "Flowexa",
                     todayOrdersCount = todayOrdersCount,
                     totalSales = totalSales,
@@ -602,7 +650,28 @@ fun FlowexaApp(
                     onCreateOrderClick = { navController.navigate(Routes.CreateOrder.route) },
                     onProductsClick = { navController.navigate(Routes.Products.route) },
                     onCustomersClick = { navController.navigate(Routes.Customers.route) },
-                    onOrderClick = { orderId -> navController.navigate(Routes.OrderDetail.createRoute(orderId)) }
+                    onOrderClick = { orderId -> navController.navigate(Routes.OrderDetail.createRoute(orderId)) },
+                    onAllOrdersClick = { navController.navigate(Routes.Orders.route) },
+                    onCompanySettingsClick = { navController.navigate(Routes.Settings.route) },
+                    onNotificationsClick = { navController.navigate(Routes.Notifications.route) },
+                    onCallRecordingsClick = { navController.navigate(Routes.CallRecordings.route) },
+                    onAdministrationClick = if (userProfile?.role == AppConfig.ROLE_OWNER || userProfile?.role == AppConfig.ROLE_ADMIN) {
+                        { navController.navigate(Routes.Administration.route) }
+                    } else null,
+                    onLogoutClick = {
+                        coroutineScope.launch {
+                            authRepo.logout()
+                            db.clearAllTables()
+                            try { WorkManager.getInstance(context).cancelAllWork() } catch (_: Exception) {}
+                            navController.navigate(Routes.Login.route) { popUpTo(0) { inclusive = true } }
+                        }
+                    },
+                    displayName = userProfile?.displayName ?: "",
+                    roleLabel = when (userProfile?.role) {
+                        AppConfig.ROLE_OWNER -> "مالك"
+                        AppConfig.ROLE_ADMIN -> "مدير"
+                        else -> "مبيعات"
+                    }
                 )
             }
 
@@ -875,14 +944,50 @@ fun FlowexaApp(
                     order = orderRepo.getOrder(orderId)
                 }
 
+                val detailStages by stageRepo.observeOrderStages(currentCompanyId).collectAsState(initial = emptyList())
+                val detailNotifRepo = remember { NotificationRepository(db, context) }
+
                 OrderDetailScreen(
                     order = order,
                     items = items,
+                    stages = detailStages,
+                    isClient = isClient,
                     onBackClick = { navController.popBackStack() },
-                    onUpdateStatus = { newStatus ->
+                    onMoveToNextStage = { nextName, isFinal ->
                         coroutineScope.launch {
-                            orderRepo.updateStatus(orderId, newStatus, currentUser?.uid ?: "")
-                            order = orderRepo.getOrder(orderId)
+                            val o = order
+                            orderRepo.updateStatus(orderId, nextName, currentUser?.uid ?: "")
+                            if (o != null && !isFinal) {
+                                val cUid = o.clientUid ?: if (o.source == "customer") o.createdBy else null
+                                detailNotifRepo.createNotification(
+                                    companyId = o.companyId,
+                                    title = "تحديث حالة الطلب",
+                                    message = "تم تحديث حالة الطلب للعميل ${o.customerName} إلى: $nextName",
+                                    type = "status_update", orderId = o.id, clientUid = cUid,
+                                    createdBy = currentUser?.uid ?: ""
+                                )
+                            }
+                            navController.popBackStack()
+                        }
+                    },
+                    onExcludeItems = { indexes, hours, onResult ->
+                        coroutineScope.launch {
+                            val o = order
+                            if (o == null) { onResult(false); return@launch }
+                            val first = stageRepo.getFirstStageName(currentCompanyId) ?: "pending"
+                            val ok = orderRepo.excludeItems(o, items, indexes, first, currentUser?.uid ?: "", userProfile?.displayName)
+                            if (ok) {
+                                detailNotifRepo.createNotification(
+                                    companyId = o.companyId,
+                                    title = "تذكير باستكمال صنف مستثنى",
+                                    message = "طلب مجدول: العميل ${o.customerName} يحتاج لتوفير أصناف نفذت.",
+                                    type = "reminder", orderId = o.id, clientUid = null,
+                                    createdBy = currentUser?.uid ?: "",
+                                    remindAtMs = System.currentTimeMillis() + hours * 3600_000L
+                                )
+                                order = orderRepo.getOrder(orderId)
+                            }
+                            onResult(ok)
                         }
                     }
                 )
@@ -987,8 +1092,120 @@ fun FlowexaApp(
                 )
             }
 
+            composable(Routes.CallRecordings.route) {
+                val prefs = remember { context.getSharedPreferences("flowexa_calls", android.content.Context.MODE_PRIVATE) }
+                val prefKey = "company_contacts_$currentCompanyId"
+                var contacts by remember(currentCompanyId) {
+                    mutableStateOf(runCatching {
+                        val a = org.json.JSONArray(prefs.getString(prefKey, "[]"))
+                        List(a.length()) { CallContact(a.getJSONObject(it).getString("name"), a.getJSONObject(it).getString("tel")) }
+                    }.getOrDefault(emptyList()))
+                }
+                fun persist(list: List<CallContact>) {
+                    contacts = list
+                    val a = org.json.JSONArray(); list.forEach { a.put(org.json.JSONObject().put("name", it.name).put("tel", it.tel)) }
+                    prefs.edit().putString(prefKey, a.toString()).apply()
+                }
+                val recordings by db.callRecordingDao().observeRecordings(currentCompanyId).collectAsState(initial = emptyList())
+                val callCustomers by customerRepo.observeCustomers(currentCompanyId).collectAsState(initial = emptyList())
+                val callProducts by productRepo.observeProducts(currentCompanyId).collectAsState(initial = emptyList())
+                CallRecordingsScreen(
+                    recordings = recordings,
+                    contacts = contacts,
+                    customers = callCustomers,
+                    products = callProducts,
+                    onDeleteRecording = { r ->
+                        coroutineScope.launch {
+                            try { java.io.File(r.filePath).delete() } catch (_: Exception) {}
+                            db.callRecordingDao().delete(r.id)
+                        }
+                    },
+                    onAddContact = { persist(contacts + it) },
+                    onDeleteContact = { i -> persist(contacts.filterIndexed { idx, _ -> idx != i }) },
+                    onSimulateCall = { c ->
+                        navController.popBackStack()
+                        coroutineScope.launch { kotlinx.coroutines.delay(1500); incomingCall = c }
+                    },
+                    onCreateOrder = { customer, product, qty, onDone ->
+                        coroutineScope.launch {
+                            try {
+                                val initialStatus = stageRepo.getFirstStageName(currentCompanyId) ?: "pending"
+                                orderRepo.createOrder(
+                                    companyId = currentCompanyId,
+                                    customerId = customer.id,
+                                    customerName = customer.name,
+                                    customerPhone = customer.phone,
+                                    customerAddress = customer.address ?: "غير محدد",
+                                    invoiceType = null,
+                                    dueDate = null,
+                                    notes = null,
+                                    source = "company",
+                                    clientUid = customer.appUserId,
+                                    createdBy = currentUser?.uid ?: "",
+                                    createdByName = userProfile?.displayName,
+                                    items = listOf(OrderItemEntity(orderId = "", productId = product.id, productName = product.name, quantity = qty.toDouble(), price = product.price, currency = product.currency)),
+                                    totalAmountByCurrency = mapOf(product.currency to product.price * qty),
+                                    initialStatus = initialStatus
+                                )
+                                onDone(true)
+                            } catch (e: Exception) { onDone(false) }
+                        }
+                    }
+                )
+            }
+
+            composable(Routes.Administration.route) {
+                val locationRepo = remember { LocationRepository(db, context) }
+                val categoryRepo = remember { ProductCategoryRepository(db, context) }
+                val brandRepo = remember { ProductBrandRepository(db, context) }
+                val locations by locationRepo.observeLocations(currentCompanyId).collectAsState(initial = emptyList())
+                val categories by categoryRepo.observeCategories(currentCompanyId).collectAsState(initial = emptyList())
+                val brands by brandRepo.observeBrands(currentCompanyId).collectAsState(initial = emptyList())
+                val adminStages by stageRepo.observeOrderStages(currentCompanyId).collectAsState(initial = emptyList())
+                val uid = currentUser?.uid ?: ""
+                AdministrationScreen(
+                    isAdmin = userProfile?.role == AppConfig.ROLE_OWNER || userProfile?.role == AppConfig.ROLE_ADMIN,
+                    company = company,
+                    locations = locations,
+                    categories = categories,
+                    brands = brands,
+                    stages = adminStages,
+                    onSaveCurrencies = { primary, secondary, rates ->
+                        company?.let { c ->
+                            coroutineScope.launch {
+                                companyRepo.updateCompany(c.copy(
+                                    primaryCurrency = primary,
+                                    secondaryCurrenciesJson = org.json.JSONArray(secondary).toString(),
+                                    exchangeRatesJson = org.json.JSONObject(rates as Map<*, *>).toString()
+                                ), uid)
+                            }
+                        }
+                    },
+                    onAddLocation = { name, type, parentId ->
+                        coroutineScope.launch { locationRepo.saveLocation(LocationEntity(id = UUID.randomUUID().toString(), companyId = currentCompanyId, type = type, name = name, parentId = parentId), true, uid) }
+                    },
+                    onDeleteLocation = { id -> coroutineScope.launch { locationRepo.deleteLocation(id, uid) } },
+                    onAddCategory = { n -> coroutineScope.launch { categoryRepo.saveCategory(ProductCategoryEntity(id = UUID.randomUUID().toString(), companyId = currentCompanyId, name = n), true, uid) } },
+                    onDeleteCategory = { id -> coroutineScope.launch { categoryRepo.deleteCategory(id, uid) } },
+                    onAddBrand = { n -> coroutineScope.launch { brandRepo.saveBrand(ProductBrandEntity(id = UUID.randomUUID().toString(), companyId = currentCompanyId, name = n), true, uid) } },
+                    onDeleteBrand = { id -> coroutineScope.launch { brandRepo.deleteBrand(id, uid) } },
+                    onAddStage = { n, roles ->
+                        coroutineScope.launch {
+                            stageRepo.saveOrderStage(OrderStageEntity(
+                                id = UUID.randomUUID().toString(), companyId = currentCompanyId, name = n,
+                                stageIndex = adminStages.size, allowedRolesJson = org.json.JSONArray(roles).toString()
+                            ), true, uid)
+                        }
+                    },
+                    onDeleteStage = { id -> coroutineScope.launch { stageRepo.deleteOrderStage(id, uid) } }
+                )
+            }
+
             composable(Routes.Settings.route) {
+                val settingsLocations by remember { LocationRepository(db, context) }.observeLocations(currentCompanyId).collectAsState(initial = emptyList())
                 CompanySettingsScreen(
+                    locations = settingsLocations,
+                    canEdit = userProfile?.role == AppConfig.ROLE_OWNER || userProfile?.role == AppConfig.ROLE_ADMIN,
                     company = company,
                     pendingSyncCount = pendingSyncCount,
                     onSaveCompany = { updated ->
@@ -1029,6 +1246,25 @@ fun FlowexaApp(
                     onCatalogClick = { navController.navigate(Routes.ClientCatalog.route) },
                     onOrdersClick = { navController.navigate(Routes.ClientOrders.route) },
                     onOrderClick = { orderId -> navController.navigate(Routes.OrderDetail.createRoute(orderId)) }
+                )
+            }
+
+            composable(Routes.ClientProfile.route) {
+                val clientOrders by orderRepo.observeClientOrders(currentUser?.uid ?: "").collectAsState(initial = emptyList())
+                val profileRepo = remember { ProfileRepository(db, context) }
+                ClientProfileScreen(
+                    profile = userProfile,
+                    orders = clientOrders,
+                    loadItems = { id -> orderRepo.getOrderItems(id) },
+                    onSave = { form -> currentUser?.uid?.let { profileRepo.updateClientProfile(it, form) } },
+                    onLogout = {
+                        coroutineScope.launch {
+                            authRepo.logout()
+                            db.clearAllTables()
+                            try { WorkManager.getInstance(context).cancelAllWork() } catch (_: Exception) {}
+                            navController.navigate(Routes.Login.route) { popUpTo(0) { inclusive = true } }
+                        }
+                    }
                 )
             }
 

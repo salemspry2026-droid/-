@@ -6,6 +6,8 @@ import com.flowexa.app.data.local.entity.UserProfileEntity
 import com.flowexa.app.data.remote.FirebaseProvider
 import com.flowexa.app.data.remote.FirestoreMappers
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +60,33 @@ class AuthRepository(
                 is ProfileLoadResult.Unavailable -> Result.failure(ProfileUnavailableException(r.cause))
             }
         } catch (e: Exception) {
+            // Web parity (app/page.tsx): invalid credential / unknown user -> try to create the account
+            // seamlessly; if the e-mail already exists the password was simply wrong.
+            val code = (e as? FirebaseAuthException)?.errorCode
+            if (code == "ERROR_INVALID_CREDENTIAL" || code == "ERROR_USER_NOT_FOUND") {
+                return@withContext try {
+                    val created = auth.createUserWithEmailAndPassword(email.trim(), pass).await()
+                    val user = created.user ?: throw Exception("فشل إنشاء الحساب")
+                    user.updateProfile(
+                        UserProfileChangeRequest.Builder()
+                            .setDisplayName(email.trim().substringBefore('@'))
+                            .build()
+                    ).await()
+                    when (val r = loadProfile(user.uid)) {
+                        is ProfileLoadResult.Found -> Result.success(r.profile)
+                        ProfileLoadResult.NotFound -> Result.failure(ProfileNotFoundException())
+                        is ProfileLoadResult.Unavailable -> Result.failure(ProfileUnavailableException(r.cause))
+                    }
+                } catch (ce: Exception) {
+                    when ((ce as? FirebaseAuthException)?.errorCode) {
+                        "ERROR_EMAIL_ALREADY_IN_USE" -> Result.failure(Exception(
+                            "كلمة المرور غير صحيحة لهذا الحساب. يرجى التأكد من كلمة المرور أو استخدام \"نسيت كلمة المرور؟\"."))
+                        "ERROR_WEAK_PASSWORD" -> Result.failure(Exception(
+                            "كلمة المرور يجب أن تكون 6 أحرف أو أرقام على الأقل."))
+                        else -> Result.failure(ce)
+                    }
+                }
+            }
             Result.failure(e)
         }
     }
@@ -169,7 +198,7 @@ class AuthRepository(
                 .setHandleCodeInApp(true)
                 .setAndroidPackageName(
                     "com.flowexa.app",
-                    true,   // installIfNotAvailable
+                    false,  // installIfNotAvailable (same as web)
                     "1"     // minimumVersion
                 )
                 .build()
@@ -186,5 +215,23 @@ class AuthRepository(
         if (uid != null) {
             database.userProfileDao().delete(uid)
         }
+    }
+}
+
+
+/** Arabic auth messages identical to the web login screen (app/page.tsx). */
+fun authErrorMessage(e: Throwable, fallback: String): String {
+    val code = (e as? FirebaseAuthException)?.errorCode
+    return when (code) {
+        "ERROR_INVALID_CREDENTIAL", "ERROR_WRONG_PASSWORD", "ERROR_USER_NOT_FOUND", "ERROR_INVALID_EMAIL" ->
+            "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+        "ERROR_EMAIL_ALREADY_IN_USE" -> "هذا البريد الإلكتروني مسجل مسبقاً، يرجى تسجيل الدخول."
+        "ERROR_WEAK_PASSWORD" -> "كلمة المرور ضعيفة جداً، يجب أن تكون 6 أحرف على الأقل."
+        "ERROR_OPERATION_NOT_ALLOWED" -> "طريقة تسجيل الدخول هذه غير مفعلة في إعدادات Firebase Authentication."
+        "ERROR_NETWORK_REQUEST_FAILED" -> "فشل الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت."
+        "ERROR_TOO_MANY_REQUESTS" -> "تم حظر الحساب مؤقتاً بسبب محاولات تسجيل دخول خاطئة كثيرة. يرجى إعادة المحاولة لاحقاً أو استعادة كلمة المرور."
+        else -> if (e is com.google.firebase.FirebaseNetworkException)
+            "فشل الاتصال بالخادم. يرجى التأكد من اتصال الإنترنت."
+        else e.message?.takeIf { it.isNotBlank() } ?: fallback
     }
 }

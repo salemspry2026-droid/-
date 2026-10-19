@@ -25,7 +25,7 @@ import com.flowexa.app.data.local.entity.*
         OrderStageEntity::class,
         CustomerPhoneEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class FlowexaDatabase : RoomDatabase() {
@@ -85,30 +85,37 @@ abstract class FlowexaDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `companies` ADD COLUMN `companyTypeOther` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `companies` ADD COLUMN `isVisibleToClients` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): FlowexaDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: try {
-                    // First attempt: try with migration
-                    Room.databaseBuilder(
-                        context.applicationContext,
-                        FlowexaDatabase::class.java,
-                        "flowexa.db"
-                    )
-                        .addMigrations(MIGRATION_1_2)
-                        .build()
-                        .also { INSTANCE = it }
-                } catch (e: Exception) {
-                    Log.e("FlowexaDatabase", "Migration failed, using fallback: ${e.message}")
-                    // Fallback: create fresh database without migration
-                    Room.databaseBuilder(
-                        context.applicationContext,
-                        FlowexaDatabase::class.java,
-                        "flowexa.db"
-                    )
-                        .fallbackToDestructiveMigration()
-                        .build()
-                        .also { INSTANCE = it }
-                }
+                INSTANCE ?: openSafely(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+
+        /**
+         * Room opens lazily, so a failed migration / corrupt file would crash on the FIRST query
+         * (an instant app close). Force-open here; if it fails, wipe the local cache and rebuild.
+         * (The local DB is a cache of Firestore; unsynced outbox rows of a corrupt DB are unrecoverable anyway.)
+         */
+        private fun openSafely(appContext: Context): FlowexaDatabase {
+            fun build(destructive: Boolean): FlowexaDatabase {
+                val b = Room.databaseBuilder(appContext, FlowexaDatabase::class.java, "flowexa.db")
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                if (destructive) b.fallbackToDestructiveMigration()
+                return b.build()
+            }
+            return try {
+                build(false).also { it.openHelper.writableDatabase }
+            } catch (e: Exception) {
+                Log.e("FlowexaDatabase", "Open/migration failed, rebuilding local cache: ${e.message}", e)
+                try { appContext.deleteDatabase("flowexa.db") } catch (_: Exception) {}
+                build(true).also { it.openHelper.writableDatabase }
             }
         }
     }

@@ -21,6 +21,8 @@ data class CompanyEntity(
     val notes: String? = null,
     val workingHours: String? = null,
     val companyType: String? = null,
+    val companyTypeOther: String? = null,
+    val isVisibleToClients: Boolean = false,
     val primaryCurrency: String = "SAR",
     val secondaryCurrenciesJson: String = "[]",
     val exchangeRatesJson: String = "{}",

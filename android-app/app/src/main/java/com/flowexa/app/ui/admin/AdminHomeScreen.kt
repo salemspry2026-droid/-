@@ -2,7 +2,9 @@ package com.flowexa.app.ui.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +37,20 @@ fun AdminHomeScreen(
     onCreateOrderClick: () -> Unit,
     onProductsClick: () -> Unit,
     onCustomersClick: () -> Unit,
-    onOrderClick: (String) -> Unit
+    onOrderClick: (String) -> Unit,
+    onAllOrdersClick: () -> Unit = {},
+    onCompanySettingsClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onAdministrationClick: (() -> Unit)? = null,
+    onCallRecordingsClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    displayName: String = "",
+    roleLabel: String = "",
+    stages: List<com.flowexa.app.data.local.entity.OrderStageEntity> = emptyList(),
+    stageCounts: Map<String, Int> = emptyMap(),
+    delegateCount: Int = 0,
+    customerCount: Int = 0,
+    unreadNotifications: Int = 0
 ) {
     LazyColumn(
         modifier = Modifier
@@ -44,6 +59,29 @@ fun AdminHomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Company card + logout (web HomeTab header)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(companyName, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        if (roleLabel.isNotEmpty()) Text(roleLabel, fontSize = 12.sp, color = TextSecondary)
+                    }
+                    IconButton(onClick = onLogoutClick) {
+                        Icon(Icons.Default.Logout, contentDescription = "تسجيل الخروج", tint = Color(0xFFEF4444))
+                    }
+                }
+            }
+        }
+
         // Welcome Banner
         item {
             Card(
@@ -53,7 +91,7 @@ fun AdminHomeScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "مرحباً بك في لوحة تحكم",
+                        text = if (displayName.isNotEmpty()) "مرحباً $displayName" else "مرحباً بك في لوحة تحكم",
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -79,77 +117,75 @@ fun AdminHomeScreen(
             }
         }
 
-        // Stats Grid
+        // Sales summary card (web HomeTab: إجمالي مبيعات اليوم)
         item {
-            Row(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2E5CA6))
             ) {
-                StatCard(
-                    title = "مبيعات اليوم",
-                    value = totalSales.formatAmount(currency),
-                    icon = Icons.Default.Payments,
-                    color = FlowexaBlue,
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    title = "طلبات اليوم",
-                    value = "$todayOrdersCount طلب",
-                    icon = Icons.Default.ReceiptLong,
-                    color = FlowexaGreen,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.padding(20.dp)) {
+                    Text("إجمالي مبيعات اليوم", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("%,.0f".format(totalSales), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(currency, fontSize = 18.sp, color = Color.White)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("$todayOrdersCount طلب ($delegateCount مندوب - $customerCount عميل)", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                        val avg = if (todayOrdersCount > 0) totalSales / todayOrdersCount else 0.0
+                        Text("متوسط ${"%,.0f".format(avg)} $currency", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                    }
+                }
             }
         }
 
+        // Dynamic status cards (web: stagesToDisplay with per-status counts)
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = "الأصناف المتوفرة",
-                    value = "$productsCount صنف",
-                    icon = Icons.Default.Inventory2,
-                    color = Color(0xFF6366F1),
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    title = "إجمالي العملاء",
-                    value = "$customersCount عميل",
-                    icon = Icons.Default.People,
-                    color = Color(0xFFD97706),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // Quick Actions
-        item {
-            Text(
-                text = "الإجراءات السريعة",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextPrimary
+            val display: List<Pair<String, String>> =
+                if (stages.isNotEmpty()) stages.sortedBy { it.stageIndex }.map { it.name to it.name }
+                else listOf("pending" to "جديد", "processing" to "مراجعة", "completed" to "مؤكد", "delivered" to "مُسلّم")
+            val palette = listOf(
+                Color(0xFFEFF6FF) to Color(0xFF1E3A8A),
+                Color(0xFFFFF7ED) to Color(0xFFEA580C),
+                Color(0xFFF0FDF4) to Color(0xFF16A34A),
+                Color(0xFFFAF5FF) to Color(0xFF7E22CE)
             )
+            val scrollable = display.size > 5
+            Row(
+                modifier = Modifier.fillMaxWidth().let { if (scrollable) it.horizontalScroll(rememberScrollState()) else it },
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                display.forEachIndexed { idx, (statusKey, label) ->
+                    val (bg, fg) = palette.getOrElse(idx) { Color(0xFFF9FAFB) to Color(0xFF1F2937) }
+                    Card(
+                        modifier = if (scrollable) Modifier.width(110.dp) else Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = bg)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${stageCounts[statusKey] ?: 0}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = fg)
+                            Text(label, fontSize = 11.sp, color = fg.copy(alpha = 0.85f), maxLines = 1)
+                        }
+                    }
+                }
+            }
         }
 
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            ActionChip(title = "سجل المكالمات", icon = Icons.Default.Mic, onClick = onCallRecordingsClick, modifier = Modifier.fillMaxWidth())
+        }
+
+        // Action buttons (web: معلومات الشركة / الإشعارات)
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionChip(title = "معلومات الشركة", icon = Icons.Default.Business, onClick = onCompanySettingsClick, modifier = Modifier.weight(1f))
+                if (onAdministrationClick != null) {
+                    ActionChip(title = "الإدارة", icon = Icons.Default.Settings, onClick = onAdministrationClick, modifier = Modifier.weight(1f))
+                }
                 ActionChip(
-                    title = "إدارة الأصناف",
-                    icon = Icons.Default.Inventory2,
-                    onClick = onProductsClick,
-                    modifier = Modifier.weight(1f)
-                )
-                ActionChip(
-                    title = "إدارة العملاء",
-                    icon = Icons.Default.People,
-                    onClick = onCustomersClick,
-                    modifier = Modifier.weight(1f)
+                    title = if (unreadNotifications > 0) "الإشعارات (${if (unreadNotifications > 99) "99+" else unreadNotifications})" else "الإشعارات",
+                    icon = Icons.Default.Notifications, onClick = onNotificationsClick, modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -162,11 +198,12 @@ fun AdminHomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "أحدث الطلبات",
+                    text = "آخر الطلبات",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = TextPrimary
                 )
+                TextButton(onClick = onAllOrdersClick) { Text("الكل", color = FlowexaBlue) }
             }
         }
 

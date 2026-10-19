@@ -181,6 +181,7 @@ class SyncEngine(
                 val payloadMap = jsonToMap(JSONObject(op.payloadJson))
                     .filterKeys { !it.startsWith("__") }
                     .toMutableMap()
+                (payloadMap["remindAt"] as? Number)?.let { payloadMap["remindAt"] = com.google.firebase.Timestamp(java.util.Date(it.toLong())) }
                 payloadMap["updatedAt"] = FieldValue.serverTimestamp()
                 if ((payloadMap["updatedBy"] as? String).isNullOrEmpty()) payloadMap["updatedBy"] = uid
                 if (op.operation == OutboxOp.CREATE) {

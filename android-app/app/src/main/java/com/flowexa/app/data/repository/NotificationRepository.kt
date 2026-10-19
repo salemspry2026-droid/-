@@ -25,6 +25,28 @@ class NotificationRepository(
         return notificationDao.observeNotifications(companyId)
     }
 
+    suspend fun createNotification(
+        companyId: String, title: String, message: String, type: String,
+        orderId: String?, clientUid: String?, createdBy: String, remindAtMs: Long? = null
+    ) = withContext(Dispatchers.IO) {
+        val id = "notif_${UUID.randomUUID()}"
+        val payload = JSONObject().apply {
+            put("companyId", companyId); put("title", title); put("message", message); put("type", type)
+            orderId?.let { put("orderId", it) }
+            clientUid?.let { put("clientUid", it) }
+            remindAtMs?.let { put("remindAt", it) }
+            put("readBy", org.json.JSONArray())
+            put("createdBy", createdBy); put("updatedBy", createdBy); put("isDeleted", false)
+        }
+        syncDao.insert(
+            SyncOperationEntity(
+                id = UUID.randomUUID().toString(), collectionName = AppConfig.COL_NOTIFICATIONS,
+                documentId = id, operation = OutboxOp.CREATE, payloadJson = payload.toString()
+            )
+        )
+        SyncScheduler.scheduleImmediateSync(context)
+    }
+
     /**
      * Marks a notification as read locally and enqueues an operation-specific ARRAY_ADD on the
      * `readBy` field (never replacing the whole array). Runs in one local+outbox transaction so an

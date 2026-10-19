@@ -1,8 +1,19 @@
 package com.flowexa.app.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -17,26 +28,38 @@ data class BottomNavItem(
     val icon: ImageVector
 )
 
+/**
+ * Mirrors the web dashboards:
+ *  - Staff (AdminDashboard.tsx): الرئيسية | الطلبات | الأصناف | العملاء | الموظفين
+ *    (each tab only when the permission allows; الموظفين only for owner/admin).
+ *  - Client (ClientDashboard.tsx): الرئيسية | المفضلة | المنتجات | طلباتي (| حسابي when available).
+ */
 @Composable
 fun FlowexaBottomBar(
     currentRoute: String,
     onNavigate: (String) -> Unit,
-    isClient: Boolean = false
+    isClient: Boolean = false,
+    canViewOrders: Boolean = true,
+    canViewProducts: Boolean = true,
+    canViewCustomers: Boolean = true,
+    canViewStaff: Boolean = false
 ) {
     val items = if (isClient) {
         listOf(
-            BottomNavItem(Routes.ClientHome.route, "الرئيسية", Icons.Default.Home),
-            BottomNavItem(Routes.ClientCatalog.route, "الأصناف", Icons.Default.Inventory2),
-            BottomNavItem(Routes.ClientOrders.route, "طلباتي", Icons.Default.ShoppingBag)
+            BottomNavItem(Routes.ClientHome.route, "الرئيسية", Icons.Default.Dashboard),
+            BottomNavItem(Routes.ClientFavorites.route, "المفضلة", Icons.Default.Favorite),
+            BottomNavItem(Routes.ClientCatalog.route, "المنتجات", Icons.Default.ShoppingBag),
+            BottomNavItem(Routes.ClientOrders.route, "طلباتي", Icons.Default.ReceiptLong),
+            BottomNavItem(Routes.ClientProfile.route, "حسابي", Icons.Default.Person)
         )
     } else {
-        listOf(
-            BottomNavItem(Routes.AdminHome.route, "الرئيسية", Icons.Default.Dashboard),
-            BottomNavItem(Routes.Products.route, "الأصناف", Icons.Default.Inventory2),
-            BottomNavItem(Routes.Customers.route, "العملاء", Icons.Default.People),
-            BottomNavItem(Routes.Orders.route, "الطلبات", Icons.Default.ReceiptLong),
-            BottomNavItem(Routes.Settings.route, "الإعدادات", Icons.Default.Settings)
-        )
+        buildList {
+            add(BottomNavItem(Routes.AdminHome.route, "الرئيسية", Icons.Default.Dashboard))
+            if (canViewOrders) add(BottomNavItem(Routes.Orders.route, "الطلبات", Icons.Default.ReceiptLong))
+            if (canViewProducts) add(BottomNavItem(Routes.Products.route, "الأصناف", Icons.Default.Inventory2))
+            if (canViewCustomers) add(BottomNavItem(Routes.Customers.route, "العملاء", Icons.Default.People))
+            if (canViewStaff) add(BottomNavItem(Routes.Staff.route, "الموظفين", Icons.Default.Security))
+        }
     }
 
     NavigationBar(
