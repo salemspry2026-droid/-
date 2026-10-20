@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.flowexa.app.data.local.entity.CustomerEntity
+import com.flowexa.app.data.local.entity.UserProfileEntity
+import com.flowexa.app.domain.PermissionManager
 import com.flowexa.app.ui.theme.*
 import java.util.UUID
 
@@ -34,23 +36,30 @@ fun CustomersScreen(
     onSaveCustomer: (CustomerEntity, isNew: Boolean) -> Unit,
     onDeleteCustomer: (String) -> Unit,
     companyId: String,
-    onCustomerClick: ((String) -> Unit)? = null
+    onCustomerClick: ((String) -> Unit)? = null,
+    userProfile: UserProfileEntity? = null
 ) {
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
     var editingCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
 
+    val canCreate = PermissionManager.hasPermission(userProfile, PermissionManager.Module.CUSTOMERS, PermissionManager.Action.CREATE)
+    val canEdit = PermissionManager.hasPermission(userProfile, PermissionManager.Module.CUSTOMERS, PermissionManager.Action.EDIT)
+    val canDelete = PermissionManager.hasPermission(userProfile, PermissionManager.Module.CUSTOMERS, PermissionManager.Action.DELETE)
+
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    editingCustomer = null
-                    showDialog = true
-                },
-                containerColor = FlowexaBlue,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "إضافة عميل")
+            if (canCreate) {
+                FloatingActionButton(
+                    onClick = {
+                        editingCustomer = null
+                        showDialog = true
+                    },
+                    containerColor = FlowexaBlue,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = "إضافة عميل")
+                }
             }
         }
     ) { padding ->
@@ -90,10 +99,11 @@ fun CustomersScreen(
                     items(customers, key = { it.id }) { customer ->
                         CustomerCard(
                             customer = customer,
+                            canEdit = canEdit,
                             onClick = {
                                 if (onCustomerClick != null) {
                                     onCustomerClick(customer.id)
-                                } else {
+                                } else if (canEdit) {
                                     editingCustomer = customer
                                     showDialog = true
                                 }
@@ -131,6 +141,7 @@ fun CustomersScreen(
 @Composable
 fun CustomerCard(
     customer: CustomerEntity,
+    canEdit: Boolean,
     onClick: () -> Unit = {},
     onEdit: () -> Unit,
     onCall: () -> Unit
@@ -179,8 +190,10 @@ fun CustomerCard(
                 }
             }
 
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = FlowexaBlue)
+            if (canEdit) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = FlowexaBlue)
+                }
             }
         }
     }
@@ -204,94 +217,84 @@ fun CustomerFormDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = if (isNew) "إضافة عميل جديد" else "تعديل بيانات العميل",
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FlowexaBlue
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
-
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("اسم العميل أو الصيدلية / المحل *") },
+                    label = { Text("اسم العميل *") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    singleLine = true
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
                     label = { Text("رقم الهاتف") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    singleLine = true
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("العنوان / المدينة / الحي") },
+                    label = { Text("العنوان") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    minLines = 2
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("ملاحظات") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    minLines = 2
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedButton(
+                    TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text("إلغاء")
                     }
-
                     Button(
                         onClick = {
-                            val custId = customer?.id ?: "cust_${UUID.randomUUID()}"
-                            val newCust = CustomerEntity(
-                                id = custId,
+                            if (name.isBlank()) return@Button
+                            val newCustomer = CustomerEntity(
+                                id = customer?.id ?: "cust_${UUID.randomUUID()}",
                                 companyId = companyId,
                                 name = name.trim(),
                                 phone = phone.trim().ifEmpty { null },
                                 address = address.trim().ifEmpty { null },
-                                notes = notes.trim().ifEmpty { null }
+                                notes = notes.trim().ifEmpty { null },
+                                createdAtMs = customer?.createdAtMs ?: System.currentTimeMillis(),
+                                isDeleted = false
                             )
-                            onSave(newCust, isNew)
+                            onSave(newCustomer, isNew)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FlowexaBlue),
-                        enabled = name.isNotBlank()
+                        colors = ButtonDefaults.buttonColors(containerColor = FlowexaBlue)
                     ) {
-                        Text("حفظ")
+                        Text(if (isNew) "إضافة" else "حفظ")
                     }
                 }
             }

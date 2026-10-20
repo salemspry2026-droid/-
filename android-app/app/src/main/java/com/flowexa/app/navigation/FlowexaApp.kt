@@ -432,12 +432,21 @@ fun FlowexaApp(
                             res.onSuccess {
                                 authRepo.currentUser?.uid?.let { uid -> routeAfterAuth(uid) }
                             }.onFailure { err ->
-                                authError = err.message ?: "فشل تسجيل الدخول عبر Google"
+                                authError = authErrorMessage(err, "فشل تسجيل الدخول عبر Google")
                             }
                         }
                     },
-                    onRegisterNavigate = { navController.navigate(Routes.Register.route) },
-                    onForgotPasswordNavigate = { navController.navigate(Routes.ForgotPassword.route) },
+                    onRegisterNavigate = {
+                        authError = null
+                        resetSuccess = false
+                        emailLinkSent = false
+                        navController.navigate(Routes.Register.route)
+                    },
+                    onForgotPasswordNavigate = {
+                        authError = null
+                        resetSuccess = false
+                        navController.navigate(Routes.ForgotPassword.route)
+                    },
                     onSendEmailLinkClick = { email ->
                         coroutineScope.launch {
                             isAuthLoading = true
@@ -490,7 +499,10 @@ fun FlowexaApp(
                             }
                         }
                     },
-                    onLoginNavigate = { navController.navigate(Routes.Login.route) },
+                    onLoginNavigate = {
+                        authError = null
+                        navController.navigate(Routes.Login.route)
+                    },
                     isLoading = isAuthLoading,
                     errorMessage = authError
                 )
@@ -506,7 +518,7 @@ fun FlowexaApp(
                             val res = authRepo.sendPasswordReset(email)
                             isAuthLoading = false
                             res.onSuccess { resetSuccess = true }
-                                .onFailure { err -> authError = err.message }
+                                .onFailure { err -> authError = authErrorMessage(err, "فشل إرسال رابط الاستعادة") }
                         }
                     },
                     onBackClick = { navController.popBackStack() },
@@ -690,7 +702,8 @@ fun FlowexaApp(
                         coroutineScope.launch { productRepo.deleteProduct(id, currentUserId = currentUser?.uid ?: "") }
                     },
                     companyId = currentCompanyId,
-                    primaryCurrency = company?.primaryCurrency ?: "SAR"
+                    primaryCurrency = company?.primaryCurrency ?: "SAR",
+                    userProfile = userProfile
                 )
             }
 
@@ -711,7 +724,8 @@ fun FlowexaApp(
                     companyId = currentCompanyId,
                     onCustomerClick = { custId ->
                         navController.navigate(Routes.CustomerDetail.createRoute(custId))
-                    }
+                    },
+                    userProfile = userProfile
                 )
             }
 

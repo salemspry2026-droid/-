@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.flowexa.app.core.formatAmount
 import com.flowexa.app.data.local.entity.ProductEntity
+import com.flowexa.app.data.local.entity.UserProfileEntity
+import com.flowexa.app.domain.PermissionManager
 import com.flowexa.app.ui.theme.*
 import java.util.UUID
 
@@ -33,22 +35,29 @@ fun ProductsScreen(
     onSaveProduct: (ProductEntity, isNew: Boolean) -> Unit,
     onDeleteProduct: (String) -> Unit,
     companyId: String,
-    primaryCurrency: String
+    primaryCurrency: String,
+    userProfile: UserProfileEntity? = null
 ) {
     var showDialog by remember { mutableStateOf(false) }
     var editingProduct by remember { mutableStateOf<ProductEntity?>(null) }
 
+    val canCreate = PermissionManager.hasPermission(userProfile, PermissionManager.Module.PRODUCTS, PermissionManager.Action.CREATE)
+    val canEdit = PermissionManager.hasPermission(userProfile, PermissionManager.Module.PRODUCTS, PermissionManager.Action.EDIT)
+    val canDelete = PermissionManager.hasPermission(userProfile, PermissionManager.Module.PRODUCTS, PermissionManager.Action.DELETE)
+
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    editingProduct = null
-                    showDialog = true
-                },
-                containerColor = FlowexaBlue,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "إضافة صنف")
+            if (canCreate) {
+                FloatingActionButton(
+                    onClick = {
+                        editingProduct = null
+                        showDialog = true
+                    },
+                    containerColor = FlowexaBlue,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "إضافة صنف")
+                }
             }
         }
     ) { padding ->
@@ -89,6 +98,8 @@ fun ProductsScreen(
                     items(products, key = { it.id }) { product ->
                         ProductCard(
                             product = product,
+                            canEdit = canEdit,
+                            canDelete = canDelete,
                             onEdit = {
                                 editingProduct = product
                                 showDialog = true
@@ -118,13 +129,15 @@ fun ProductsScreen(
 @Composable
 fun ProductCard(
     product: ProductEntity,
+    canEdit: Boolean,
+    canDelete: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEdit() },
+            .clickable(enabled = canEdit) { onEdit() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
     ) {
@@ -176,8 +189,10 @@ fun ProductCard(
                 }
             }
 
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = FlowexaBlue)
+            if (canEdit) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = FlowexaBlue)
+                }
             }
         }
     }
@@ -199,165 +214,146 @@ fun ProductFormDialog(
     var unit by remember { mutableStateOf(product?.unit ?: "قطعة") }
     var inStock by remember { mutableStateOf(product?.inStock ?: true) }
     var bonusType by remember { mutableStateOf(product?.bonusType ?: "none") }
-    var bonusPercentText by remember { mutableStateOf(product?.bonusFixedPercent?.toString() ?: "0.0") }
-    var description by remember { mutableStateOf(product?.description ?: "") }
+    var bonusFixedPercentText by remember { mutableStateOf(product?.bonusFixedPercent?.toString() ?: "0.0") }
+    var bonusTiersJson by remember { mutableStateOf(product?.bonusTiersJson ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(20.dp),
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = FlowexaSurface)
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = if (isNew) "إضافة صنف جديد" else "تعديل الصنف",
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FlowexaBlue
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
-
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("اسم الصنف التجاري *") },
+                    label = { Text("الاسم التجاري *") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    singleLine = true
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = scientificName,
                     onValueChange = { scientificName = it },
-                    label = { Text("الاسم العلمي (اختياري)") },
+                    label = { Text("الاسم العلمي") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = priceText,
                         onValueChange = { priceText = it },
                         label = { Text("السعر *") },
-                        modifier = Modifier.weight(1.5f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = currency,
                         onValueChange = { currency = it },
                         label = { Text("العملة") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(0.6f),
+                        singleLine = true
                     )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = unit,
                     onValueChange = { unit = it },
-                    label = { Text("الوحدة (كرتون، باكت، علبة..)") },
+                    label = { Text("الوحدة") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = inStock, onCheckedChange = { inStock = it })
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text("متوفر في المخزون", fontSize = 14.sp)
-                    Switch(checked = inStock, onCheckedChange = { inStock = it })
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Bonus system selector
-                Text("نظام البونص المجاني", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = FlowexaBlue)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilterChip(
-                        selected = bonusType == "none",
-                        onClick = { bonusType = "none" },
-                        label = { Text("بدون", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = bonusType == "fixed",
-                        onClick = { bonusType = "fixed" },
-                        label = { Text("نسبة مئوية", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = bonusType == "tiered",
-                        onClick = { bonusType = "tiered" },
-                        label = { Text("شرائح كميات", fontSize = 11.sp) }
-                    )
+                Text("نوع البونص:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = bonusType == "none", onClick = { bonusType = "none" })
+                    Text("بدون بونص")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    RadioButton(selected = bonusType == "fixed", onClick = { bonusType = "fixed" })
+                    Text("ثابت")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    RadioButton(selected = bonusType == "tiered", onClick = { bonusType = "tiered" })
+                    Text("تصاعدي")
                 }
 
                 if (bonusType == "fixed") {
-                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = bonusPercentText,
-                        onValueChange = { bonusPercentText = it },
-                        label = { Text("نسبة البونص المئوية %") },
+                        value = bonusFixedPercentText,
+                        onValueChange = { bonusFixedPercentText = it },
+                        label = { Text("نسبة البونص الثابت %") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        singleLine = true
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (bonusType == "tiered") {
+                    OutlinedTextField(
+                        value = bonusTiersJson,
+                        onValueChange = { bonusTiersJson = it },
+                        label = { Text("شرائح البونص (JSON)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedButton(
+                    TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text("إلغاء")
                     }
-
                     Button(
                         onClick = {
-                            val priceVal = priceText.toDoubleOrNull() ?: 0.0
-                            val bonusVal = bonusPercentText.toDoubleOrNull()
-                            val prodId = product?.id ?: "prod_${UUID.randomUUID()}"
-                            val newProd = ProductEntity(
-                                id = prodId,
+                            if (name.isBlank()) return@Button
+                            val price = priceText.toDoubleOrNull() ?: 0.0
+                            val bonusFixedPercent = if (bonusType == "fixed") bonusFixedPercentText.toDoubleOrNull() else null
+                            val newProduct = ProductEntity(
+                                id = product?.id ?: "prod_${UUID.randomUUID()}",
                                 companyId = companyId,
                                 name = name.trim(),
                                 scientificName = scientificName.trim().ifEmpty { null },
-                                price = priceVal,
+                                price = price,
                                 currency = currency.trim(),
                                 unit = unit.trim(),
                                 inStock = inStock,
                                 bonusType = bonusType,
-                                bonusFixedPercent = bonusVal,
-                                description = description.trim().ifEmpty { null }
+                                bonusFixedPercent = bonusFixedPercent,
+                                bonusTiersJson = if (bonusType == "tiered") bonusTiersJson.trim() else "",
+                                createdAtMs = product?.createdAtMs ?: System.currentTimeMillis(),
+                                isDeleted = false
                             )
-                            onSave(newProd, isNew)
+                            onSave(newProduct, isNew)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FlowexaBlue),
-                        enabled = name.isNotBlank()
+                        colors = ButtonDefaults.buttonColors(containerColor = FlowexaBlue)
                     ) {
-                        Text("حفظ")
+                        Text(if (isNew) "إضافة" else "حفظ")
                     }
                 }
             }

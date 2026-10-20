@@ -60,16 +60,22 @@ android {
     val releaseKeystore = file("flowexa-release.keystore")
     val hasReleaseKeystore = releaseKeystore.exists()
 
+    // Signing credentials are CI secrets. Validate them only when a release artifact is
+    // actually requested, so a keystore present locally (gitignored) does not make debug
+    // builds fail at configuration time when the environment variables are not set.
+    fun releaseSigningValue(name: String): String? {
+        val value = System.getenv(name)
+        if (isReleasePackagingRequested && value == null) error("$name is required when building a release")
+        return value
+    }
+
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
                 storeFile = releaseKeystore
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                    ?: error("KEYSTORE_PASSWORD is required when building a release")
-                keyAlias = System.getenv("KEY_ALIAS")
-                    ?: error("KEY_ALIAS is required when building a release")
-                keyPassword = System.getenv("KEY_PASSWORD")
-                    ?: error("KEY_PASSWORD is required when building a release")
+                storePassword = releaseSigningValue("KEYSTORE_PASSWORD")
+                keyAlias = releaseSigningValue("KEY_ALIAS")
+                keyPassword = releaseSigningValue("KEY_PASSWORD")
             }
         }
     }

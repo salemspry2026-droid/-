@@ -3,7 +3,9 @@ package com.flowexa.app.auth
 import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.flowexa.app.data.remote.FirebaseProvider
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -49,6 +51,10 @@ class GoogleAuthManager(private val context: Context) {
             } else {
                 Result.failure(Exception("نوع الاعتماد غير مدعوم"))
             }
+        } catch (e: GetCredentialCancellationException) {
+            Result.failure(Exception("تم إلغاء تسجيل الدخول"))
+        } catch (e: NoCredentialException) {
+            Result.failure(Exception("لا توجد حسابات Google متاحة على هذا الجهاز"))
         } catch (e: GetCredentialException) {
             Result.failure(e)
         } catch (e: Exception) {

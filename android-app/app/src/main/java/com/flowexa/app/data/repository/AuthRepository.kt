@@ -51,8 +51,9 @@ class AuthRepository(
     }
 
     suspend fun login(email: String, pass: String): Result<UserProfileEntity> = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
         try {
-            val authResult = auth.signInWithEmailAndPassword(email.trim(), pass).await()
+            val authResult = auth.signInWithEmailAndPassword(cleanEmail, pass).await()
             val user = authResult.user ?: throw Exception("تعذر العثور على المستخدم")
             when (val r = loadProfile(user.uid)) {
                 is ProfileLoadResult.Found -> Result.success(r.profile)
@@ -65,11 +66,11 @@ class AuthRepository(
             val code = (e as? FirebaseAuthException)?.errorCode
             if (code == "ERROR_INVALID_CREDENTIAL" || code == "ERROR_USER_NOT_FOUND") {
                 return@withContext try {
-                    val created = auth.createUserWithEmailAndPassword(email.trim(), pass).await()
+                    val created = auth.createUserWithEmailAndPassword(cleanEmail, pass).await()
                     val user = created.user ?: throw Exception("فشل إنشاء الحساب")
                     user.updateProfile(
                         UserProfileChangeRequest.Builder()
-                            .setDisplayName(email.trim().substringBefore('@'))
+                            .setDisplayName(cleanEmail.substringBefore('@'))
                             .build()
                     ).await()
                     when (val r = loadProfile(user.uid)) {
@@ -92,9 +93,17 @@ class AuthRepository(
     }
 
     suspend fun register(email: String, pass: String, displayName: String): Result<UserProfileEntity> = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
         try {
-            val authResult = auth.createUserWithEmailAndPassword(email.trim(), pass).await()
+            val authResult = auth.createUserWithEmailAndPassword(cleanEmail, pass).await()
             val user = authResult.user ?: throw Exception("فشل إنشاء الحساب")
+
+            val trimmedName = displayName.trim()
+            if (trimmedName.isNotEmpty()) {
+                user.updateProfile(
+                    UserProfileChangeRequest.Builder().setDisplayName(trimmedName).build()
+                ).await()
+            }
 
             // NOTE: We intentionally do NOT create a user profile here.
             // The profile is created during onboarding (createCompany / joinAsEmployee / joinAsClient).
@@ -114,7 +123,7 @@ class AuthRepository(
 
     suspend fun sendPasswordReset(email: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            auth.sendPasswordResetEmail(email.trim()).await()
+            auth.sendPasswordResetEmail(email.trim().lowercase()).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -169,11 +178,12 @@ class AuthRepository(
      */
     suspend fun completeEmailLinkSignIn(email: String, emailLink: String): Result<ProfileLoadResult> =
         withContext(Dispatchers.IO) {
+            val cleanEmail = email.trim().lowercase()
             try {
                 if (!auth.isSignInWithEmailLink(emailLink)) {
                     return@withContext Result.failure(IllegalArgumentException("رابط تسجيل الدخول غير صالح"))
                 }
-                val result = auth.signInWithEmailLink(email.trim(), emailLink).await()
+                val result = auth.signInWithEmailLink(cleanEmail, emailLink).await()
                 val user = result.user ?: return@withContext Result.failure(Exception("تعذر العثور على المستخدم"))
                 Result.success(loadProfile(user.uid))
             } catch (e: Exception) {
@@ -192,6 +202,7 @@ class AuthRepository(
      * so the app can handle the link when opened.
      */
     suspend fun sendSignInLinkToEmail(email: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
         try {
             val actionCodeSettings = com.google.firebase.auth.ActionCodeSettings.newBuilder()
                 .setUrl("https://orderflow-topaz.vercel.app/")
@@ -202,7 +213,7 @@ class AuthRepository(
                     "1"     // minimumVersion
                 )
                 .build()
-            auth.sendSignInLinkToEmail(email.trim(), actionCodeSettings).await()
+            auth.sendSignInLinkToEmail(cleanEmail, actionCodeSettings).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -70,8 +70,8 @@ class MainActivity : ComponentActivity() {
         )
         if (link != null) {
             pendingDeepLink = link
-            // Consume the data so the same URI is not re-processed on re-creation.
-            intent.data = null
         }
+        // Consume the data so the same URI is not re-processed on re-creation.
+        intent.data = null
     }
 }
