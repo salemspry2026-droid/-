@@ -59,3 +59,13 @@ These are the first executed tests recorded in this knowledge base. They are Fir
 | Real-device verification | NOT RUN | pending; not applicable until a build exists |
 
 Rules in this working tree are NOT deployed and nothing was published (deployed rules remain EXTERNAL VERIFICATION REQUIRED).
+
+## Update 2026-10-20 — Local Gradle attempts on aarch64 host (Claude)
+
+| Area | Status | Evidence / notes |
+|---|---|---|
+| `./gradlew :app:assembleDebug` (local, this host) | FAIL | 2026-10-20, `android-app/`, JDK 21, Gradle 8.9, AGP 8.7.0. Fails at `:app:processDebugResources` — `AAPT2 Daemon startup failed`. Root cause: this host is **aarch64**; AGP 8.7.0's aapt2 (Maven `aapt2-8.7.0-12006047-linux.jar` and SDK `build-tools/35.0.0/aapt2`) are x86-64 ELF and cannot execute (`cannot execute: required file not found`; no `/lib64/ld-linux-x86-64.so.2`). Gradle configuration now passes after the `build.gradle.kts` signing-credential deferral fix (before it, even configuration failed). |
+| `compileDebugKotlin` of the uncommitted auth/permission batch | NOT AVAILABLE locally | Gated behind `processDebugResources`; never ran (verified in the task log). Static review done; compile verification DEFERRED to CI (x86-64). |
+| `./gradlew :app:testDebugUnitTest` (local) | NOT AVAILABLE locally | Dry-run task graph includes `processDebugResources` → same aapt2 blocker. CI path (`testReleaseUnitTest` on x86-64 runners) remains the verified route. |
+| Android APK production | EXTERNAL VERIFICATION REQUIRED | Must use `workflow_dispatch` on GitHub Actions (x86-64); unchanged from prior row, now with a definitive reason why local production is impossible. |
+| Status of `PermissionCeilingTest` / `BonusCalculatorTest` / `DomainUnitTests` / `DeepLinkParserTest` | NOT RUN (unchanged) | Cannot run locally (aapt2 prerequisite); CI only. |

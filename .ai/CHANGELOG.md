@@ -130,3 +130,22 @@ V1 … V8 (deployed rules, Google Sign-In/OAuth, app links, CI run, production p
   Tests: command + result (or NOT RUN)
   KB files updated: ...
 ```
+
+## 2026-10-20
+
+### Continued Android repair — session evidence record (Claude)
+
+- `[2026-10-20] [android|knowledge base] [Claude]` Resumed the repair workflow from the `flowexa-audit.txt` stopping point. The KB (last recorded HEAD `87a05e4c`) was six commits behind (`72ac378`→`bb1a202`), and the working tree carries an **uncommitted** Android/web batch: AuthRepository email normalization + Arabic `authErrorMessage`; GoogleAuthManager cancellation/no-credential handling; permission-gated Products/Customers screens (`PermissionManager`, closing C-06); `data_extraction_rules.xml` (T07/KI-013); deep-link `pathPrefix="/__/auth/"`; Customers/Products form-dialog rework; matched web email-link fixes (`app/page.tsx`, `components/AuthProvider.tsx`). Two defects were found and fixed in that batch:
+  1. `android-app/app/build.gradle.kts` — the `release` signing config demanded CI secrets at configuration time whenever a (gitignored, locally present) keystore file existed, failing even `assembleDebug`. Credential validation is now deferred behind the file's existing `isReleasePackagingRequested` guard; release builds still fail hard with the same messages. Config-level effect VERIFIED (the build progressed past configuration into task execution).
+  2. `FlowexaApp.kt` — the new `userProfile` params on `ProductsScreen`/`CustomersScreen` were never passed, so `hasPermission(null, …)` returned false for everyone and the gating would hide create/edit/delete even for owners/admins. Both call sites now pass `userProfile = userProfile`.
+  Refs: T04, T07, KI-007, KI-013, C-06. Commit: NO COMMIT RECORDED (uncommitted).
+  Files: `android-app/app/build.gradle.kts`, `android-app/app/src/main/java/com/flowexa/app/navigation/FlowexaApp.kt`.
+  Tests: full uncommitted diff statically reviewed PASS (imports, named args, entity fields, call sites); Gradle compile NOT AVAILABLE locally — see blocker below.
+  KB files updated: `.ai/CHANGELOG.md`.
+
+### Environment blocker (must be preserved in all future audits)
+
+- `[2026-10-20] [environment|build] [Claude]` **This host is aarch64.** `uname -m` = `aarch64`; the JVM and the system loaders are aarch64 (`/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1`). AGP 8.7.0's AAPT2 (Maven `aapt2-8.7.0-12006047-linux.jar`, and SDK `build-tools/35.0.0/aapt2`) are **x86-64 ELF** binaries needing `/lib64/ld-linux-x86-64.so.2`, which does not exist; both fail `cannot execute: required file not found`. Probes confirm **no ARM64-Linux aapt2 artifact exists** on Google Maven for aapt2 `8.7.0-12006047` or even `8.11.1` (`-linux-arm64` / `-arm64-linux` / `-linux_aarch64` all HTTP 404). Therefore no Gradle task that needs resource processing (`processDebugResources`, then `compileDebugKotlin`, `assembleDebug`, `testDebugUnitTest`) can run on this host at any AGP version. This **corrects** the earlier assumption that a debug build "should work locally if JDK + Android SDK are present" (`claude/AUDIT_REPORT.md` / `PROJECT_STATE.md`): on this host that is false by architecture. APK production and code compilation verification must flow through CI (GitHub Actions, x86-64 runners). Secondary constraints: RAM (~0.2–0.6 GB free, swap exhausted) and disk (`/` and `/dev/shm` at ~98%).
+  Refs: none. Commit: NO COMMIT RECORDED.
+  Tests: `./gradlew :app:assembleDebug` → `BUILD FAILED` at `:app:processDebugResources` (AAPT2 Daemon startup failed, 8m 31s); `build-tools/35.0.0/aapt2 version` → `cannot execute: required file not found`; `curl` HEAD on aapt2 arm64 jar names → HTTP 404.
+  KB files updated: `.ai/CHANGELOG.md`, `.ai/PROJECT_STATE.md`, `.ai/TESTING_STATUS.md`.

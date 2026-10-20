@@ -1,8 +1,12 @@
 # PROJECT_STATE — Flowexa
 
-Last updated: 2026-10-14 by Claude (Release workflow fix).
-**Current repository HEAD:** `87a05e4c` ("fix(workflow): allow publish-release to run on workflow_dispatch", 2026-10-14).
-**Implementation commits this session:** `4067bf4` (parity fixes) → `3541ad3` (compilation fix push) → `87a05e4c` (workflow fix push). Working tree clean at time of write.
+Last updated: 2026-10-20 by Claude (continued Android repair; environment blocker discovered).
+**Current repository HEAD:** `bb1a202` ("fix(android): import withStyle used by AppLogoText").
+**Working tree:** NOT clean — uncommitted Android/web/auth batch (see `git status`): AuthRepository email normalization + `authErrorMessage`, GoogleAuthManager cancellation handling, permission-gated Products/Customers screens, `data_extraction_rules.xml`, deep-link `pathPrefix`, screen form-dialog rework, web email-link fixes, plus two fixes from this session (`build.gradle.kts` signing-credential deferral, `FlowexaApp.kt` `userProfile` wiring). Nothing committed — no authorization requested. `flowexa-audit.txt` (session transcript) is untracked at repo root.
+
+## Environment blocker (correction — see CHANGELOG 2026-10-20)
+
+**This host is aarch64 (ARM64).** AGP 8.7.0's AAPT2 (Maven + SDK build-tools 35.0.0) exists only as x86-64 ELF; no ARM64-Linux aapt2 artifact exists at any probed AGP version (8.7.0, 8.11.1). Every Gradle task needing resource processing — `processDebugResources` → `compileDebugKotlin` → `assembleDebug` / `testDebugUnitTest` — **cannot run on this host**. The earlier `claude/AUDIT_REPORT.md` assumption that a local debug build should work with JDK+SDK present is FALSE by architecture here. Code compilation verification and APK production must go through CI (GitHub Actions, x86-64 runners). Secondary: RAM ~0.2–0.6 GB free (swap exhausted), disk ~98%. Static review and `.ai/` documentation remain fully possible.
 
 Evidence basis: static reading of the repository on 2026-10-06/07. **No code was executed, no Gradle/emulator/Firebase Emulator run, no Firebase/Google/GitHub/Vercel console was accessed.** All statuses use the vocabulary in `README.md`.
 
