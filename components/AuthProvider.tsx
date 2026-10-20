@@ -13,9 +13,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubscribeProfile: (() => void) | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = undefined;
+      }
       if (user) {
         setUser(user);
-        
+
         // Listen to user profile
         unsubscribeProfile = authService.subscribeToUserProfile(user.uid, (profileData) => {
           if (profileData) {
@@ -31,10 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setIsAuthReady(true);
       } else {
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = undefined;
-        }
         clearAuth();
         setIsAuthReady(true);
       }

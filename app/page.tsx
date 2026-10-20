@@ -58,8 +58,13 @@ export default function Home() {
         emailForSignIn = window.prompt('يرجى تأكيد البريد الإلكتروني لإكمال تسجيل الدخول:');
       }
       if (emailForSignIn) {
+        const cleanEmailForLink = emailForSignIn.trim().toLowerCase();
+        if (!cleanEmailForLink) {
+          toast.error('البريد الإلكتروني غير صالح');
+          return;
+        }
         setLoading(true);
-        signInWithEmailLink(auth, emailForSignIn, window.location.href)
+        signInWithEmailLink(auth, cleanEmailForLink, window.location.href)
           .then(() => {
             window.localStorage.removeItem('emailForSignIn');
             toast.success('تم تسجيل الدخول بنجاح عبر رابط البريد الإلكتروني');
@@ -68,6 +73,7 @@ export default function Home() {
             }
           })
           .catch((error: any) => {
+            window.localStorage.removeItem('emailForSignIn');
             console.error('Email link sign in error:', error);
             toast.error('تعذر تسجيل الدخول بالرابط: ' + (error.message || 'الرابط غير صالح أو منتهي'));
           })
@@ -81,7 +87,7 @@ export default function Home() {
   const handleEmailAction = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    const cleanPassword = password;
 
     if (!cleanEmail) {
       toast.error('الرجاء إدخال البريد الإلكتروني');
@@ -118,7 +124,7 @@ export default function Home() {
                 toast.error('كلمة المرور يجب أن تكون 6 أحرف أو أرقام على الأقل.');
                 return;
               }
-              throw signInErr;
+              throw createErr;
             }
           }
           throw signInErr;
@@ -189,8 +195,9 @@ export default function Home() {
         try {
           await signInWithRedirect(auth, googleProvider);
           return;
-        } catch (redirectErr) {
+        } catch (redirectErr: any) {
           console.error("Redirect login failed:", redirectErr);
+          toast.error('تعذر التحويل للمصادقة المباشرة: ' + (redirectErr?.message || redirectErr?.code || ''));
         }
       } else if (error.code === 'auth/unauthorized-domain') {
         toast.error('لم يتم تفويض رابط الموقع الحالي. يرجى الذهاب إلى Firebase Console > Authentication > Settings > Authorized Domains وإضافة هذا النطاق.');
