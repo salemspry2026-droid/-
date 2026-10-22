@@ -8,6 +8,16 @@ object SyncScheduler {
     private const val UNIQUE_WORK_NAME = "flowexa_sync_work"
     private const val PERIODIC_WORK_NAME = "flowexa_periodic_sync"
 
+    /**
+     * Cancels both unique sync chains. Cancellation is cooperative; callers must still
+     * await [SyncActivity.awaitIdle] before touching Room.
+     */
+    fun cancelSyncWork(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
+        workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
+    }
+
     fun scheduleImmediateSync(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

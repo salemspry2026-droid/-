@@ -5,6 +5,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -21,7 +22,11 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
-import androidx.work.WorkManager
+import com.flowexa.app.domain.LogoutCoordinator
+import com.flowexa.app.domain.LogoutDependencies
+import com.flowexa.app.domain.LogoutPreparation
+import com.flowexa.app.domain.LogoutResult
+import com.flowexa.app.domain.OutboxCounts
 import com.flowexa.app.ui.auth.EmailLinkDialog
 import com.flowexa.app.ui.auth.ProfileRetryScreen
 import com.flowexa.app.auth.GoogleAuthManager
@@ -30,6 +35,7 @@ import com.flowexa.app.data.local.FlowexaDatabase
 import com.flowexa.app.data.local.entity.SyncOperationEntity
 import com.flowexa.app.data.repository.*
 import com.flowexa.app.domain.PermissionManager
+import com.flowexa.app.sync.SyncActivity
 import com.flowexa.app.sync.SyncEngine
 import com.flowexa.app.sync.SyncScheduler
 import com.flowexa.app.ui.admin.AdminHomeScreen
@@ -62,7 +68,11 @@ import com.flowexa.app.ui.products.ProductsScreen
 import com.flowexa.app.ui.settings.CompanySettingsScreen
 import com.flowexa.app.ui.staff.StaffScreen
 import com.flowexa.app.ui.theme.FlowexaBlue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.UUID
@@ -88,6 +98,58 @@ fun FlowexaApp(
     val favoritesRepo = remember { FavoritesRepository(db, context) }
     val syncEngine = remember { SyncEngine(db) }
     val googleAuthManager = remember { GoogleAuthManager(context) }
+
+    // Safe logout state: never discard unsynchronized outbox work silently.
+    var logoutBusy by remember { mutableStateOf(false) }
+    var logoutPrompt by remember { mutableStateOf<LogoutPreparation.NeedsConfirmation?>(null) }
+    var logoutError by remember { mutableStateOf<String?>(null) }
+
+    val logoutCoordinator = remember {
+        LogoutCoordinator(object : LogoutDependencies {
+            override suspend fun outboxCounts(): OutboxCounts = withContext(Dispatchers.IO) {
+                val dao = db.syncOperationDao()
+                OutboxCounts(
+                    pending = dao.countByState(AppConfig.SYNC_STATE_PENDING),
+                    processing = dao.countByState(AppConfig.SYNC_STATE_PROCESSING),
+                    failed = dao.countByState(AppConfig.SYNC_STATE_FAILED)
+                )
+            }
+
+            override suspend fun syncOutbox(): Result<Unit> {
+                SyncEngine.resume()
+                return syncEngine.syncOutbox().fold(
+                    onSuccess = { Result.success(Unit) },
+                    onFailure = { Result.failure(it) }
+                )
+            }
+
+            override suspend fun stopBackgroundSync(): Boolean {
+                if (!SyncEngine.suspendAndAwaitIdle(10_000L)) return false
+                SyncScheduler.cancelSyncWork(context)
+                return SyncActivity.awaitIdle(10_000L)
+            }
+
+            override suspend fun clearLocalData() {
+                withContext(Dispatchers.IO) { db.clearAllTables() }
+            }
+
+            override suspend fun signOut() {
+                authRepo.logout()
+            }
+
+            override fun allowSync() {
+                SyncEngine.resume()
+            }
+
+            override fun resumeSync() {
+                SyncEngine.resume()
+                if (authRepo.currentUser != null) {
+                    SyncScheduler.schedulePeriodicSync(context)
+                    SyncScheduler.scheduleImmediateSync(context)
+                }
+            }
+        })
+    }
 
     // Network Connectivity State
     var isOnline by remember { mutableStateOf(true) }
@@ -146,6 +208,105 @@ fun FlowexaApp(
     var resetSuccess by remember { mutableStateOf(false) }
     var emailLinkSent by remember { mutableStateOf(false) }
     var isProfileRetrying by remember { mutableStateOf(false) }
+
+    suspend fun finishLogout() {
+        logoutPrompt = null
+        logoutBusy = true
+        logoutError = null
+        val result = logoutCoordinator.finalize()
+        logoutBusy = false
+        logoutCoordinator.finish()
+        when (result) {
+            is LogoutResult.Success -> {
+                navController.navigate(Routes.Login.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            is LogoutResult.CleanupFailed -> {
+                // Authentication was not cleared, so stale rows cannot leak to another tenant.
+                logoutError = "تعذر حذف البيانات المحلية، ولم يتم تسجيل الخروج. لم تُحذف أي بيانات إضافية. حاول مرة أخرى."
+            }
+            is LogoutResult.SignOutFailed -> {
+                if (authRepo.currentUser == null) {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                } else {
+                    logoutError = "تم حذف البيانات المحلية لكن تعذر إكمال تسجيل الخروج. حاول مرة أخرى."
+                }
+            }
+        }
+    }
+
+    fun performLogout() {
+        if (logoutBusy) return
+        logoutPrompt = null
+        logoutBusy = true
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) { finishLogout() }
+    }
+
+    suspend fun handlePreparation(preparation: LogoutPreparation) {
+        logoutBusy = false
+        when (preparation) {
+            is LogoutPreparation.Ready -> finishLogout()
+            is LogoutPreparation.NeedsConfirmation -> logoutPrompt = preparation
+            is LogoutPreparation.Blocked -> {
+                logoutPrompt = null
+                logoutCoordinator.abort()
+                logoutError = "تعذر إيقاف المزامنة الجارية بأمان، لذلك لم تُحذف أي بيانات. حاول مرة أخرى."
+            }
+        }
+    }
+
+    fun cancelLogoutPrompt() {
+        logoutPrompt = null
+        logoutCoordinator.abort()
+    }
+
+    fun retryLogout() {
+        if (logoutBusy) return
+        logoutPrompt = null
+        logoutBusy = true
+        logoutError = null
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val preparation = try {
+                logoutCoordinator.prepare()
+            } catch (e: CancellationException) {
+                logoutCoordinator.abort()
+                logoutBusy = false
+                throw e
+            } catch (e: Exception) {
+                logoutPrompt = null
+                logoutCoordinator.abort()
+                logoutBusy = false
+                logoutError = "تعذر التحقق من التغييرات غير المتزامنة. لم تُحذف أي بيانات. حاول مرة أخرى."
+                return@launch
+            }
+            handlePreparation(preparation)
+        }
+    }
+
+    fun beginLogout() {
+        if (logoutBusy || logoutPrompt != null) return
+        if (!logoutCoordinator.tryBegin()) return
+        logoutBusy = true
+        logoutError = null
+        coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val preparation = try {
+                logoutCoordinator.prepare()
+            } catch (e: CancellationException) {
+                logoutCoordinator.abort()
+                logoutBusy = false
+                throw e
+            } catch (e: Exception) {
+                logoutCoordinator.abort()
+                logoutBusy = false
+                logoutError = "تعذر التحقق من التغييرات غير المتزامنة. لم تُحذف أي بيانات. حاول مرة أخرى."
+                return@launch
+            }
+            handlePreparation(preparation)
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: ""
@@ -288,6 +449,57 @@ fun FlowexaApp(
         )
     }
 
+    logoutPrompt?.let { preparation ->
+        val counts = preparation.counts
+        val message = buildString {
+            when (preparation.reason) {
+                LogoutPreparation.Reason.SYNC_FAILED -> append("تعذرت مزامنة بعض التغييرات. ")
+                LogoutPreparation.Reason.INSPECTION_FAILED -> append("تعذر التحقق من التغييرات غير المتزامنة. ")
+                else -> Unit
+            }
+            if (counts != null) {
+                append("لديك ${counts.total} عملية غير متزامنة (قيد الانتظار: ${counts.pending}، قيد المعالجة: ${counts.processing}، فاشلة: ${counts.failed}). ")
+            } else {
+                append("قد توجد تغييرات محلية لم تتم مزامنتها. ")
+            }
+            append("إذا أكدت الخروج، ستُحذف هذه التغييرات المحلية نهائيًا. يمكنك إعادة المحاولة أو إلغاء الخروج بأمان.")
+        }
+        AlertDialog(
+            onDismissRequest = { cancelLogoutPrompt() },
+            title = { Text("تغييرات غير متزامنة") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { performLogout() }) { Text("تأكيد الخروج وحذف التغييرات") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { retryLogout() }) { Text("إعادة المحاولة") }
+                    TextButton(onClick = { cancelLogoutPrompt() }) { Text("إلغاء") }
+                }
+            }
+        )
+    }
+
+    if (logoutBusy) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("تسجيل الخروج") },
+            text = { Text("جارٍ إيقاف المزامنة والتحقق من التغييرات غير المتزامنة...") },
+            confirmButton = {}
+        )
+    }
+
+    logoutError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { logoutError = null },
+            title = { Text("تعذر إكمال تسجيل الخروج") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { logoutError = null }) { Text("حسنًا") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             if (showBars) {
@@ -381,20 +593,7 @@ fun FlowexaApp(
                             }
                         }
                     },
-                    onLogout = {
-                        coroutineScope.launch {
-                            authRepo.logout()
-                            // Clear all local Room data so the next login starts fresh (no stale tenant data).
-                            db.clearAllTables()
-                            // Cancel any pending WorkManager sync jobs.
-                            try {
-                                WorkManager.getInstance(context).cancelAllWork()
-                            } catch (_: Exception) {}
-                            navController.navigate(Routes.Login.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
-                            }
-                        }
-                    }
+                    onLogout = { beginLogout() }
                 )
             }
 
@@ -670,14 +869,7 @@ fun FlowexaApp(
                     onAdministrationClick = if (userProfile?.role == AppConfig.ROLE_OWNER || userProfile?.role == AppConfig.ROLE_ADMIN) {
                         { navController.navigate(Routes.Administration.route) }
                     } else null,
-                    onLogoutClick = {
-                        coroutineScope.launch {
-                            authRepo.logout()
-                            db.clearAllTables()
-                            try { WorkManager.getInstance(context).cancelAllWork() } catch (_: Exception) {}
-                            navController.navigate(Routes.Login.route) { popUpTo(0) { inclusive = true } }
-                        }
-                    },
+                    onLogoutClick = { beginLogout() },
                     displayName = userProfile?.displayName ?: "",
                     roleLabel = when (userProfile?.role) {
                         AppConfig.ROLE_OWNER -> "مالك"
@@ -1233,20 +1425,7 @@ fun FlowexaApp(
                             }
                         }
                     },
-                    onLogout = {
-                        coroutineScope.launch {
-                            authRepo.logout()
-                            // Clear all local Room data so the next login starts fresh (no stale tenant data).
-                            db.clearAllTables()
-                            // Cancel any pending WorkManager sync jobs.
-                            try {
-                                WorkManager.getInstance(context).cancelAllWork()
-                            } catch (_: Exception) {}
-                            navController.navigate(Routes.Login.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        }
-                    }
+                    onLogout = { beginLogout() }
                 )
             }
 
@@ -1271,14 +1450,7 @@ fun FlowexaApp(
                     orders = clientOrders,
                     loadItems = { id -> orderRepo.getOrderItems(id) },
                     onSave = { form -> currentUser?.uid?.let { profileRepo.updateClientProfile(it, form) } },
-                    onLogout = {
-                        coroutineScope.launch {
-                            authRepo.logout()
-                            db.clearAllTables()
-                            try { WorkManager.getInstance(context).cancelAllWork() } catch (_: Exception) {}
-                            navController.navigate(Routes.Login.route) { popUpTo(0) { inclusive = true } }
-                        }
-                    }
+                    onLogout = { beginLogout() }
                 )
             }
 

@@ -10,6 +10,12 @@ on:
       - 'public/.well-known/assetlinks.json'
       - '.github/workflows/build-flowexa-apk.yml'
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish a GitHub Release after validation (default: no)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -303,8 +309,12 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     # The release is published ONLY after build, validation AND runtime smoke test passed.
+    # Routine pushes to main are validation-only. Publishing requires a v* tag push or an
+    # explicit workflow_dispatch with publish_release=true.
     needs: [build-and-validate, runtime-smoke]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: |
+      (github.event_name == 'push' && github.ref_type == 'tag') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 

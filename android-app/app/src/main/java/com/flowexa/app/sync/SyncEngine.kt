@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -56,6 +57,31 @@ class SyncEngine(
 
         @Volatile
         private var inFlight: Deferred<Result<SyncReport>>? = null
+
+        @Volatile
+        private var suspended = false
+
+        /**
+         * Prevents new sync runs and waits (bounded) for the current run to finish.
+         * Returns false if running work could not be proven idle; callers must not clear Room.
+         */
+        suspend fun suspendAndAwaitIdle(timeoutMs: Long = 10_000L): Boolean {
+            val current = singleFlightMutex.withLock {
+                suspended = true
+                inFlight
+            }
+            return current?.let {
+                withTimeoutOrNull(timeoutMs) {
+                    it.join()
+                    true
+                }
+            } ?: true
+        }
+
+        /** Allows sync again after an aborted logout or completed cleanup. */
+        fun resume() {
+            suspended = false
+        }
     }
 
     private val firestore = FirebaseProvider.firestore
@@ -71,21 +97,38 @@ class SyncEngine(
      */
     suspend fun syncOutbox(): Result<SyncReport> {
         val deferred = singleFlightMutex.withLock {
-            val current = inFlight
-            if (current != null && current.isActive) {
-                current
+            if (suspended) {
+                null
             } else {
-                engineScope.async { runSync() }.also { inFlight = it }
+                val current = inFlight
+                if (current != null && current.isActive) {
+                    current
+                } else {
+                    engineScope.async {
+                        SyncActivity.begin()
+                        try {
+                            runSync()
+                        } finally {
+                            SyncActivity.end()
+                        }
+                    }.also { inFlight = it }
+                }
             }
-        }
+        } ?: return Result.failure(IOException("Sync suspended for logout"))
         return deferred.await()
     }
 
     /** Explicitly retries every FAILED operation and then runs a full sync. */
     suspend fun retryFailedOperations(): Result<SyncReport> {
-        database.syncOperationDao().retryAllFailed()
-        singleFlightMutex.withLock { inFlight = null }
-        return syncOutbox()
+        SyncActivity.begin()
+        return try {
+            if (suspended) return Result.failure(IOException("Sync suspended for logout"))
+            database.syncOperationDao().retryAllFailed()
+            singleFlightMutex.withLock { inFlight = null }
+            syncOutbox()
+        } finally {
+            SyncActivity.end()
+        }
     }
 
     suspend fun getDiagnostics(): SyncDiagnostics = withContext(Dispatchers.IO) {
@@ -256,7 +299,11 @@ class SyncEngine(
      * respecting local pending drafts (never overwriting an unsynced local mutation) and applying
      * remote tombstones.
      */
-    suspend fun syncCompanyData(companyId: String, uid: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun syncCompanyData(companyId: String, uid: String): Result<Unit> {
+        SyncActivity.begin()
+        return try {
+            if (suspended) return Result.failure(IOException("Sync suspended for logout"))
+            withContext(Dispatchers.IO) {
         try {
             // 1. Company profile
             val companyDoc = firestore.collection(AppConfig.COL_COMPANIES).document(companyId).get().await()
@@ -391,6 +438,10 @@ class SyncEngine(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+            }
+        } finally {
+            SyncActivity.end()
         }
     }
 
